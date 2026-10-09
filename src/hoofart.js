@@ -25,7 +25,7 @@ const DOME_H = 12;   // how convex the claw reads
 // Cut relief: removed horn sits lower, so cuts get lit walls. About 0.7 mm per logical px,
 // exaggerated a little so a 2 mm step still reads.
 const RELIEF = 1.5 / 0.7;
-const CAVITY_DEPTH = 3.5;  // mm the opened pocket drops below the surrounding sole
+const CAVITY_MAX = 4;      // mm: deepest the opened ulcer core reads below the sole around it
 const ARC_R = 5;           // grinder striation arcs: radius as a multiple of the disc radius
 
 function norm3(x, y, z) {
@@ -259,6 +259,7 @@ export class HoofArt {
       this.drips = [];
       this.bubbles = [];
       this.dirty = null;
+      this.rg = null;
       this.compose(0, 0, this.w, this.h);
       return;
     }
@@ -339,12 +340,21 @@ export class HoofArt {
   // ----------------------------------------------------------------- compose
 
   // Per claw, how far each cell's surface sits below where it started (mm, <= 0): removed
-  // horn, plus the depth of an opened pocket. Padded past the claw's edge so the spline
-  // doesn't read the outline as a cliff.
+  // horn and lifted heel flakes. Padded past the claw's edge so the spline doesn't read the
+  // outline as a cliff. The ulcer core starts thin (corium just under it), so it is measured
+  // against the sole around it instead: flush while capped, a pit once opened.
   reliefGrid() {
     const hoof = this.hoof, n = hoof.n, cols = CFG.grid.cols, cc = this.cellCls;
-    if (!this.rg) this.rg = { 1: new Float32Array(n), 2: new Float32Array(n), ok: new Uint8Array(n), nx: new Uint8Array(n) };
-    const { ok, nx } = this.rg;
+    if (!this.rg) {
+      this.rg = { 1: new Float32Array(n), 2: new Float32Array(n), ok: new Uint8Array(n), nx: new Uint8Array(n) };
+      // Starting level of the sole round the ulcer core: the mean of the loose rim cells.
+      let sum = 0, k = 0;
+      for (let i = 0; i < n; i++) {
+        if (hoof.looseInit[i] === LOOSE.ULCER && !(hoof.zone[i] & Z.ULCER)) { sum += hoof.init[i]; k++; }
+      }
+      this.rg.coreRef = k ? sum / k : 0;
+    }
+    const { ok, nx, coreRef } = this.rg;
     for (const c of [1, 2]) {
       const a = this.rg[c];
       for (let i = 0; i < n; i++) {
@@ -352,8 +362,11 @@ export class HoofArt {
         if (!ok[i]) { a[i] = 0; continue; }
         let v = hoof.thick[i] - hoof.init[i];
         const lg = hoof.looseInit[i];
-        if (lg === LOOSE.ULCER) v -= CAVITY_DEPTH * (1 - this.looseF[i]);
-        else if (lg === LOOSE.HEEL) v -= 1.2 * (1 - this.looseF[i]);
+        if (hoof.zone[i] & Z.ULCER) {
+          // Capped: let the padding below carry the surrounding level across it.
+          if (hoof.loose[i]) { ok[i] = 0; continue; }
+          v = Math.max(-CAVITY_MAX, hoof.thick[i] - coreRef);
+        } else if (lg === LOOSE.HEEL) v -= 1.2 * (1 - this.looseF[i]);
         a[i] = v;
       }
       for (let round = 0; round < 3; round++) {
@@ -461,14 +474,23 @@ export class HoofArt {
         let sheen = 1;
 
         if (c >= 3) {
-          // Overgrown dead toe horn: stained, layered, and gone once nipped.
-          if (t + (ngr - 0.5) * 1.6 < 1.3) { d[o + 3] = 0; continue; }
+          // Overgrown dead toe horn: stained, layered, and gone once nipped. The edge sits
+          // midway between a kept and a nipped cell and is torn with noise, so leftover
+          // stubs break off raggedly instead of showing the cell grid.
+          const kept = t / Math.max(0.5, sm(init));
+          const tear = 0.5 + (ncv - 0.5) * 0.7 + (ngr - 0.5) * 0.18;
+          if (kept < tear) { d[o + 3] = 0; continue; }
           // Kept dark and cool (slate-brown) so it reads against the warm straw floor.
           const layer = 0.5 + 0.5 * Math.sin(e * 1.15 + ns * 9);
           R = 78 - 22 * layer + 16 * ngr; G = 70 - 20 * layer + 14 * ngr; B = 62 - 14 * layer + 12 * ngr;
           if (e < 1.6) { R *= 0.35; G *= 0.35; B *= 0.38; }
           else if (e < wallW) { R *= 0.6; G *= 0.6; B *= 0.62; }
           else if (e < wallW + 1.5) { R += 26; G += 24; B += 22; }
+          // Where the jaws went through, the fresh cross-section shows paler horn.
+          if (kept < 0.97) {
+            const face = smoothstep(tear + 0.16, tear + 0.03, kept);
+            R += (150 + 20 * ngr - R) * face; G += (136 + 18 * ngr - G) * face; B += (108 + 14 * ngr - B) * face;
+          }
         } else {
           const ti = sm(init), r = sm(rough);
           const removed = ti - t;
@@ -531,7 +553,8 @@ export class HoofArt {
             lf = sm(looseF);
             const holeR = 2.1 + ncv * 1.1;
             if (dL < holeR * 2.4) {
-              const halo = smoothstep(holeR * 2.4, holeR, dL) * 0.35;
+              // The bruised ring round the hole goes with the cap once the pocket is opened.
+              const halo = smoothstep(holeR * 2.4, holeR, dL) * 0.35 * smoothstep(0.4, 0.9, lf);
               R *= 1 - halo; G *= 1 - halo * 1.05; B *= 1 - halo * 1.1;
             }
             if (dL < holeR) {
@@ -592,19 +615,23 @@ export class HoofArt {
               // pits between them. Noise contours, not rings, so no two flaps are the same.
               const ls = nStreak[p] / 255;
               const flap = smoothstep(0.46, 0.6, ncv * 0.7 + ls * 0.3);
-              let cr = 176 + 58 * flap, cg = 146 + 70 * flap, cb = 140 + 44 * flap;
-              const pit = smoothstep(0.3, 0.2, ncv);
-              cr += (78 - cr) * pit; cg += (50 - cg) * pit; cb += (62 - cb) * pit;
+              let cr = 126 + 96 * flap, cg = 96 + 112 * flap, cb = 92 + 82 * flap;
+              // Pits only in the deepest noise troughs, so they stay small and scattered.
+              const pit = smoothstep(0.26, 0.15, ncv) * 0.85;
+              cr += (92 - cr) * pit; cg += (60 - cg) * pit; cb += (68 - cb) * pit;
               // Flap edges catch a bright rim.
               const fe = smoothstep(0.4, 0.5, ncv * 0.7 + ls * 0.3) * (1 - flap);
               cr += 40 * fe; cg += 36 * fe; cb += 30 * fe;
               // The corium shows pink-red at the very centre.
               const core = smoothstep(0.55, 0.25, u + (ncv - 0.5) * 0.4);
               cr += (198 - 40 * ngr - cr) * core; cg += (92 - 30 * ngr - cg) * core; cb += (100 - 28 * ngr - cb) * core;
-              // Inner shadow: the rim of horn on the lamp side overhangs the hole.
+              // Walls: the rim of horn on the lamp side overhangs the hole and shades it,
+              // while the far wall faces the lamp and shows a band of pale cut horn.
               const sh = looseAt(lx - 1.7, ly - 2.4);
-              const dk = (1 - 0.5 * sh) * (0.8 + 0.2 * Math.min(1, u));
+              const dk = (1 - 0.55 * sh) * (0.8 + 0.2 * Math.min(1, u));
               cr *= dk; cg *= dk; cb *= dk;
+              const fw = smoothstep(0.35, 0.8, looseAt(lx + 1.3, ly + 1.8)) * (1 - sh);
+              cr += (236 - 10 * ngr - cr) * fw * 0.8; cg += (206 - 10 * ngr - cg) * fw * 0.8; cb += (186 - 8 * ngr - cb) * fw * 0.8;
               // Antiseptic pools in the crevices and stains the rest only faintly.
               const tn = sm(tint) * (0.18 + 0.7 * smoothstep(0.5, 0.25, ncv));
               cr += (96 - cr) * tn * 0.75; cg += (196 - cg) * tn * 0.75; cb += (164 - cb) * tn * 0.75;

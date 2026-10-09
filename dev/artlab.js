@@ -1,14 +1,16 @@
 // Dev-only art lab: replays scripted tool work on fresh hoofs and draws each stage large,
 // so texture and cut edges can be judged side by side. Not loaded by the game.
 
-import { Hoof, CLAW } from '../src/hoof.js';
+import { Hoof, CLAW, Z } from '../src/hoof.js';
+import { CFG } from '../src/config.js';
 import { CASE_B } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
 import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
 
 const CROP = { x: 24, y: 165, w: 352, h: 480 };
-// ?focus=lesion crops a close-up around the ulcer.
-if (new URLSearchParams(location.search).get('focus') === 'lesion') Object.assign(CROP, { x: 132, y: 248, w: 80, h: 80 });
+// ?focus=lesion crops a close-up around the ulcer; ?focus=toe the nipped toe tips.
+const FOCUS = { lesion: { x: 132, y: 248, w: 80, h: 80 }, toe: { x: 70, y: 500, w: 260, h: 130 } };
+Object.assign(CROP, FOCUS[new URLSearchParams(location.search).get('focus')] || {});
 // ?stage=2 renders one stage; ?zoom=2 draws larger.
 const Q = new URLSearchParams(location.search);
 const ZOOM = Number(Q.get('zoom')) || 1.225;
@@ -50,9 +52,16 @@ function session() {
       for (let y = 180; y < 640; y += 14) s.drag('brush', [[30, y], [370, y + 6], [30, y + 12]], 900);
       return s;
     },
+    // Nip each column from the tip back, stopping before the jaws' core would reach live horn.
     nip() {
-      for (const x of [158, 242, 128, 272, 100, 300, 190, 210]) {
-        for (let y = 640; y >= 560; y -= 10) applyBite(hoof, x, y);
+      const core = CFG.tools.nippers.radius * CFG.tools.nippers.liveCore;
+      const touchesLive = (x, y) => {
+        let live = false;
+        hoof.stamp(x, y, core, (i) => { if (!(hoof.zone[i] & Z.DEAD)) live = true; });
+        return live;
+      };
+      for (const x of [158, 242, 128, 272, 100, 300, 190, 210, 80, 320, 70, 330, 112, 288, 143, 257, 174, 226]) {
+        for (let y = 640; y >= 520 && !touchesLive(x, y); y -= 6) applyBite(hoof, x, y);
       }
       art.sync(hoof);
       return s;
@@ -97,6 +106,7 @@ const t0 = performance.now();
 STAGES.forEach(([name, make], k) => {
   if (ONLY >= 0 && k !== ONLY) return;
   const s = make();
+  (window.lab ||= [])[k] = s;
   const cv = document.createElement('canvas');
   const dpr = window.devicePixelRatio || 1;
   cv.width = Math.round(CROP.w * ZOOM * dpr);
