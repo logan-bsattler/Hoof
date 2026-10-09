@@ -72,11 +72,14 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 | Area | Implementation |
 |---|---|
 | Hoof model | 84×120 cell grid over two claws; per-cell sole thickness, mud, roughness, loose horn, blood; zones for wall, white line, heel, dish, toe triangle, ulcer, dead toe |
-| Tools | 7 of 8: brush, testers, nippers, grinder, knife, rasp, block (spray deferred) |
-| Gestures | Stroke (brush/knife/rasp), press-hold-glide (grinder), tap/drag bite (nippers), tap (testers/block) |
+| Tools | 9: brush, testers, nippers, grinder, knife, rasp, block, spray bottle, pad + wrap |
+| Gestures | Scrub (brush/rasp), press-hold-pull strip (knife), press-hold-glide (grinder/spray), tip-first tap/drag bite (nippers; all-or-nothing per bite), tap (testers/block/pad + wrap) |
+| View | Sole facing the camera, heel bulbs at the top, toes pointing down (the trimmer's view in the chute) |
+| Guided run | Optional coached first trim: 13 beats, each with a tool, an on-hoof target outline, one instruction and a progress bar |
+| Treatment | Flush the opened ulcer with the spray, then pad and wrap it; fresh paring washes out the flush |
 | Reveal | Mud hides the bruise-coloured ulcer patch until scrubbed |
 | Diagnosis | Testers spring on the lesion, then you pick from 4 diagnoses; wrong picks are explained |
-| Steps | Live checklist with per-step narrator tips and a suggested tool |
+| Steps | Live checklist (clean, read, five steps, finish, treat) with per-step tips and a suggested tool |
 | Feedback | Thickness colour ramp, mm gauge, balance beam, toe-length gauges, near-target resistance, thin-sole warnings |
 | Hard fail | Any living cell cut to 0 mm: flinch, moo, blood, case failed |
 | Scoring | Weighted 4-part score + teaching notes; gait (sound/tender/lame) drives the walk-off |
@@ -91,8 +94,8 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 
 ### Next up
 
-1. Case A tutorial (overgrowth only, apprentice tools) and Case C (embedded screw).
+1. Case A (overgrowth only, apprentice tools) and Case C (embedded screw); per-tool practice drills.
 2. Case select + farm visit (3–5 cases) + herd mobility score.
-3. Art pass: layered horn rendering, better lesion visuals, real cow sprite.
+3. Art: real cow sprite (the layered horn renderer is done; see docs/ART-DIRECTION.md).
 4. Recorded ASMR audio + optional narrator.
 5. Capacitor wrap for iOS/Android; haptics via native plugin.
