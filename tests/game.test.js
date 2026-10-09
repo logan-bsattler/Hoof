@@ -240,3 +240,14 @@ test('guided run starts at cleaning, tracks progress, and finishes on an ideal t
   t.update(h.metrics(), idealSession(), h);
   assert.equal(t.finished, true);
 });
+
+test('the block does not lock out the loose heel horn or the rasp step', () => {
+  const h = new Hoof(CASE_B);
+  h.block = CLAW.INNER;
+  const H = CASE_B.looseHorn;
+  const ev = applyStroke(h, 'knife', H.x, H.y, 4);
+  assert.ok(ev.loose[LOOSE.HEEL] > 0, 'knife reaches the heel horn on the blocked claw');
+  // Rough inner sole under the block, smooth outer sole: the finish step only sees the outer.
+  for (let i = 0; i < h.n; i++) if (h.claw[i]) h.rough[i] = h.claw[i] === CLAW.INNER ? 1 : 0;
+  assert.ok(h.metrics().roughMean < 0.15, 'horn under the block no longer counts toward finish');
+});

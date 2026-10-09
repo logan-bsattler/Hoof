@@ -312,7 +312,8 @@ export class Hoof {
       }
 
       if (z & Z.ULCER) continue;
-      if (!(z & Z.HEEL)) {
+      // Horn under the block can't be rasped, and no longer needs to be.
+      if (!(z & Z.HEEL) && !(this.block && c === this.block)) {
         m.roughSum += this.rough[i];
         m.roughN++;
       }

@@ -93,7 +93,8 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist) {
 function blocked(hoof, i, ev) {
   const c = hoof.claw[i];
   const covered = (hoof.block && c === hoof.block) || (hoof.wrap && c === hoof.wrapClaw);
-  if (covered && (hoof.zone[i] & Z.LIVE)) {
+  // The block and wrap cover the sole; the heel bulb behind them stays workable.
+  if (covered && (hoof.zone[i] & Z.LIVE) && !(hoof.zone[i] & Z.HEEL)) {
     ev.blockedSkip = true;
     return true;
   }
