@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, Z, CLAW, LOOSE } from '../src/hoof.js';
+import { Hoof, Z, CLAW, LOOSE, GEOM } from '../src/hoof.js';
 import { CASE_B } from '../src/case.js';
-import { applyStroke, applyGrind, applyBite } from '../src/tools.js';
+import { applyStroke, applyGrind, applyBite, applySpray, applyWrap } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase } from '../src/scoring.js';
 
@@ -22,7 +22,16 @@ function idealTrim(hoof) {
     hoof.thick[i] = z & Z.DISH ? D : T;
     hoof.rough[i] = 0;
   }
+  for (let i = 0; i < hoof.n; i++) if (hoof.looseInit[i] === LOOSE.ULCER) hoof.tint[i] = 1;
   hoof.block = CLAW.INNER;
+  hoof.wrap = 2;
+  hoof.wrapClaw = CLAW.OUTER;
+}
+
+// Centre of the first cell matching a predicate.
+function findCell(hoof, pred) {
+  for (let i = 0; i < hoof.n; i++) if (hoof.claw[i] && pred(i)) return [hoof.cellX(i), hoof.cellY(i)];
+  throw new Error('no matching cell');
 }
 
 function idealSession() {
@@ -56,7 +65,8 @@ test('lingering with the grinder draws blood', () => {
 
 test('nippers remove dead toe horn entirely', () => {
   const h = new Hoof(CASE_B);
-  const ev = applyBite(h, 222, 170);
+  const [x, y] = findCell(h, (i) => (h.zone[i] & Z.DEAD) && h.claw[i] === CLAW.INNER && h.cellY(i) > 600);
+  const ev = applyBite(h, x, y);
   assert.ok(ev.dead > 0);
   assert.equal(ev.blood, false);
 });
@@ -139,4 +149,61 @@ test('over-trimming scores lower than trimming to target', () => {
   const rOver = scoreCase(over.metrics(), idealSession(), over, CASE_B);
   assert.ok(rOver.total < rGood.total - 10, `${rOver.total} vs ${rGood.total}`);
   assert.ok(rOver.notes.some((n) => n.includes('over-trimmed')));
+});
+
+test('foot is presented heels-up: heel bulbs at the top, overgrown toes at the bottom', () => {
+  const h = new Hoof(CASE_B);
+  let heelY = 0, heelN = 0, deadY = 0, deadN = 0;
+  for (let i = 0; i < h.n; i++) {
+    if (h.zone[i] & Z.HEEL) { heelY += h.cellY(i); heelN++; }
+    if (h.zone[i] & Z.DEAD) { deadY += h.cellY(i); deadN++; }
+  }
+  assert.ok(heelY / heelN < GEOM.heelY && deadY / deadN > GEOM.triY);
+  assert.ok(CASE_B.lesion.y < GEOM.dishY1, 'ulcer sits at the sole/heel junction, near the top');
+});
+
+test('spray soaks the opened ulcer, and paring washes it out again', () => {
+  const h = new Hoof(CASE_B);
+  const L = CASE_B.lesion;
+  for (let i = 0; i < h.n; i++) if (h.looseInit[i] === LOOSE.ULCER) h.loose[i] = 0; // opened
+  let ev;
+  for (let k = 0; k < 90; k++) ev = applySpray(h, L.x, L.y, 1 / 60);
+  assert.ok(ev.sprayLesion > 0);
+  const flushed = h.metrics().lesionTint;
+  assert.ok(flushed >= CFG.treat.tintMin, `tint ${flushed}`);
+  for (let k = 0; k < 10; k++) applyStroke(h, 'knife', L.x, L.y + k, 3);
+  assert.ok(h.metrics().lesionTint < flushed, 'paring needs another flush');
+});
+
+test('pad + wrap only goes on a flushed, opened ulcer once the trim is done', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  h.wrap = 0; h.wrapClaw = CLAW.NONE;
+  const m = h.metrics();
+  assert.equal(applyWrap(h, CLAW.INNER, m, true).reason, 'sound');
+  assert.equal(applyWrap(h, CLAW.OUTER, m, false).reason, 'early');
+  assert.equal(applyWrap(h, CLAW.OUTER, m, true).stage, 1);
+  assert.equal(applyWrap(h, CLAW.OUTER, m, true).stage, 2);
+  assert.equal(applyWrap(h, CLAW.OUTER, m, true).reason, 'done');
+  // Wrapped horn can't be cut.
+  const L = CASE_B.lesion;
+  const ev = applyStroke(h, 'knife', L.x, L.y + 40, 5);
+  assert.equal(ev.removed, 0);
+  assert.ok(ev.blockedSkip);
+
+  const raw = new Hoof(CASE_B);
+  assert.equal(applyWrap(raw, CLAW.OUTER, raw.metrics(), true).reason, 'closed');
+});
+
+test('an untreated ulcer leaves the treat step open and costs correctness', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  h.wrap = 0;
+  const s = idealSession();
+  const m = h.metrics();
+  const { status } = evaluateSteps(m, s, h, 1);
+  assert.equal(status.find((x) => x.id === 'treat').done, false);
+  const r = scoreCase(m, s, h, CASE_B);
+  assert.ok(r.parts.correctness <= 90);
+  assert.ok(r.notes.some((n) => n.includes('untreated')));
 });

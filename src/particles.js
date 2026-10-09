@@ -1,5 +1,5 @@
-// Lightweight particle system: horn shavings, mud clods, grinder dust,
-// loose-horn flakes, the pressure-release puff, and blood droplets.
+// Lightweight particle system: translucent horn curls, manure clods and straw,
+// grinder dust, loose-horn flakes, spray mist, the release puff, and blood.
 
 const R = (a, b) => a + Math.random() * (b - a);
 
@@ -12,6 +12,8 @@ const KINDS = {
   puff:    { life: [0.7, 1.1], vx: 30, vy: [-40, -10], g: -10, size: [6, 12], drag: 1.5 },
   blood:   { life: [0.8, 1.2], vx: 60, vy: [-120, -40], g: 500, size: [2, 4], drag: 0.3 },
   spark:   { life: [0.6, 1.0], vx: 40, vy: [-90, -40], g: -20, size: [2, 4], drag: 1 },
+  straw:   { life: [0.8, 1.3], vx: 90, vy: [-120, -40], g: 380, size: [5, 12], drag: 0.8 },
+  mist:    { life: [0.25, 0.5], vx: 25, vy: [-25, 25], g: 30, size: [0.6, 1.6], drag: 3 },
 };
 
 export class Particles {
@@ -19,14 +21,17 @@ export class Particles {
     this.list = [];
   }
 
-  spawn(kind, x, y, color, count = 1) {
+  // `dir` optionally throws the particles along a velocity (e.g. grinder dust, spray).
+  spawn(kind, x, y, color, count = 1, dir = null) {
     const k = KINDS[kind];
     for (let n = 0; n < count; n++) {
-      if (this.list.length > 600) this.list.shift();
+      if (this.list.length > 900) this.list.shift();
       const life = R(...k.life);
+      const spread = dir ? 0.35 : 1;
       this.list.push({
         kind, x: x + R(-4, 4), y: y + R(-4, 4),
-        vx: R(-k.vx, k.vx), vy: R(...k.vy),
+        vx: R(-k.vx, k.vx) * spread + (dir ? dir[0] * R(0.6, 1.3) : 0),
+        vy: (dir ? R(-k.vx, k.vx) * spread + dir[1] * R(0.6, 1.3) : R(...k.vy)),
         g: k.g, drag: k.drag, life, max: life,
         size: R(...k.size), rot: R(0, Math.PI * 2), vr: R(-8, 8), color,
       });
@@ -54,14 +59,41 @@ export class Particles {
       ctx.rotate(p.rot);
       switch (p.kind) {
         case 'shaving':
-        case 'flake':
-          // A curled ribbon of horn: the "forbidden parmesan".
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = p.kind === 'flake' ? 3 : 2;
+        case 'flake': {
+          // A thin, translucent curl of horn: the "forbidden parmesan".
+          const wd = p.kind === 'flake' ? 3.4 : 2.2;
           ctx.lineCap = 'round';
+          ctx.globalAlpha = a * 0.75;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = wd;
           ctx.beginPath();
           ctx.arc(0, 0, p.size / 2, 0, Math.PI * 1.5);
           ctx.stroke();
+          ctx.globalAlpha = a * 0.9;
+          ctx.strokeStyle = 'rgba(255,255,250,0.8)';
+          ctx.lineWidth = wd * 0.3;
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2 - wd * 0.2, 0.2, Math.PI * 1.1);
+          ctx.stroke();
+          break;
+        }
+        case 'straw':
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 0.9;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-p.size / 2, 0); ctx.quadraticCurveTo(0, 1.2, p.size / 2, 0);
+          ctx.stroke();
+          break;
+        case 'mud':
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.size, p.size * 0.75, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,240,210,0.35)';
+          ctx.beginPath();
+          ctx.arc(-p.size * 0.3, -p.size * 0.3, p.size * 0.28, 0, Math.PI * 2);
+          ctx.fill();
           break;
         case 'chunk':
           ctx.fillStyle = p.color;

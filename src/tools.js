@@ -34,6 +34,14 @@ export const TOOLS = {
     name: 'Block + glue', icon: '🧱', mode: 'tap', key: '7',
     hint: 'Tap a claw to glue on the block. It goes on the sound claw.',
   },
+  spray: {
+    name: 'Spray bottle', icon: '🧴', mode: 'hold', key: '8',
+    hint: 'Hold to flush the opened lesion. Flush, pare, flush: fresh cuts need another rinse.',
+  },
+  wrap: {
+    name: 'Pad + wrap', icon: '🩹', mode: 'tap', key: '9',
+    hint: 'The last beat. Tap the treated claw: white pad first, then the pink wrap.',
+  },
 };
 
 export const TOOL_ORDER = Object.keys(TOOLS);
@@ -48,6 +56,7 @@ function newEvents() {
     loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0 },
     blood: false, thin: false, lesionCut: false, grinderLesion: false,
     dirtyCut: false, nipLive: false, blockedSkip: false, claws: new Set(),
+    sprayed: 0, sprayLesion: 0,
   };
 }
 
@@ -82,7 +91,9 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist) {
 }
 
 function blocked(hoof, i, ev) {
-  if (hoof.block && hoof.claw[i] === hoof.block && (hoof.zone[i] & Z.LIVE)) {
+  const c = hoof.claw[i];
+  const covered = (hoof.block && c === hoof.block) || (hoof.wrap && c === hoof.wrapClaw);
+  if (covered && (hoof.zone[i] & Z.LIVE)) {
     ev.blockedSkip = true;
     return true;
   }
@@ -110,6 +121,8 @@ export function applyStroke(hoof, tool, x, y, dist) {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       if (blocked(hoof, i, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
+      // Fresh cuts expose untreated tissue: the flush has to be repeated.
+      hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * dist * f);
       if (clearLoose(hoof, i, ev)) return;
       const d = cut(hoof, i, cfg.rate * dist * f, ev, cfg.resist);
       // A clean knife pass leaves a smooth surface.
@@ -162,4 +175,37 @@ export function applyBite(hoof, x, y) {
     hoof.rough[i] = 0.9;
   });
   return ev;
+}
+
+// Spray bottle: held like the grinder. Soaks antiseptic into opened tissue
+// (and a little into horn), and rinses residual muck.
+export function applySpray(hoof, x, y, dt) {
+  const ev = newEvents();
+  const cfg = CFG.tools.spray;
+  hoof.stamp(x, y, cfg.radius, (i, f) => {
+    if (blocked(hoof, i, ev)) return;
+    hoof.mud[i] = Math.max(0, hoof.mud[i] - cfg.rinse * dt * f);
+    const opened = hoof.looseInit[i] === LOOSE.ULCER && !hoof.loose[i];
+    const a = Math.min(1 - hoof.tint[i], (opened ? cfg.rate : cfg.hornRate) * dt * f);
+    hoof.tint[i] += a;
+    ev.sprayed += a;
+    if (opened) ev.sprayLesion += a;
+  });
+  return ev;
+}
+
+// Pad + wrap: one tap pads the treated claw, the next wraps it.
+// `m` is the current metrics; `ready` is true once the trim itself is finished.
+// Returns { ok, stage } or { ok: false, reason }.
+export function applyWrap(hoof, claw, m, ready) {
+  const L = hoof.caseDef.lesion;
+  if (!claw) return { ok: false, reason: 'miss' };
+  if (claw !== L.claw) return { ok: false, reason: 'sound' };
+  if (hoof.wrap >= 2) return { ok: false, reason: 'done' };
+  if (m.looseRemain[LOOSE.ULCER] > 0.1) return { ok: false, reason: 'closed' };
+  if (m.lesionTint < CFG.treat.tintMin) return { ok: false, reason: 'unflushed' };
+  if (!ready) return { ok: false, reason: 'early' };
+  hoof.wrapClaw = claw;
+  hoof.wrap++;
+  return { ok: true, stage: hoof.wrap };
 }

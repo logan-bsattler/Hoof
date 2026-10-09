@@ -1,68 +1,31 @@
-// Canvas rendering for the trimming scene: barn backdrop, the hoof (from the
-// simulation grid), guided lines, the block, the balance beam, and cursors.
+// Scene composition for the trimming view: backdrop, contact shadows, the layered
+// hoof material (hoofart.js), strap, block and dressings, guides, HUD and the tool in hand.
 
 import { CFG } from './config.js';
-import { Z, CLAW, LOOSE, clawPolygon, toeLine } from './hoof.js';
+import { Z, CLAW, GEOM, clawPolygon, toeLine } from './hoof.js';
 import { toolRadius } from './tools.js';
+import { HoofArt } from './hoofart.js';
+import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
+import {
+  drawKnife, drawGrinder, drawBrush, drawNippers, drawRasp, drawTesters, drawSpray,
+  drawWrapRoll, drawBlock, drawPad, drawWrap,
+} from './toolart.js';
 
 const { w: W, h: H } = CFG.view;
-const lerp = (a, b, t) => a + (b - a) * t;
-const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
-
-// Horn colour by remaining sole thickness: pink when thin, cream at target,
-// weathered yellow-brown when overgrown.
-const HORN = [
-  [0, [200, 40, 50]], [1, [214, 120, 120]], [3, [232, 178, 162]],
-  [5, [238, 212, 186]], [7, [236, 222, 190]], [8.5, [212, 186, 136]],
-  [11, [168, 138, 92]], [15, [132, 106, 72]],
-];
-function hornColor(t) {
-  if (t <= HORN[0][0]) return HORN[0][1];
-  for (let k = 1; k < HORN.length; k++) {
-    if (t <= HORN[k][0]) {
-      const [t0, c0] = HORN[k - 1];
-      const [t1, c1] = HORN[k];
-      return mix(c0, c1, (t - t0) / (t1 - t0));
-    }
-  }
-  return HORN[HORN.length - 1][1];
-}
-
-const MUD_A = [70, 50, 32];
-const MUD_B = [108, 82, 54];
-const DEAD = [118, 96, 66];
-const HEEL = [196, 168, 156];
-const BRUISE = [92, 58, 46];
-const ULCER = [158, 44, 50];
-const BLOOD = [190, 14, 26];
-const LOOSE_C = [214, 196, 158];
+const CLAWS = [CLAW.OUTER, CLAW.INNER];
 
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    const g = CFG.grid;
-    this.grid = document.createElement('canvas');
-    this.grid.width = g.cols;
-    this.grid.height = g.rows;
-    this.gctx = this.grid.getContext('2d');
-    this.img = this.gctx.createImageData(g.cols, g.rows);
-    this.grain = this.makeGrain();
     this.k = 1;
-  }
-
-  makeGrain() {
-    const c = document.createElement('canvas');
-    c.width = c.height = 128;
-    const x = c.getContext('2d');
-    const d = x.createImageData(128, 128);
-    for (let i = 0; i < d.data.length; i += 4) {
-      const v = Math.random() * 255;
-      d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
-      d.data[i + 3] = 40;
-    }
-    x.putImageData(d, 0, 0);
-    return this.ctx.createPattern(c, 'repeat');
+    this.art = null;
+    this.scenery = null;
+    this.shadows = null;
+    // Tool-in-hand state driven by the game loop.
+    this.fx = { ang: 0.7, spin: 0, grindOn: false, biteT: 0, squeezeT: 0 };
+    this.placed = { block: -9, pad: -9, wrap: -9 };
+    this.time = 0;
   }
 
   resize(cssW, cssH, dpr) {
@@ -70,7 +33,16 @@ export class Renderer {
     this.canvas.style.height = `${cssH}px`;
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
-    this.k = (cssW * dpr) / W;
+    const k = (cssW * dpr) / W;
+    if (!k || !isFinite(k)) return;
+    this.k = k;
+    // Hoof buffers are sized once: 2× logical, 3× on dense screens.
+    this.scenery = paintScenery(k);
+    this.shadows = {};
+    for (const c of CLAWS) {
+      this.shadows[c] = shadowSprite(clawPolygon(c), k);
+      this.shadows[c + 2] = shadowSprite(clawPolygon(c, true), k);
+    }
   }
 
   begin(shake = 0) {
@@ -79,137 +51,81 @@ export class Renderer {
     if (shake > 0) c.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   }
 
+  update(dt) {
+    this.time += dt;
+    const f = this.fx;
+    if (f.grindOn) f.spin += dt * 30;
+    f.biteT = Math.max(0, f.biteT - dt * 5);
+    f.squeezeT = Math.max(0, f.squeezeT - dt * 4);
+    this.art?.update(dt);
+  }
+
+  // A tool moved across the hoof: steer the sprite and record striations.
+  stroke(tool, x, y, dx, dy) {
+    if (Math.hypot(dx, dy) > 0.5) {
+      const d = Math.atan2(dy, dx) - this.fx.ang;
+      this.fx.ang += Math.atan2(Math.sin(d), Math.cos(d)) * 0.25;
+    }
+    this.art?.mark(tool, x, y, dx, dy, toolRadius(tool));
+  }
+
   background() {
     const c = this.ctx;
-    const bg = c.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#2a1f17');
-    bg.addColorStop(1, '#16100c');
-    c.fillStyle = bg;
+    c.fillStyle = '#16120f';
     c.fillRect(-20, -20, W + 40, H + 40);
-    // Barn planks.
-    c.strokeStyle = 'rgba(0,0,0,0.25)';
-    c.lineWidth = 1;
-    for (let x = 0; x < W; x += 50) {
-      c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke();
-    }
-    // Work light on the hoof.
-    const sp = c.createRadialGradient(200, 400, 30, 200, 400, 330);
-    sp.addColorStop(0, 'rgba(255,226,170,0.20)');
-    sp.addColorStop(1, 'rgba(255,226,170,0)');
-    c.fillStyle = sp;
-    c.fillRect(0, 0, W, H);
+    if (this.scenery) c.drawImage(this.scenery, 0, 0, W, H);
   }
 
-  // The leg and dewclaws behind the heel bulbs.
-  leg() {
+  hoof(hoof, diagnosed, m) {
     const c = this.ctx;
-    c.save();
-    c.fillStyle = '#231d1a';
-    c.beginPath();
-    c.ellipse(200, 690, 190, 130, 0, Math.PI, 0);
-    c.fill();
-    c.fillStyle = '#e9e4da';
-    c.beginPath();
-    c.ellipse(285, 668, 60, 34, -0.3, 0, Math.PI * 2);
-    c.ellipse(95, 705, 50, 30, 0.4, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#3a2f28';
-    for (const x of [150, 250]) {
-      c.beginPath();
-      c.ellipse(x, 640, 16, 11, 0, 0, Math.PI * 2);
-      c.fill();
+    // Created on first draw: the first resize can fire before layout gives the canvas a size.
+    if (!this.art) this.art = new HoofArt(this.k >= 2.6 ? 3 : 2);
+    this.art.sync(hoof);
+    // Contact shadows give each claw weight against the chute.
+    for (const claw of CLAWS) {
+      const dead = m ? m.claws[claw].deadRemain : 1;
+      if (!this.shadows) break;
+      this.shadow(this.shadows[claw], 0.65);
+      if (dead > 0.02) this.shadow(this.shadows[claw + 2], 0.65 * dead);
     }
-    c.restore();
-  }
-
-  hoof(hoof, diagnosed) {
-    const d = this.img.data;
-    const n = hoof.n;
-    for (let i = 0; i < n; i++) {
-      const p = i * 4;
-      const c = hoof.claw[i];
-      if (!c) { d[p + 3] = 0; continue; }
-      const z = hoof.zone[i];
-      const t = hoof.thick[i];
-      const nz = hoof.noise[i];
-      let col;
-
-      if (z & Z.DEAD) {
-        if (t <= 0.05) { d[p + 3] = 0; continue; }
-        col = mix(DEAD, [86, 70, 50], 0.5 + nz * 0.5);
-      } else if (hoof.blood[i]) {
-        col = BLOOD;
-      } else if (z & Z.ULCER) {
-        col = hoof.loose[i] ? mix(BRUISE, [70, 45, 36], 0.5 + nz * 0.3) : mix(ULCER, [110, 30, 34], 0.4 + nz * 0.4);
-      } else if (hoof.loose[i]) {
-        col = mix(LOOSE_C, [150, 125, 90], nz > 0.35 ? 0.7 : 0.15);
-        if (hoof.looseInit[i] === LOOSE.ULCER) col = mix(col, BRUISE, 0.35);
-      } else if (z & Z.HEEL) {
-        col = mix(HEEL, hornColor(t), 0.25);
-      } else {
-        col = hornColor(t);
-        if (z & Z.WALL) col = mix(col, [150, 132, 104], 0.45);
-        else if (z & Z.WL) col = mix(col, [248, 242, 226], 0.45);
-      }
-      // Texture + roughness (grinder swirls, weathered surface).
-      const shade = 1 + nz * 0.06 - hoof.rough[i] * (0.1 + Math.max(0, nz) * 0.25);
-      col = [col[0] * shade, col[1] * shade, col[2] * shade];
-
-      const mud = hoof.mud[i];
-      if (mud > 0.01) {
-        const mc = mix(MUD_A, MUD_B, 0.5 + nz * 0.5);
-        col = mix(col, mc, Math.min(1, mud * 1.15));
-      }
-      d[p] = col[0]; d[p + 1] = col[1]; d[p + 2] = col[2]; d[p + 3] = 255;
-    }
-    this.gctx.putImageData(this.img, 0, 0);
-
-    const c = this.ctx;
-    const g = CFG.grid;
-    c.save();
-    c.imageSmoothingEnabled = true;
-    c.drawImage(this.grid, g.x0, g.y0, g.cols * g.cell, g.rows * g.cell);
-
-    // Fine grain over the live claws, then a crisp outline.
-    for (const claw of [CLAW.OUTER, CLAW.INNER]) {
-      const pts = clawPolygon(claw);
-      c.save();
-      path(c, pts);
-      c.clip();
-      c.globalCompositeOperation = 'multiply';
-      c.fillStyle = this.grain;
-      c.fillRect(0, 0, W, H);
-      c.restore();
-      path(c, pts);
-      c.strokeStyle = 'rgba(38,24,14,0.85)';
-      c.lineWidth = 2;
-      c.stroke();
-    }
+    this.art.draw(c);
+    drawStrap(c);
 
     // Colour-blind-safe lesion marker once it's been diagnosed.
-    if (diagnosed) {
+    if (diagnosed && hoof.wrap < 1) {
       const L = hoof.caseDef.lesion;
+      c.save();
       c.setLineDash([4, 3]);
       c.strokeStyle = '#ff6b5b';
       c.lineWidth = 1.5;
       c.beginPath();
-      c.arc(L.x, L.y, L.r * 1.9, 0, Math.PI * 2);
+      c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
       c.stroke();
       c.setLineDash([]);
-      c.fillStyle = '#ff6b5b';
       c.font = 'bold 11px system-ui, sans-serif';
       c.textAlign = 'center';
-      c.fillText('▲ ulcer', L.x, L.y - L.r * 1.9 - 4);
+      label(c, 'ulcer ▼', L.x, L.y - L.r * 2.1 - 4, '#ff6b5b');
+      c.restore();
     }
+  }
+
+  shadow(sp, alpha) {
+    const c = this.ctx;
+    c.save();
+    c.globalAlpha = alpha;
+    c.drawImage(sp.img, sp.x + 4, sp.y + 7, sp.w, sp.h);
     c.restore();
   }
 
-  guides(hoof) {
+  weep(x, y, amount) { this.art?.weep(x, y, amount); }
+  sprayDecal(x, y, r, dt) { this.art?.spray(x, y, r, dt); }
+
+  guides() {
     const c = this.ctx;
     c.save();
     c.font = '10px system-ui, sans-serif';
     c.textAlign = 'center';
-    for (const claw of [CLAW.OUTER, CLAW.INNER]) {
+    for (const claw of CLAWS) {
       const mirror = claw === CLAW.OUTER ? (x) => W - x : (x) => x;
 
       // Trim line at the front of the living toe.
@@ -221,71 +137,62 @@ export class Renderer {
       tl.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y)));
       c.stroke();
 
-      // Dish channel.
+      // Dish channel along the axial wall.
       c.strokeStyle = 'rgba(120,190,210,0.9)';
       c.beginPath();
-      roundRect(c, Math.min(mirror(212), mirror(254)), 310, 42, 195, 14);
+      roundRect(c, Math.min(mirror(212), mirror(254)), GEOM.dishY0, 42, GEOM.dishY1 - GEOM.dishY0, 14);
       c.stroke();
 
       // Toe triangle: no-cut.
       c.setLineDash([2, 3]);
       c.strokeStyle = 'rgba(255,107,91,0.9)';
-      path(c, [[209, 300], [242, 300], [242, 222], [222, 199], [211, 240]].map(([x, y]) => [mirror(x), y]));
+      path(c, [[209, 480], [242, 480], [242, 558], [222, 581], [211, 540]].map(([x, y]) => [mirror(x), y]));
       c.stroke();
 
       // Heel line.
-      c.strokeStyle = 'rgba(255,255,255,0.35)';
+      c.strokeStyle = 'rgba(255,255,255,0.45)';
       c.beginPath();
-      c.moveTo(mirror(214), 522); c.lineTo(mirror(345), 522);
+      c.moveTo(mirror(214), GEOM.heelY); c.lineTo(mirror(345), GEOM.heelY);
       c.stroke();
       c.setLineDash([]);
 
-      c.fillStyle = 'rgba(232,190,100,0.95)';
-      c.fillText('trim line', mirror(270), 192);
-      c.fillStyle = 'rgba(120,190,210,0.95)';
-      c.fillText('dish', mirror(233), 304);
-      c.fillStyle = 'rgba(255,107,91,0.95)';
-      c.fillText('no-cut', mirror(226), 262);
-      c.fillStyle = 'rgba(255,255,255,0.55)';
-      c.fillText('heel: leave it', mirror(290), 517);
+      label(c, 'trim line', mirror(272), 606, 'rgba(232,190,100,0.95)');
+      label(c, 'dish', mirror(233), GEOM.dishY0 - 4, 'rgba(120,190,210,0.95)');
+      label(c, 'no-cut', mirror(228), 520, 'rgba(255,107,91,0.95)');
+      label(c, 'heel: leave it', mirror(290), GEOM.heelY + 13, 'rgba(255,255,255,0.8)');
     }
     c.restore();
   }
 
   block(hoof, ghostClaw = 0) {
-    const draw = (claw, alpha) => {
-      const c = this.ctx;
-      const cx = claw === CLAW.OUTER ? W - 282 : 282;
-      c.save();
-      c.globalAlpha = alpha;
-      c.translate(cx, 405);
-      c.fillStyle = '#e8e2d0';
-      c.beginPath(); roundRect(c, -36, -82, 72, 164, 12); c.fill();
-      c.fillStyle = '#a77b4a';
-      c.beginPath(); roundRect(c, -32, -78, 64, 156, 10); c.fill();
-      c.strokeStyle = 'rgba(80,50,25,0.5)';
-      c.lineWidth = 1;
-      for (let x = -24; x <= 24; x += 8) {
-        c.beginPath(); c.moveTo(x, -74); c.bezierCurveTo(x + 4, -20, x - 4, 20, x + 2, 74); c.stroke();
-      }
-      c.fillStyle = 'rgba(255,255,255,0.85)';
-      c.font = 'bold 11px system-ui, sans-serif';
-      c.textAlign = 'center';
-      c.fillText('BLOCK', 0, 4);
-      c.restore();
-    };
-    if (hoof.block) draw(hoof.block, 1);
-    if (ghostClaw && ghostClaw !== hoof.block) draw(ghostClaw, 0.35);
+    const c = this.ctx;
+    const press = Math.min(1, (this.time - this.placed.block) / 0.25);
+    if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block), 1, press);
+    if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw), 0.4, 1);
   }
+
+  // Pad and pink wrap over the treated claw (plus a ghost pad while aiming).
+  dressing(hoof, ghostClaw = 0) {
+    const c = this.ctx;
+    const L = hoof.caseDef.lesion;
+    if (hoof.wrap >= 1) {
+      const pts = clawPolygon(hoof.wrapClaw);
+      drawPad(c, L, pts, Math.min(1, (this.time - this.placed.pad) / 0.2));
+      if (hoof.wrap >= 2) drawWrap(c, pts, 1, Math.min(1, (this.time - this.placed.wrap) / 0.6));
+    } else if (ghostClaw === L.claw) {
+      drawPad(c, L, clawPolygon(L.claw), 0.35);
+    }
+  }
+
+  placedNow(what) { this.placed[what] = this.time; }
 
   labels() {
     const c = this.ctx;
     c.save();
     c.font = 'bold 12px system-ui, sans-serif';
     c.textAlign = 'center';
-    c.fillStyle = 'rgba(241,231,208,0.8)';
-    c.fillText('OUTER claw', 115, 618);
-    c.fillText('INNER claw', 285, 618);
+    label(c, 'OUTER claw', 115, 652, 'rgba(241,231,208,0.9)');
+    label(c, 'INNER claw', 285, 652, 'rgba(241,231,208,0.9)');
     c.restore();
   }
 
@@ -354,32 +261,30 @@ export class Renderer {
     if (!ptr.over && !ptr.down) return;
     const c = this.ctx;
     const r = toolRadius(tool);
+    const f = this.fx;
     c.save();
-    c.strokeStyle = 'rgba(255,255,255,0.7)';
-    c.lineWidth = 1.2;
-    if (tool === 'probe') {
-      c.beginPath();
-      c.moveTo(ptr.x - 9, ptr.y); c.lineTo(ptr.x + 9, ptr.y);
-      c.moveTo(ptr.x, ptr.y - 9); c.lineTo(ptr.x, ptr.y + 9);
-      c.stroke();
-    } else if (r) {
+    // Working-area ring, kept faint: the tool itself carries the feel.
+    if (r && tool !== 'grinder') {
+      c.strokeStyle = 'rgba(255,255,255,0.35)';
+      c.lineWidth = 1;
       c.beginPath();
       c.arc(ptr.x, ptr.y, r, 0, Math.PI * 2);
       c.stroke();
-      if (tool === 'grinder' && ptr.down) {
-        c.strokeStyle = 'rgba(255,255,255,0.45)';
-        for (let a = 0; a < 6; a++) {
-          const th = time * 30 + (a * Math.PI) / 3;
-          c.beginPath();
-          c.moveTo(ptr.x + Math.cos(th) * r * 0.3, ptr.y + Math.sin(th) * r * 0.3);
-          c.lineTo(ptr.x + Math.cos(th) * r * 0.9, ptr.y + Math.sin(th) * r * 0.9);
-          c.stroke();
-        }
-      }
+    }
+    switch (tool) {
+      case 'knife': drawKnife(c, ptr.x, ptr.y, f.ang); break;
+      case 'grinder': drawGrinder(c, ptr.x, ptr.y, f.spin, ptr.down, r); break;
+      case 'brush': drawBrush(c, ptr.x, ptr.y, 0.5 + Math.sin(f.ang) * 0.2); break;
+      case 'nippers': drawNippers(c, ptr.x, ptr.y, 1 - f.biteT); break;
+      case 'rasp': drawRasp(c, ptr.x, ptr.y, f.ang); break;
+      case 'probe': drawTesters(c, ptr.x, ptr.y, f.squeezeT); break;
+      case 'spray': drawSpray(c, ptr.x, ptr.y, ptr.down, time); break;
+      case 'wrap': drawWrapRoll(c, ptr.x, ptr.y); break;
+      default: break;
     }
 
     // Thickness readout: the trimmer's gauge.
-    if (guides && tool !== 'block' && tool !== 'brush') {
+    if (guides && !['block', 'brush', 'spray', 'wrap'].includes(tool)) {
       const i = hoof.cellAt(ptr.x, ptr.y);
       if (i >= 0 && (hoof.zone[i] & Z.LIVE) && !(hoof.zone[i] & Z.ULCER)) {
         const t = hoof.thick[i];
@@ -400,6 +305,13 @@ export class Renderer {
     }
     c.restore();
   }
+}
+
+function label(c, text, x, y, color) {
+  c.fillStyle = 'rgba(0,0,0,0.6)';
+  c.fillText(text, x + 0.8, y + 0.8);
+  c.fillStyle = color;
+  c.fillText(text, x, y);
 }
 
 function path(c, pts) {

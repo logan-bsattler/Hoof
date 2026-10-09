@@ -49,10 +49,20 @@ export const STEPS = [
   },
   {
     id: 'finish', label: 'Finish: rasp it smooth', tool: 'rasp',
-    tip: 'True up the grinder marks with the rasp, then release her.',
+    tip: 'True up the grinder marks with the rasp before anything gets covered up.',
     done: (m) => m.roughMean < 0.15 && m.claws[CLAW.OUTER].deadRemain < 0.12,
   },
+  {
+    id: 'treat', label: 'Treat: flush, pad and wrap the ulcer', tool: 'spray',
+    tip: 'Flush the opened ulcer with the spray bottle, then tap it with the pad + wrap: white pad first, then the pink wrap.',
+    done: (m, s, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin,
+  },
 ];
+
+// The wrap goes on last: every step before 'treat' must be done.
+export function trimFinished(status) {
+  return status.every((s) => s.id === 'treat' || s.done);
+}
 
 export const DONE_TIP = 'That’s a good foot. Release her and watch her walk.';
 

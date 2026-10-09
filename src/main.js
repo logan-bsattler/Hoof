@@ -4,8 +4,8 @@
 import { CFG } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
 import { CASE_B } from './case.js';
-import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite } from './tools.js';
-import { STEPS, evaluateSteps } from './steps.js';
+import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
+import { STEPS, evaluateSteps, trimFinished } from './steps.js';
 import { newSession, scoreCase } from './scoring.js';
 import { Renderer } from './render.js';
 import { Particles } from './particles.js';
@@ -33,6 +33,8 @@ const game = {
   scrubLevel: 0,
   knifeAccum: 0,
   failTimer: 0,
+  weepT: 0,
+  holdLast: null,
   walkoff: null,
   result: null,
   lastWarn: {},
@@ -57,6 +59,7 @@ function newCase() {
   game.lastWarn = {};
   game.walkoff = null;
   game.result = null;
+  game.weepT = 0;
   particles.list = [];
   ui.setSteps(game.steps);
   selectTool('brush');
@@ -75,6 +78,7 @@ async function showIntro() {
        <li><b>Clean</b> to reveal what’s hiding under the muck.</li>
        <li><b>Read</b> it with the hoof testers before you commit.</li>
        <li><b>Trim</b> the five steps in order: balance beats speed.</li>
+       <li><b>Treat</b> it: flush, pad and wrap before she goes.</li>
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
     [{ id: 'start', label: 'Lift the foot', primary: true }],
@@ -85,9 +89,14 @@ async function showIntro() {
   ui.toast(STEPS[0].tip, 'info', 4500);
 }
 
+function stopHoldSounds() {
+  Sound.grinder(false);
+  Sound.spray(false);
+}
+
 function selectTool(id) {
   if (!TOOLS[id]) return;
-  if (game.tool === 'grinder' && game.ptr.down) Sound.grinder(false);
+  if (game.ptr.down) stopHoldSounds();
   game.tool = id;
   ui.setTool(id);
 }
@@ -110,7 +119,11 @@ canvas.addEventListener('pointerdown', (e) => {
   Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId });
   const mode = TOOLS[game.tool].mode;
   if (mode === 'bite') bite(p.x, p.y);
-  if (mode === 'hold') Sound.grinder(true, 0);
+  if (mode === 'hold') {
+    game.holdLast = { x: p.x, y: p.y };
+    if (game.tool === 'grinder') Sound.grinder(true, 0);
+    else Sound.spray(true);
+  }
 });
 
 canvas.addEventListener('pointermove', (e) => {
@@ -127,6 +140,7 @@ canvas.addEventListener('pointermove', (e) => {
       const steps = Math.ceil(dist / 3);
       for (let s = 1; s <= steps; s++) {
         const x = ptr.x + (dx * s) / steps, y = ptr.y + (dy * s) / steps;
+        renderer.stroke(game.tool, x, y, dx / steps, dy / steps);
         handle(applyStroke(game.hoof, game.tool, x, y, dist / steps), x, y);
         if (game.state !== 'play') break;
       }
@@ -146,7 +160,7 @@ function endPointer(e) {
   const ptr = game.ptr;
   if (!ptr.down || e.pointerId !== ptr.id) return;
   ptr.down = false;
-  if (TOOLS[game.tool].mode === 'hold') Sound.grinder(false);
+  if (TOOLS[game.tool].mode === 'hold') stopHoldSounds();
   if (game.state === 'play' && TOOLS[game.tool].mode === 'tap' && ptr.moved < 12) tap(ptr.x, ptr.y);
   if (e.pointerType !== 'mouse') ptr.over = false;
 }
@@ -166,10 +180,11 @@ window.addEventListener('keydown', (e) => {
 
 function bite(x, y) {
   const ev = applyBite(game.hoof, x, y);
+  renderer.fx.biteT = 1;
   if (ev.removed > 0) {
     Sound.snip();
     buzz(8);
-    particles.spawn('chunk', x, y, '#76603f', Math.min(5, 1 + Math.round(ev.dead / 20)));
+    particles.spawn('chunk', x, y, '#5e4a30', Math.min(5, 1 + Math.round(ev.dead / 20)));
   }
   handle(ev, x, y);
 }
@@ -178,11 +193,15 @@ function tap(x, y) {
   const hoof = game.hoof;
   const i = hoof.cellAt(x, y);
   if (game.tool === 'probe') {
+    renderer.fx.squeezeT = 1;
     const r = hoof.probe(i, !!game.session.diagnosis);
     if (r.kind === 'lesion' && !game.session.diagnosis) {
       Sound.spring();
       buzz([10, 40, 20]);
-      particles.spawn('puff', x, y, '#e8dcc0', 2);
+      // The weeping hole: squeezing it pushes fluid and bubbles out.
+      const L = caseDef.lesion;
+      renderer.weep(L.x, L.y, 1);
+      Sound.bubbles();
       ui.toast(r.text, 'info');
       diagnose();
     } else {
@@ -193,6 +212,35 @@ function tap(x, y) {
   } else if (game.tool === 'block') {
     if (i < 0) { ui.toast('Tap a claw to glue the block onto it.'); return; }
     placeBlock(hoof.claw[i]);
+  } else if (game.tool === 'wrap') {
+    dress(i < 0 ? 0 : hoof.claw[i]);
+  }
+}
+
+const WRAP_MSG = {
+  miss: 'Tap the treated claw to pad and wrap it.',
+  sound: 'That’s the sound claw: it has the block. The pad and wrap go over the ulcer.',
+  closed: 'Open the ulcer first. Pare the loose horn off it with the knife.',
+  unflushed: 'Flush the opened ulcer with the spray bottle before you cover it.',
+  early: 'Finish the trim first. The wrap goes on last, just before she’s released.',
+  done: 'She’s wrapped. Release her.',
+};
+
+function dress(claw) {
+  const r = applyWrap(game.hoof, claw, game.hoof.metrics(), trimFinished(game.steps.status));
+  if (!r.ok) {
+    ui.toast(WRAP_MSG[r.reason], r.reason === 'done' ? 'good' : 'info', 3400);
+    return;
+  }
+  buzz(15);
+  if (r.stage === 1) {
+    renderer.placedNow('pad');
+    Sound.pad();
+    ui.toast('Pad pressed on over the treated sole. Now the wrap.', 'good');
+  } else {
+    renderer.placedNow('wrap');
+    Sound.wrap();
+    ui.toast('Wrapped. Pink means treated: everyone will know to check her.', 'good');
   }
 }
 
@@ -222,6 +270,7 @@ function placeBlock(claw) {
   s.blockAttempts.push(claw);
   if (!s.diagnosis) s.blockBeforeDx = true;
   hoof.block = claw;
+  renderer.placedNow('block');
   Sound.clunk();
   buzz(30);
   game.shake = 4;
@@ -244,14 +293,20 @@ function handle(ev, x, y) {
   const s = game.session;
   const tool = game.tool;
 
-  if (ev.mud > 0.05 && Math.random() < Math.min(1, ev.mud * 0.5)) particles.spawn('mud', x, y, '#4f3a25');
+  if (ev.mud > 0.05 && Math.random() < Math.min(1, ev.mud * 0.5)) {
+    particles.spawn('mud', x, y, '#2e2216');
+    if (Math.random() < 0.5) particles.spawn('straw', x, y, '#c8a352');
+  }
   if (ev.removed > 0.01) {
     if (tool === 'knife') {
-      if (Math.random() < Math.min(1, ev.removed * 0.15)) particles.spawn('shaving', x, y, '#efe2c2');
+      if (Math.random() < Math.min(1, ev.removed * 0.15)) particles.spawn('shaving', x, y, '#f4ead2');
       game.knifeAccum += ev.removed;
       if (game.knifeAccum > 6) { game.knifeAccum = 0; Sound.knife(); buzz(4); }
     } else if (tool === 'grinder') {
-      if (Math.random() < Math.min(1, ev.removed * 0.4)) particles.spawn('dust', x, y, '#f2e6c8', 2);
+      // The disc throws a spray of white dust off its trailing edge.
+      if (Math.random() < Math.min(1, ev.removed * 0.6)) {
+        particles.spawn('dust', x + 14, y + 10, '#f6efe0', 3, [-150, 70]);
+      }
     } else if (tool === 'rasp') {
       if (Math.random() < 0.15) particles.spawn('dust', x, y, '#e6d8b8');
     }
@@ -284,7 +339,7 @@ function fail(x, y) {
   game.failTimer = 1.4;
   game.shake = 10;
   game.ptr.down = false;
-  Sound.grinder(false);
+  stopHoldSounds();
   Sound.moo(true);
   buzz([60, 40, 120]);
   particles.spawn('blood', x, y, '#c0101c', 10);
@@ -305,7 +360,7 @@ async function requestRelease() {
   }
   game.metrics = game.hoof.metrics();
   game.result = scoreCase(game.metrics, game.session, game.hoof, caseDef);
-  game.walkoff = new Walkoff(game.result, Sound);
+  game.walkoff = new Walkoff(game.result, Sound, { wrapped: game.hoof.wrap >= 2 });
   game.state = 'walkoff';
 }
 
@@ -360,11 +415,32 @@ function frame(now) {
 
   if (game.state === 'play') {
     const ptr = game.ptr;
-    if (ptr.down && game.tool === 'grinder') {
-      const ev = applyGrind(game.hoof, ptr.x, ptr.y, dt);
-      Sound.grinder(true, Math.min(1, ev.removed / 4));
-      if (ev.removed > 0.05) buzz(4);
-      handle(ev, ptr.x, ptr.y);
+    renderer.fx.grindOn = ptr.down && game.tool === 'grinder';
+    if (ptr.down && TOOLS[game.tool].mode === 'hold') {
+      const last = game.holdLast ?? { x: ptr.x, y: ptr.y };
+      const dx = ptr.x - last.x, dy = ptr.y - last.y;
+      game.holdLast = { x: ptr.x, y: ptr.y };
+      if (game.tool === 'grinder') {
+        renderer.stroke('grinder', ptr.x, ptr.y, dx, dy);
+        const ev = applyGrind(game.hoof, ptr.x, ptr.y, dt);
+        Sound.grinder(true, Math.min(1, ev.removed / 4));
+        if (ev.removed > 0.05) buzz(4);
+        handle(ev, ptr.x, ptr.y);
+      } else if (game.tool === 'spray') {
+        const ev = applySpray(game.hoof, ptr.x, ptr.y, dt);
+        renderer.sprayDecal(ptr.x, ptr.y, CFG.tools.spray.radius * 0.8, dt);
+        particles.spawn('mist', ptr.x - 8, ptr.y + 8, '#bff0e2', 3, [70, -60]);
+        if (ev.sprayLesion > 0 && !game.session.flushed) {
+          game.session.flushed = true;
+          ui.toast('Flushing the pocket. Flush again after each round of paring.', 'good', 3200);
+        }
+        handle(ev, ptr.x, ptr.y);
+      }
+    }
+    // The opened pocket keeps weeping for a while.
+    if (game.weepT > 0) {
+      game.weepT -= dt;
+      if (Math.random() < dt * 5) renderer.weep(caseDef.lesion.x, caseDef.lesion.y, 0.5);
     }
     game.scrubLevel = Math.max(0, game.scrubLevel - dt * 4);
     Sound.scrub('brush', game.tool === 'brush' && ptr.down ? game.scrubLevel : 0);
@@ -389,8 +465,10 @@ function frame(now) {
         game.session.released = true;
         const L = caseDef.lesion;
         Sound.release();
+        Sound.bubbles();
         buzz([15, 30, 40]);
-        particles.spawn('puff', L.x, L.y, '#e9dfc8', 6);
+        renderer.weep(L.x, L.y, 3);
+        game.weepT = 4;
         ui.toast('Pressure released. You can almost hear her sigh.', 'good', 3200);
       }
       ui.setSteps(game.steps);
@@ -406,6 +484,7 @@ function frame(now) {
   }
 
   particles.update(dt);
+  renderer.update(dt);
   draw();
 
   if (game.state === 'walkoff') {
@@ -424,11 +503,11 @@ function draw() {
   }
   const hoof = game.hoof;
   renderer.background();
-  renderer.leg();
-  renderer.hoof(hoof, !!game.session.diagnosis);
+  renderer.hoof(hoof, !!game.session.diagnosis, game.metrics);
+  const aim = game.ptr.over && game.state === 'play' ? hoof.claw[hoof.cellAt(game.ptr.x, game.ptr.y)] ?? 0 : 0;
+  renderer.block(hoof, game.tool === 'block' ? aim : 0);
+  renderer.dressing(hoof, game.tool === 'wrap' ? aim : 0);
   if (game.guides) renderer.guides(hoof);
-  const ghost = game.tool === 'block' && game.ptr.over ? hoof.claw[hoof.cellAt(game.ptr.x, game.ptr.y)] ?? 0 : 0;
-  renderer.block(hoof, ghost);
   renderer.labels();
   particles.draw(ctx);
   renderer.meter(game.metrics);

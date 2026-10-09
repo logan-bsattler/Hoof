@@ -51,6 +51,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (m.looseRemain[LOOSE.ULCER] > 0.1) { correctness -= 20; notes.push('Loose horn left over the ulcer: it needs opening up to heal.'); }
   if (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
   if (session.firstCutClaw === CLAW.OUTER) { correctness -= 10; notes.push('Started on the outer claw. On a hind foot, trim the inner claw first and match the outer to it.'); }
+  if (hoof.wrap < 2 || m.lesionTint < CFG.treat.tintMin) { correctness -= 10; notes.push('The ulcer went out untreated. Flush it with the spray, then pad and wrap it.'); }
   if (session.grinderLesion) { correctness -= 10; notes.push('Grinder over the lesion. Use the knife near the ulcer.'); }
   if (session.dirtyCuts > 0) { correctness -= 10; notes.push('You cut into a dirty foot. Clean first, then cut.'); }
   if (session.dishBeforeLevel) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }

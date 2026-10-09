@@ -14,10 +14,10 @@ export const CASE_B = {
   excess: { [CLAW.OUTER]: 4.6, [CLAW.INNER]: 2.4 },
 
   // Hidden lesion: sole ulcer at the typical site (sole/heel junction, axial side).
-  lesion: { type: 'ulcer', claw: CLAW.OUTER, x: 172, y: 492, r: 12 },
+  lesion: { type: 'ulcer', claw: CLAW.OUTER, x: 172, y: 288, r: 12 },
 
   // A curl of loose heel horn for step 5.
-  looseHorn: { claw: CLAW.INNER, x: 292, y: 552, r: 11 },
+  looseHorn: { claw: CLAW.INNER, x: 292, y: 228, r: 11 },
 
   diagnosis: 'ulcer',
   diagnosisOptions: [
@@ -38,5 +38,5 @@ export const CASE_B = {
       feedback: "No puncture, no screw, no stone. It's a sole ulcer.",
     },
   ],
-  plan: 'Plan: functional trim (steps 1–3), then open the ulcer and block the sound inner claw.',
+  plan: 'Plan: functional trim (steps 1–3), open the ulcer and block the sound inner claw, then flush, pad and wrap it.',
 };

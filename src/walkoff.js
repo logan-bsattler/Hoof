@@ -14,8 +14,9 @@ const STAMP = {
 };
 
 export class Walkoff {
-  constructor(result, sound) {
+  constructor(result, sound, { wrapped = false } = {}) {
     this.result = result;
+    this.wrapped = wrapped;
     this.gait = result.gait;
     this.sound = sound;
     this.t = 0;
@@ -65,7 +66,7 @@ export class Walkoff {
     c.fillRect(8, 300, 72, 10);
 
     const x = -60 + this.t * this.speed;
-    drawCow(c, x, this.t * (this.speed / 18), this.gait);
+    drawCow(c, x, this.t * (this.speed / 18), this.gait, this.wrapped);
 
     if (this.stamped) {
       const s = STAMP[this.gait];
@@ -102,7 +103,7 @@ const LEGS = [
   { dx: 62, off: (3 * Math.PI) / 2, back: false, far: false },
 ];
 
-function drawCow(c, x, phase, gait) {
+function drawCow(c, x, phase, gait, wrapped) {
   const limpLeg = 0;
   const bobAmp = gait === 'lame' ? 7 : gait === 'tender' ? 3 : 1;
   // Body dips when the sore leg takes weight.
@@ -126,6 +127,11 @@ function drawCow(c, x, phase, gait) {
     c.beginPath(); c.moveTo(hx, hy); c.quadraticCurveTo(kx, ky, fx, fy); c.stroke();
     c.fillStyle = '#2a211c';
     c.beginPath(); roundRect(c, fx - 8, fy - 6, 16, 9, 3); c.fill();
+    // The treated foot goes out in its bright pink wrap.
+    if (wrapped && idx === limpLeg) {
+      c.fillStyle = '#f0478f';
+      c.beginPath(); roundRect(c, fx - 9, fy - 15, 18, 14, 4); c.fill();
+    }
   };
 
   // Far legs behind the body.

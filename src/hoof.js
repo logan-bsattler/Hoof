@@ -23,22 +23,33 @@ export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2 };
 
 const MID_X = 200; // centre line between the claws
 
+// Zone boundaries in view coords. The foot is presented the way a trimmer sees it in the
+// chute: sole facing the camera, heel bulbs at the top (toward the leg), toes pointing down.
+export const GEOM = {
+  midX: MID_X,
+  heelY: 258,              // above this line: heel bulb
+  dishY0: 275, dishY1: 470, dishW: 46, // dish channel along the axial wall
+  triY: 480, triW: 34,     // below this line, near the axial wall: toe triangle
+  toeRamp: [450, 580],     // overgrowth thickens toward the toe
+  overgrowY: 480,          // overgrown toe horn extends below this line
+};
+
 // Inner (medial) claw outline in view coords; the outer claw is its mirror.
-// Toe at the top, heel bulb at the bottom, axial wall facing the centre line.
+// Heel bulb at the top, toe at the bottom, axial wall facing the centre line.
 const INNER_PTS = [
-  [222, 195], [210, 240], [207, 320], [207, 420], [210, 500],
-  [218, 560], [245, 592], [285, 598], [320, 580], [340, 545],
-  [350, 480], [352, 410], [342, 330], [320, 265], [290, 220], [255, 198],
+  [222, 585], [210, 540], [207, 460], [207, 360], [210, 280],
+  [218, 220], [245, 188], [285, 182], [320, 200], [340, 235],
+  [350, 300], [352, 370], [342, 450], [320, 515], [290, 560], [255, 582],
 ];
 
 export function clawPolygon(claw, overgrown = false) {
   let pts = INNER_PTS.map(([x, y]) => [x, y]);
   if (overgrown) {
-    // Stretch the toe forward and curl it slightly toward the axial side.
+    // Stretch the toe forward (down) and curl it slightly toward the axial side.
     pts = pts.map(([x, y]) => {
-      if (y >= 300) return [x, y];
-      const t = (300 - y) / 105;
-      return [x - 6 * t * t, y - 40 * t];
+      if (y <= GEOM.overgrowY) return [x, y];
+      const t = (y - GEOM.overgrowY) / 105;
+      return [x - 6 * t * t, y + 40 * t];
     });
   }
   if (claw === CLAW.OUTER) pts = pts.map(([x, y]) => [CFG.view.w - x, y]);
@@ -47,7 +58,7 @@ export function clawPolygon(claw, overgrown = false) {
 
 // The front edge of the living toe: the "trim to here" line.
 export function toeLine(claw) {
-  const pts = INNER_PTS.filter(([, y]) => y < 270);
+  const pts = INNER_PTS.filter(([, y]) => y > 510);
   pts.sort((a, b) => a[0] - b[0]);
   return claw === CLAW.OUTER ? pts.map(([x, y]) => [CFG.view.w - x, y]) : pts;
 }
@@ -116,9 +127,12 @@ export class Hoof {
     this.loose = new Uint8Array(n);
     this.looseInit = new Uint8Array(n);
     this.blood = new Uint8Array(n);
+    this.tint = new Float32Array(n); // antiseptic spray soaked into the tissue, 0..1
     this.edge = new Float32Array(n);
     this.noise = new Float32Array(n);
     this.block = CLAW.NONE;
+    this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
+    this.wrapClaw = CLAW.NONE;
     this.rand = mulberry32(seed);
     this.build();
   }
@@ -191,15 +205,15 @@ export class Hoof {
         if (this.edge[i] < 6) this.zone[i] |= Z.WALL;
         else if (this.edge[i] < 8.5) this.zone[i] |= Z.WL;
 
-        if (y > 522) this.zone[i] |= Z.HEEL;
-        else if (y >= 310 && y <= 505 && ax < 46 && !(this.zone[i] & Z.WALL)) this.zone[i] |= Z.DISH;
-        if (y < 300 && ax < 34) this.zone[i] |= Z.TRI;
+        if (y < GEOM.heelY) this.zone[i] |= Z.HEEL;
+        else if (y >= GEOM.dishY0 && y <= GEOM.dishY1 && ax < GEOM.dishW && !(this.zone[i] & Z.WALL)) this.zone[i] |= Z.DISH;
+        if (y > GEOM.triY && ax < GEOM.triW) this.zone[i] |= Z.TRI;
 
         if (this.zone[i] & Z.HEEL) {
           this.thick[i] = heel + nz * 0.2;
           this.rough[i] = 0.1;
         } else {
-          this.thick[i] = T + excess + 2.2 * smoothstep(330, 200, y) + nz * 0.35;
+          this.thick[i] = T + excess + 2.2 * smoothstep(GEOM.toeRamp[0], GEOM.toeRamp[1], y) + nz * 0.35;
           this.rough[i] = 0.5;
         }
       }
@@ -268,7 +282,7 @@ export class Hoof {
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
-      looseN: { 1: 0, 2: 0 }, looseLeft: { 1: 0, 2: 0 },
+      looseN: { 1: 0, 2: 0 }, looseLeft: { 1: 0, 2: 0 }, tintSum: 0,
       thinCells: 0, overWB: 0, wbN: 0, overDish: 0, dishN: 0,
       triCut: 0, triN: 0, heelRemoved: 0, heelN: 0, blood: 0,
     };
@@ -294,6 +308,7 @@ export class Hoof {
       if (lg) {
         m.looseN[lg]++;
         if (this.loose[i]) m.looseLeft[lg]++;
+        if (lg === LOOSE.ULCER) m.tintSum += this.tint[i];
       }
 
       if (z & Z.ULCER) continue;
@@ -335,6 +350,8 @@ export class Hoof {
       1: m.looseN[1] ? m.looseLeft[1] / m.looseN[1] : 0,
       2: m.looseN[2] ? m.looseLeft[2] / m.looseN[2] : 0,
     };
+    // How well the opened ulcer has been flushed with the spray (0..1).
+    m.lesionTint = m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER] : 0;
     m.levelDiff = claws[CLAW.INNER].wbMean - claws[CLAW.OUTER].wbMean;
     m.heelRemovedMean = m.heelN ? m.heelRemoved / m.heelN : 0;
     return m;

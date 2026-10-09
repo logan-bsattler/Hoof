@@ -25,7 +25,12 @@ export const CFG = {
     grinder: { radius: 20, rate: 14, resist: 0.3, resistThin: 0.15 },
     nippers: { radius: 12, liveBite: 3.5, spacing: 16 },
     rasp:    { radius: 26, smooth: 0.02, rate: 0.003 },
+    // tint gained per second at full strength; pareWash is lost per px of knife travel.
+    spray:   { radius: 22, rate: 1.6, hornRate: 0.3, rinse: 0.6, pareWash: 0.05 },
   },
+
+  // Treatment: how well-flushed the opened ulcer must be before it's padded and wrapped.
+  treat: { tintMin: 0.6 },
 
   // Score weighting (design doc §8).
   weights: { balance: 0.35, correctness: 0.30, restraint: 0.20, finish: 0.15 },

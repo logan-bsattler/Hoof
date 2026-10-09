@@ -89,6 +89,7 @@ export const Sound = {
     loops.brush = loopNoise(2600, 0.8);
     loops.rasp = loopNoise(1300, 2.2);
     loops.grindNoise = loopNoise(3200, 1.2);
+    loops.spray = loopNoise(6500, 0.7, 'highpass');
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.value = 130;
@@ -118,6 +119,21 @@ export const Sound = {
     loops.grindTone.g.gain.setTargetAtTime(on ? 0.06 : 0, t, 0.05);
     loops.grindTone.o.frequency.setTargetAtTime(on ? 150 - load * 40 : 130, t, 0.08);
     loops.grindNoise.g.gain.setTargetAtTime(on ? 0.05 + load * 0.12 : 0, t, 0.05);
+  },
+
+  spray(on) {
+    if (!ctx) return;
+    loops.spray.g.gain.setTargetAtTime(on ? 0.09 : 0, ctx.currentTime, 0.03);
+  },
+
+  bubbles() {
+    for (let k = 0; k < 5; k++) tone({ freq: 900 + Math.random() * 900, to: 1600, dur: 0.04, gain: 0.025, delay: k * 0.07 + Math.random() * 0.05 });
+  },
+
+  pad() { burst({ dur: 0.12, freq: 900, type: 'lowpass', gain: 0.2, attack: 0.01 }); },
+
+  wrap() {
+    for (let k = 0; k < 6; k++) burst({ dur: 0.07, freq: 1800 + Math.random() * 1500, q: 0.9, gain: 0.12, delay: k * 0.09 });
   },
 
   knife() { burst({ dur: 0.07, freq: 3800 + Math.random() * 1200, q: 1.4, type: 'bandpass', gain: 0.22 }); },
