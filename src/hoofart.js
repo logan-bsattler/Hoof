@@ -645,7 +645,13 @@ export class HoofArt {
             const lip = st * (1 - st) * 4;
             if (lip > 0) { const k = 1 - 0.3 * lip; R *= k; G *= k; B *= k; }
             if (st > 0) {
-              let sr = 136 - 66 * ns, sg = 108 - 48 * ns, sb = 60 - 26 * ns;
+              // Manure-stained horn: a warm brown, darker where the stain soaked deeper, with dark,
+              // wet residue left packed into the low spots after brushing.
+              const gk = 0.9 + 0.2 * ngr;
+              let sr = (124 - 70 * ns) * gk, sg = (88 - 50 * ns) * gk, sb = (50 - 28 * ns) * gk;
+              const res = smoothstep(0.58, 0.8, nIsle[p] / 255 + (nLump[p] / 255 - 0.5) * 0.35);
+              sr += (40 - sr) * res * 0.8; sg += (29 - sg) * res * 0.8; sb += (17 - sb) * res * 0.8;
+              crust = Math.max(crust, res * st * 0.8);
               // The dark, cracked patch that gives the ulcer away on a cleaned foot.
               if (dL < L.r * 1.9) {
                 const k = smoothstep(L.r * 1.9, L.r * 0.4, dL) * 0.55;
