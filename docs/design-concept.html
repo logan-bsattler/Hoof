@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRUE HOOF — Game Design Concept</title>
+<style>
+  :root{
+    --bg:#14110e; --panel:#1f1a15; --panel2:#2a231c; --ink:#f3ece1;
+    --muted:#b7a98f; --line:#3a2f24; --accent:#c9992e; --accent2:#7fae6b;
+    --blood:#9a3b2f; --blue:#5b86a6; --radius:14px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:70px 22px 46px;text-align:center;background:
+    radial-gradient(1200px 400px at 50% -120px,rgba(201,153,46,.16),transparent),
+    linear-gradient(180deg,#120f0c,#14110e);border-bottom:1px solid var(--line)}
+  .hero .kicker{letter-spacing:.42em;font-size:12px;color:var(--accent);text-transform:uppercase;margin-bottom:14px;font-weight:700}
+  .hero h1{font-size:60px;line-height:.98;margin:0 0 10px;letter-spacing:-1px}
+  .hero .sub{font-size:19px;color:var(--muted);max-width:620px;margin:0 auto}
+  .hero .tagline{margin-top:20px;font-style:italic;color:var(--accent2);font-size:16px}
+  h2{font-size:28px;margin:52px 0 6px;letter-spacing:-.5px;scroll-margin-top:20px}
+  h2 .num{color:var(--accent);font-family:var(--mono);font-size:17px;margin-right:12px;vertical-align:middle}
+  h3{font-size:19px;margin:30px 0 6px;color:var(--accent2)}
+  h4{font-size:15px;margin:20px 0 4px;color:var(--ink);text-transform:uppercase;letter-spacing:.08em}
+  p{margin:10px 0}
+  .lede{font-size:18px;color:#e6dcca}
+  hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+  a{color:var(--accent)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin:18px 0}
+  .panel.tight{padding:16px 20px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:720px){.g2,.g3{grid-template-columns:1fr}.hero h1{font-size:42px}}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h4{margin-top:0;color:var(--accent)}
+  .tool{display:flex;gap:14px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:14px 16px;margin:10px 0}
+  .tool .ic{font-size:26px;line-height:1;flex:0 0 auto;width:34px;text-align:center}
+  .tool b{color:var(--ink)}
+  .tool .g{color:var(--accent2);font-size:13px;font-family:var(--mono)}
+  .step{border-left:3px solid var(--accent2);padding:4px 0 4px 18px;margin:16px 0}
+  .step .lab{font-family:var(--mono);color:var(--accent2);font-size:13px;letter-spacing:.05em}
+  .step b{display:block;font-size:17px;margin:2px 0}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:20px;border:1px solid var(--line);background:#191511;color:var(--muted);margin:2px 4px 2px 0}
+  .tag.gate{color:var(--blood);border-color:#5a2a22;background:#241513}
+  .tag.ok{color:var(--accent2);border-color:#3b4e32;background:#17201440}
+  .cite{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--blue);border:1px solid #2f4454;border-radius:5px;padding:1px 7px;background:#131b22;margin-left:4px;vertical-align:middle}
+  blockquote{margin:14px 0;padding:12px 18px;border-left:3px solid var(--accent);background:#19140f;color:#d8ccb6;font-style:italic;border-radius:0 8px 8px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  td b{color:var(--ink)}
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 24px 20px;margin:20px 0;border-top:4px solid var(--accent)}
+  .case .lead{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.08em;margin-top:18px}
+  ul{margin:8px 0;padding-left:20px}
+  li{margin:5px 0}
+  .toc{columns:2;column-gap:30px;font-size:14px}
+  .toc a{display:block;color:var(--muted);text-decoration:none;padding:3px 0;border-bottom:1px dotted transparent}
+  .toc a:hover{color:var(--accent)}
+  @media(max-width:600px){.toc{columns:1}}
+  .callout{border:1px solid #5a2a22;background:#1d1210;border-radius:12px;padding:16px 20px;margin:18px 0}
+  .callout h4{color:var(--blood);margin-top:0}
+  .note{border:1px dashed var(--line);border-radius:10px;padding:12px 16px;color:var(--muted);font-size:14px;background:#17130f}
+  .mvp-bar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .pill{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+  .pill.in{border-color:#3b4e32;color:var(--accent2)}
+  .pill.out{border-color:#4a3a28;color:var(--muted);opacity:.8}
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  .swatch{display:inline-block;width:46px;height:26px;border-radius:5px;border:1px solid #0005;vertical-align:middle;margin-right:8px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="kicker">Mobile Game — Design Concept v1</div>
+  <h1>TRUE HOOF</h1>
+  <div class="sub">A calm, craftsmanlike hoof-care game. You don't pop it — you <i>read</i> it, balance it, and let the animal walk away sound.</div>
+  <div class="tagline">"Forbidden parmesan, one clean pass at a time."</div>
+</header>
+
+<div class="wrap">
+
+<div class="panel tight" style="margin-top:30px">
+  <strong>Contents</strong>
+  <div class="toc" style="margin-top:10px">
+    <a href="#tone">1 · Fantasy &amp; Tone</a>
+    <a href="#pillars">2 · Design Pillars</a>
+    <a href="#loop">3 · Core Gameplay Loop</a>
+    <a href="#protocol">4 · The Five-Step Backbone</a>
+    <a href="#tools">5 · Tool Set</a>
+    <a href="#controls">6 · Touch Controls</a>
+    <a href="#caseflow">7 · Anatomy of a Case</a>
+    <a href="#scoring">8 · Scoring (Balance, not Speed)</a>
+    <a href="#juice">9 · Feedback &amp; Juice</a>
+    <a href="#progression">10 · Progression &amp; Meta</a>
+    <a href="#cases">11 · Example Cases</a>
+    <a href="#monetization">12 · Monetization</a>
+    <a href="#art">13 · Art &amp; Audio Direction</a>
+    <a href="#mvp">14 · MVP Scope</a>
+    <a href="#assumptions">15 · Assumptions &amp; Sources</a>
+  </div>
+</div>
+
+<div class="note">
+<b>Research note.</b> The 4 reference PDFs attached to this request were stored in application-internal data that this session could not open (the uploads mount came through empty and the folder can't be mounted). Rather than stall, the realism below is grounded in the <i>same</i> source material those manuals are built on — chiefly the AHDB five-step Dutch method, which is the published form of the "five-step protocol for hoof trimmers" document, plus veterinary pathology and tool references. Where a mechanic maps to that protocol it carries a <span class="cite">cite</span>. Re-attach the PDFs in a reachable folder and the specific manual citations (Cramer, the field guide, etc.) can be slotted in exactly.
+</div>
+
+<h2 id="tone"><span class="num">01</span>Fantasy &amp; Tone</h2>
+<p class="lede">You are a travelling bovine podiatrist. A big, patient cow is lifted gently in the chute, one caked hoof presented to you. Your job is to read what's wrong under the mud and the overgrown horn, choose the right tool, and bring the foot back to a flat, balanced, weight-bearing surface — so the animal walks off sound.</p>
+
+<p>The emotional target is the exact feeling people describe watching <b>Nate the Hoof Guy</b> (Nate Ranallo, a one-man hoof-care business in West Salem, Wisconsin, with 1M+ followers on each of YouTube, TikTok and Facebook): <i>calm, methodical, informative, and quietly triumphant.</i> The satisfaction comes from four real beats his viewers call out — the mud-caked "before," the careful reveal of the hidden problem, the clean pass that releases trapped pressure, and the cow walking away comfortable. Nate himself describes the appeal as "the instant gratification of fixing a problem." <span class="cite">boingboing / Outside / Hoard's</span></p>
+
+<div class="callout">
+<h4>The anti-cheese principle</h4>
+<p>This is deliberately <b>not</b> a pimple-popping game. Pop games reward gross-out spectacle and mindless tapping. TRUE HOOF rewards <b>judgment</b>: knowing that the dark spot is a white-line lesion and not an ulcer, that you lower the <i>affected</i> claw and block the sound one, that you never chase a model into the toe triangle. The payoff is craft — "I understood this foot and fixed it correctly" — not shock. Respect for the animal is a design constraint, not a disclaimer: trimming is framed, truthfully, as painless when done right ("akin to clipping a toenail"), and <b>drawing blood is always a failure</b>, never a reward. <span class="cite">Outside / AHDB</span></p>
+</div>
+
+<h2 id="pillars"><span class="num">02</span>Design Pillars</h2>
+<div class="grid g2">
+  <div class="card"><h4>Read before you cut</h4>Every hoof is a small diagnostic puzzle. The player wins by <i>seeing</i> correctly — overgrowth vs. lesion vs. foreign body — then sequencing tools, not by speed.</div>
+  <div class="card"><h4>Tactile, not twitchy</h4>Gestures map to real motions: swipe to pare, scrub to clean, drag to measure. It should <i>feel</i> like working a hoof in your hand.</div>
+  <div class="card"><h4>Balance is the win state</h4>Correctness &amp; even weight-bearing score, not clear-the-screen tapping. You can "finish" a hoof and still have done it wrong.</div>
+  <div class="card"><h4>Do no harm</h4>The sensitive corium is a hard boundary. Cut into the quick and the cow flinches, it bleeds, the case fails. Caution is always rewarded over aggression.</div>
+</div>
+
+<h2 id="loop"><span class="num">03</span>Core Gameplay Loop</h2>
+<p>One <b>case</b> = one hoof (sometimes a whole foot = two claws). The loop is designed so the player is <i>thinking about tool choice and order</i> at every beat, mirroring how a real trimmer approaches an unknown foot.</p>
+
+<div class="panel">
+<div class="step"><span class="lab">INTAKE</span><b>Read the hoof</b>Cow enters the chute, foot lifts. The hoof is dirty, overgrown, with hidden problems. A short "assessment" phase lets you look — nothing is labelled for you yet.</div>
+<div class="step"><span class="lab">CLEAN</span><b>Scrub &amp; dry to reveal</b>Wire-brush/hoof-knife off mud and loose matter. This is the first "reveal": clues (black marks, cracks, soft spots) appear only once clean. Real protocol opens with "clean and dry the foot." <span class="cite">AHDB · pre-trim</span></div>
+<div class="step"><span class="lab">DIAGNOSE</span><b>Tap suspect zones</b>Use the hoof testers / probe to confirm what you think you see. Pressure on a lesion "springs" or shows a soft spot — turning a guess into a committed diagnosis. Wrong-tool-wrong-place wastes time but never harms.</div>
+<div class="step"><span class="lab">TRIM</span><b>Work the five steps in order</b>The heart of the game — functional trimming, then therapy only if the foot needs it (see §4). Tool choice and sequence are the puzzle.</div>
+<div class="step"><span class="lab">TREAT</span><b>Relieve &amp; finish</b>Where there's a lesion: dish out weight, block the sound claw, remove loose horn, expose infected tissue to air.</div>
+<div class="step"><span class="lab">RESOLVE</span><b>The walk-off</b>Scoring resolves, then the reward shot: the cow is lowered and walks away level. Comfortable gait = the real payoff.</div>
+</div>
+<p>Average case length: <b>60–120 seconds</b> — short enough for a phone session, long enough to feel earned. Players chain 3–5 cases per "farm visit."</p>
+
+<h2 id="protocol"><span class="num">04</span>The Five-Step Backbone</h2>
+<p>The trimming core is a direct, legible adaptation of the <b>five-step Dutch method</b> — steps 1–3 are <i>functional</i> (done on every foot), steps 4–5 are <i>therapeutic</i> (only when there's a lesion). This real structure is what makes the game a sequencing puzzle instead of a scrub-fest. <span class="cite">AHDB five-step method = attached five-step protocol</span></p>
+
+<table>
+<tr><th>Step</th><th>Real protocol</th><th>In-game mechanic</th></tr>
+<tr><td><b>1 · Measure &amp; trim first claw</b></td><td>On a hind foot start with the <i>inner</i> claw; measure toe from where horn goes hard (~1&nbsp;cm below hairline) to ~8–8.5&nbsp;cm; pare excess sole to a ~6–8&nbsp;mm toe step; don't touch the heel.</td><td>A "measure" overlay drags down the toe; player trims to a target band. Over-shortening thins the sole and raises a lameness-risk flag — the game literally tells you thin sole = risk. <span class="cite">AHDB Step 1</span></td></tr>
+<tr><td><b>2 · Match opposing claw</b></td><td>Level the outer claw up to the first; usually more horn off the outer, minimal off the inner, keep weight-bearing. Don't cut the axial wall/white line.</td><td>A balance meter shows the two claws' relative height. Player pares the taller claw to level them. A protected "toe triangle" zone cannot be cut without penalty. <span class="cite">AHDB Step 2</span></td></tr>
+<tr><td><b>3 · Dish out the claws</b></td><td>Model a "dish" behind the inner wall edges so muck flows between the toes and weight comes off the typical sole-ulcer site — <i>without</i> extending into the toe triangle.</td><td>A guided swipe carves the dish along a highlighted channel. Going too deep or too far forward (into the triangle) removes weight-bearing wall = penalty. This is the signature "skill" gesture. <span class="cite">AHDB Step 3</span></td></tr>
+<tr><td><b>4 · Relieve the affected claw</b></td><td>Create a height difference for the painful claw; apply a <b>block to the sound partner claw</b> so the injured one bears less weight and can heal.</td><td>Only unlocked when a lesion is diagnosed. Player lowers the affected claw and glues a block to the <i>correct</i> (sound) claw — blocking the wrong claw is a classic failure. <span class="cite">AHDB Step 4</span></td></tr>
+<tr><td><b>5 · Remove loose horn</b></td><td>Remove loose/undermined horn from the heel; check between claws &amp; at the heel for digital dermatitis; don't strip too much weight-bearing heel.</td><td>Spreading-pliers gesture opens the claws to inspect; knife flicks away <i>only</i> horn flagged as detached. Removing attached, healthy horn costs points. <span class="cite">AHDB Step 5</span></td></tr>
+</table>
+
+<blockquote>Golden rule carried from the manuals into every scoring pass: <b>"Avoid over-trimming — always err on the side of caution."</b> As sole thickness decreases, lameness risk rises. The game should consistently reward the restrained, correct cut over the dramatic one. <span class="cite">AHDB</span></blockquote>
+
+<h2 id="tools"><span class="num">05</span>Tool Set</h2>
+<p>Each tool does one job well and the wrong job badly — so picking the tool <i>is</i> the decision. Players start with three and unlock the rest through the career.</p>
+
+<div class="tool"><div class="ic">🖌️</div><div><b>Wire brush / wash</b> <span class="g">scrub gesture</span><br>Removes mud and surface muck to reveal the hoof. Can't cut horn. The mandatory opening move — you cannot diagnose a dirty foot.</div></div>
+<div class="tool"><div class="ic">🔪</div><div><b>Hoof knife</b> <span class="g">short precise swipe</span><br>The scalpel. Thin paring, opening a lesion, releasing trapped pressure, flicking off loose horn. High control, low volume. Held "behind the blade" — a safety detail the game can teach. <span class="cite">tool review / AHDB kit</span></div></div>
+<div class="tool"><div class="ic">✂️</div><div><b>Nippers</b> <span class="g">pinch / tap to bite</span><br>Takes off bulk overgrown toe in clean bites. Fast horn removal but blunt — useless for fine finishing and dangerous near lesions. Quality nippers &gt; "clumsy choppers." <span class="cite">AHDB kit</span></div></div>
+<div class="tool"><div class="ic">⚙️</div><div><b>Angle grinder + trimming disc</b> <span class="g">sustained glide, pressure-sensitive</span><br>The power tool. Levels and models large surfaces fast; grit tiers (coarse→fine) unlock for bulk vs. finishing. Powerful and risky — overrun into the corium and you draw blood. Real evidence: a proper disc can <i>improve</i> quality and lower hazard. <span class="cite">tool review</span></div></div>
+<div class="tool"><div class="ic">🪵</div><div><b>Rasp</b> <span class="g">back-and-forth stroke</span><br>Finishing and smoothing; coarse side for quick take-down, fine side to true the surface. The "make it clean" tool that earns finish points.</div></div>
+<div class="tool"><div class="ic">🧪</div><div><b>Hoof testers / probe</b> <span class="g">tap to apply pressure</span><br>Diagnostic, not cutting. Confirms where it hurts — springs a loose sole, finds the soft spot over an abscess. Converts a visual guess into a committed diagnosis.</div></div>
+<div class="tool"><div class="ic">🧱</div><div><b>Block + glue</b> <span class="g">place &amp; press-hold</span><br>Therapeutic. Raises the sound claw so the injured one heals. Placing it on the wrong claw is a headline mistake. <span class="cite">AHDB Step 4</span></div></div>
+<div class="tool"><div class="ic">💨</div><div><b>Spray / topical + air</b> <span class="g">tap &amp; swipe to dry</span><br>For digital dermatitis and exposed lesions — expose to air, apply topical. Finishing care that closes infected cases. <span class="cite">AHDB / pathology</span></div></div>
+
+<div class="note">Secondary kit referenced for flavour/realism in later tiers: measuring gauge for toe length &amp; sole thickness, spreading pliers (to open the claws), gloves/face-shield/gown (presented as unlockable "pro rig" cosmetics that nod to the real danger of the job). <span class="cite">AHDB kit / tool review</span></div>
+
+<h2 id="controls"><span class="num">06</span>Touch Controls</h2>
+<p>Everything is one-thumb friendly and gesture-mapped to the physical motion. No twitch timing; all gestures reward smoothness and control over speed.</p>
+<div class="grid g2">
+  <div class="card"><h4>Tap</h4>Select a tool from the radial dock; tap a zone with the probe to test it.</div>
+  <div class="card"><h4>Swipe / pare</h4>Short directional swipes with the knife remove thin horn along the swipe path. Depth scales gently with swipe length — long reckless swipes risk the corium.</div>
+  <div class="card"><h4>Scrub</h4>Rapid back-and-forth to clean mud or rasp a surface smooth. Satisfying friction haptic.</div>
+  <div class="card"><h4>Press &amp; hold (pressure)</h4>Grinder and nippers: hold to keep removing material; a subtle resistance/haptic builds as you near the safe limit — let go in time.</div>
+  <div class="card"><h4>Drag guides</h4>Measuring overlay and the "dish" channel are drawn by dragging along an on-hoof guide line — keeps the skill legible on a small screen.</div>
+  <div class="card"><h4>Two-finger rotate (optional)</h4>Rotate the hoof to inspect the heel, interdigital space, and axial wall. Kept optional so the game is fully playable one-handed.</div>
+</div>
+<p><b>Assist &amp; accessibility:</b> a "guided lines" toggle (faint target bands &amp; no-cut zones shown) for new players, dialled back on harder tiers; haptics and sound both independently toggleable; colour-blind-safe lesion markers (shape + colour).</p>
+
+<h2 id="caseflow"><span class="num">07</span>Anatomy of a Case (start to finish)</h2>
+<p>Here is a single hoof — a hind foot with an outer-claw sole ulcer — played end to end, to show how the beats, tools and the five steps interlock.</p>
+<div class="panel">
+<div class="step"><span class="lab">0:00 · PRESENT</span><b>The caked "before"</b>Hind foot lifts, lateral claw visibly overgrown, everything brown with slurry. Chute creak, the cow settles. Player sees a mess and a hint of a dark patch.</div>
+<div class="step"><span class="lab">0:08 · CLEAN</span><b>Scrub reveal</b>Wire-brush gesture clears mud. A darker, bruised zone emerges on the sole of the outer claw near the typical ulcer site. First dopamine hit: order from chaos.</div>
+<div class="step"><span class="lab">0:20 · DIAGNOSE</span><b>Commit the read</b>Probe taps the dark zone — it "springs," confirming a sole ulcer (not just bruising). The case objective locks: <i>functional trim + relieve the affected claw.</i></div>
+<div class="step"><span class="lab">0:30 · STEP 1–2</span><b>Measure &amp; balance</b>Nippers take the bulk overgrowth off the toe; measure overlay confirms ~8&nbsp;cm; match the claws level, protecting the toe triangle. Balance meter swings toward centre.</div>
+<div class="step"><span class="lab">0:55 · STEP 3</span><b>The dish</b>Knife/grinder carves the guided dish behind the inner wall, pulling weight off the ulcer site. Staying out of the triangle earns the "clean model" bonus.</div>
+<div class="step"><span class="lab">1:10 · STEP 4</span><b>Relieve &amp; block</b>Lower the affected outer claw slightly; glue a block onto the <i>sound inner claw</i>. Get the claw right → satisfying "clunk" + green confirm.</div>
+<div class="step"><span class="lab">1:25 · STEP 5</span><b>Finish</b>Spreading pliers open the claws, knife flicks the one flagged curl of loose heel horn, quick DD check between the bulbs comes back clean. Rasp trues the surface.</div>
+<div class="step"><span class="lab">1:35 · RESOLVE</span><b>The walk-off</b>Score tallies (balance, correctness, restraint, finish). Cow lowers, takes a few <i>level</i> steps — no limp. "Sound." Shavings swept; next cow.</div>
+</div>
+
+<h2 id="scoring"><span class="num">08</span>Scoring — Balance &amp; Correctness, not Speed</h2>
+<p>Scoring exists to reinforce craft. <b>Speed is never a primary score.</b> A hoof is graded on how right it is, how little harm was done, and how clean the finish looks.</p>
+<table>
+<tr><th>Component</th><th>Weight</th><th>What it measures</th></tr>
+<tr><td><b>Balance</b></td><td>35%</td><td>Even weight-bearing surface, claws level, correct toe length/angle, heel preserved. The core of functional trimming. <span class="cite">AHDB 1–3</span></td></tr>
+<tr><td><b>Correctness</b></td><td>30%</td><td>Right diagnosis, right tools in the right order, block on the sound claw, lesion properly relieved/exposed. <span class="cite">AHDB 4–5</span></td></tr>
+<tr><td><b>Restraint</b></td><td>20%</td><td>Minimal over-trimming; sole kept thick enough; healthy/attached horn left alone. Rewards caution per the golden rule.</td></tr>
+<tr><td><b>Finish</b></td><td>15%</td><td>Smooth, true surface, muck cleared, loose horn gone — the aesthetic "clean hoof" payoff.</td></tr>
+</table>
+<div class="callout">
+<h4>Fail / penalty states (harm &gt; haste)</h4>
+<ul>
+<li><b>Drawing blood</b> — cutting into the corium/quick. The cow flinches, red appears, the case drops a grade or fails. The single hardest line in the game. <span class="cite">AHDB / Outside</span></li>
+<li><b>Over-thinning the sole</b> — raises explicit lameness-risk; tanks Restraint &amp; Balance.</li>
+<li><b>Cutting the toe triangle / axial wall</b> — removes weight-bearing horn; Balance penalty.</li>
+<li><b>Blocking the wrong (affected) claw</b> — defeats the therapy; Correctness penalty.</li>
+<li><b>Removing attached healthy horn</b> — Restraint penalty.</li>
+</ul>
+<p>Grading uses a trimmer's-ticket feel: <b>Sound → Clean → Textbook</b> (bronze/silver/gold), plus a herd "mobility score" that trends up across a farm visit when you trim well.</p>
+</div>
+
+<h2 id="juice"><span class="num">09</span>Feedback &amp; Juice — the satisfaction engine</h2>
+<p>The game lives or dies on how the <i>reveal</i> and the <i>clean pass</i> feel. Every satisfying beat Nate's audience names has a direct sensory hook here.</p>
+<div class="grid g2">
+  <div class="card"><h4>The reveal</h4>Mud wipes away in wet, clumping strokes; the clean hoof underneath is a visible before/after. Problems only surface once clean — earning the "oh, <i>that's</i> what's wrong" moment. <span class="cite">why-satisfying research</span></div>
+  <div class="card"><h4>The clean pass</h4>Horn shavings peel and curl off the blade ("forbidden parmesan"), each pass with a crisp <i>shk</i> sound and a short haptic tick. Long smooth passes feel best — reinforcing control.</div>
+  <div class="card"><h4>Pressure release</h4>When a lesion/abscess is opened correctly, trapped fluid escapes with a soft release cue (sound + tiny particle puff + relief haptic). This is the catharsis beat — handled cleanly, never gratuitously.</div>
+  <div class="card"><h4>The walk-off</h4>The emotional close: cow lowers and strides away <i>level</i>. A gentle success chime, a calm "Sound." stamp, the mobility score ticking up. Nate's "instant gratification" in one shot.</div>
+</div>
+<h4>Audio / haptics</h4>
+<p>ASMR-leaning throughout: ambient barn room-tone, soft chute creaks, the friction of brush and rasp, the clean peel of the blade. Optional calm, Wisconsin-ish narrator voice explaining the foot — echoing <i>why</i> Nate's narration is called "calming and informative." Distinct haptic textures per tool (scrub = fine rumble, blade = sharp tick, grinder = sustained buzz that tightens near the danger limit). All subtle, never arcade-loud.</p>
+
+<h2 id="progression"><span class="num">10</span>Progression &amp; Meta — Apprentice to Pro</h2>
+<p>A career arc gives the puzzle room to deepen without ever becoming a speed grind.</p>
+<table>
+<tr><th>Tier</th><th>Unlocks</th><th>Complexity</th></tr>
+<tr><td><b>Apprentice</b></td><td>Brush, hoof knife, nippers. Guided lines on. Routine overgrowth only.</td><td>Steps 1–3, single claw, generous target bands.</td></tr>
+<tr><td><b>Trimmer</b></td><td>Grinder + coarse disc, rasp, hoof testers. First lesions appear.</td><td>Full foot (two claws), diagnosis matters, tighter bands.</td></tr>
+<tr><td><b>Specialist</b></td><td>Blocks, spray/topical, fine discs, measuring gauge, spreading pliers.</td><td>Therapeutic steps 4–5, multi-problem feet, guided lines dialled back.</td></tr>
+<tr><td><b>Pro / Road Trimmer</b></td><td>"Pro rig" cosmetics, chute upgrades, new animals, timed exhibition modes (optional).</td><td>Rare/compound pathologies, minimal assists, full judgment.</td></tr>
+</table>
+<h4>Variety axes</h4>
+<p><b>Cases:</b> a growing deck of pathologies (overgrowth, sole ulcer, white-line lesion/abscess, toe abscess, embedded foreign body, hoof crack/fissure, digital dermatitis, heel-horn erosion, corkscrew claw). <b>Animals:</b> dairy cows first, then beef cattle, the "occasional goat" (a real Nate detail), and farther out, horses/sheep as distinct trimming rulesets. <b>Settings:</b> home farm, visiting herds, a county-fair exhibition, a "worst feet you've ever seen" rescue set. A light <b>farm-management meta</b> (build your route, upgrade the chute/truck, raise herd mobility scores) gives long-term goals without pressuring the per-hoof pace.</p>
+
+<h2 id="cases"><span class="num">11</span>Example Cases (drawn from real pathologies)</h2>
+
+<div class="case">
+<div class="lead">CASE A — "The Overgrown Toe"  ·  Apprentice</div>
+<h3>Simple functional trim</h3>
+<p>A dairy cow overdue for maintenance: long, curled toes, no disease. <b>Objective:</b> steps 1–3 only. Measure the inner hind claw to ~8&nbsp;cm, match the outer, dish both — protecting the toe triangle and the heel. <b>Teaches:</b> the measure→match→dish rhythm and the golden rule of restraint. <b>Fail lines:</b> over-shortening the sole, cutting the heel. <span class="cite">AHDB Steps 1–3</span></p>
+</div>
+
+<div class="case">
+<div class="lead">CASE B — "Pressure Point"  ·  Trimmer</div>
+<h3>Sole ulcer, lateral hind claw</h3>
+<p>The classic. Dark bruised zone at the typical ulcer site on the outer hind claw. <b>Flow:</b> clean → probe to confirm it springs → functional trim → <b>dish to pull weight off the ulcer</b> → lower the affected claw and <b>block the sound inner claw</b> → remove loose horn. <b>Fail lines:</b> blocking the wrong claw; leaving weight on the lesion. <span class="cite">AHDB Step 4 / pathology: ulcers common in lateral hind claw, treat by weight relief + block on healthy claw</span></p>
+</div>
+
+<div class="case">
+<div class="lead">CASE C — "The Hidden Screw"  ·  Trimmer</div>
+<h3>Embedded foreign body</h3>
+<p>Straight from one of Nate's most-watched videos: a blackened puncture on the sole where a screw/stone is lodged. <b>Flow:</b> clean to expose the dark entry point → probe to locate → carefully pare down and extract the object → open the tract so trapped pressure escapes (the catharsis beat) → relieve &amp; protect. <b>Fail lines:</b> gouging past the object into the corium. <span class="cite">Nate screw video / pathology</span></p>
+</div>
+
+<div class="case">
+<div class="lead">CASE D — "White Line"  ·  Specialist</div>
+<h3>White-line lesion → toe/white-line abscess</h3>
+<p>Separation along the white line packed with dark debris, tracking to an abscess. <b>Flow:</b> clean → trace the white line → trim the adjacent wall and white-line horn to <b>release the pressure</b>, trimming the wall back to the depth removed so no crater traps muck → block the sound claw for larger cavities → expose to air. <b>Note (realism):</b> no antibiotics for a simple white-line abscess; deep extension would be a vet referral — a good "know your limits" beat. <b>Fail lines:</b> leaving a crater; cutting live tissue. <span class="cite">pathology: white-line/toe abscess</span></p>
+</div>
+
+<div class="case">
+<div class="lead">CASE E — "Between the Heels"  ·  Specialist</div>
+<h3>Digital dermatitis</h3>
+<p>Painful raw lesion at the back of the hind foot, between the heel bulbs. <b>Flow:</b> clean gently → spreading pliers to inspect the interdigital space → identify DD (not a horn lesion) → <b>expose to air + apply topical</b>; trimming is minimal here — the skill is recognising that this is a <i>skin</i> disease, not something to carve. <b>Fail lines:</b> over-trimming healthy horn chasing a skin problem. <span class="cite">AHDB Step 5 / pathology: DD at heel bulbs</span></p>
+</div>
+
+<div class="case">
+<div class="lead">CASE F — "The Crack"  ·  Pro</div>
+<h3>Vertical hoof-wall fissure</h3>
+<p>A sand-crack up the wall. <b>Flow:</b> clean → assess depth with the probe → stabilise: relieve horn around the crack so it bears no leverage, remove undermined horn, smooth the edges → block if the claw is painful. <b>Fail lines:</b> aggressive grinding that weakens the wall or reaches sensitive tissue. <span class="cite">pathology: horn disorders — remove detached horn, avoid live tissue</span></p>
+</div>
+
+<h2 id="monetization"><span class="num">12</span>Monetization</h2>
+<p>The calm, craft tone should steer away from aggressive, interrupt-driven ads — those would wreck the ASMR mood the whole product is selling. Recommended, in order of fit:</p>
+<div class="grid g2">
+  <div class="card"><h4>★ Premium / one-time unlock (best fit)</h4>A paid "Pro Trimmer" upgrade (or paid app) removes limits and ads entirely. The relaxing, premium feel supports a clean paid product — closest to the "oddly satisfying, respectful" brand.</div>
+  <div class="card"><h4>Rewarded video (opt-in only)</h4>Player <i>chooses</i> to watch an ad for a cosmetic, an extra case, or a hint. Never interstitials mid-trim — the mood is the product.</div>
+  <div class="card"><h4>Cosmetic IAP</h4>Tool skins, custom chutes/trucks, barn themes, breed packs, narrator voice packs. No pay-to-win: skill is judgment, which can't be bought.</div>
+  <div class="card"><h4>Content / case packs (DLC)</h4>Themed case decks ("Rescue Herd," "County Fair," goats, horses), a light energy-free battle-pass of weekly cases. Expansion, not gating.</div>
+</div>
+<div class="note"><b>Explicitly avoid:</b> energy/lives timers, forced interstitials, and gross-out "shock" ad creatives — all three fight the product's identity. A gentle daily "farm visit" streak is enough retention hook.</div>
+
+<h2 id="art"><span class="num">13</span>Art &amp; Audio Direction</h2>
+<div class="grid g2">
+<div>
+<h4>Visual</h4>
+<p>Warm, grounded, semi-realistic — closer to a tactile craft game than a cartoon. Earthy barn palette, soft directional light on the hoof as the hero object. The hoof itself is the high-detail star: layered horn, visible white line, believable mud and shavings, honest-but-not-gory lesions. Readable at phone size — clear silhouettes, shape-coded problem markers. Restrained, never lurid; the "ick" is handled with the same matter-of-fact calm Nate brings.</p>
+<div style="margin-top:8px">
+<span class="swatch" style="background:#14110e"></span>barn dark<br>
+<span class="swatch" style="background:#c9992e"></span>horn / brass accent<br>
+<span class="swatch" style="background:#7fae6b"></span>sound / success<br>
+<span class="swatch" style="background:#9a3b2f"></span>lesion / blood (warning)<br>
+<span class="swatch" style="background:#b7a98f"></span>clean horn / UI text
+</div>
+</div>
+<div>
+<h4>Audio</h4>
+<p>ASMR-first. Low barn room-tone, chute creaks, brush friction, the clean peel of horn off the blade, grinder hum. A calm, informative optional narrator (a warm Midwestern register, consciously evoking Nate's "calming and informative" delivery) that teaches as you go and can be muted. Success is understated — a soft "Sound." and a gentle chime, never a slot-machine jingle. Music is sparse, ambient, low-tempo; the <i>work sounds</i> are the soundtrack.</p>
+</div>
+</div>
+
+<h2 id="mvp"><span class="num">14</span>MVP Scope</h2>
+<p>Goal of the MVP: prove the core feeling — <i>read → choose tool → clean pass → sound walk-off</i> — and the anti-cheese "balance over tapping" hook, with the smallest content set that tests it.</p>
+<h4>In scope (v0.1)</h4>
+<div class="mvp-bar">
+<span class="pill in">Dairy cow, hind foot only</span>
+<span class="pill in">4 tools: brush, knife, nippers, probe</span>
+<span class="pill in">Grinder + rasp (1 disc)</span>
+<span class="pill in">Five-step trim, functional 1–3</span>
+<span class="pill in">Therapy 4–5 (block + loose horn)</span>
+<span class="pill in">3 pathologies: overgrowth, sole ulcer, foreign body</span>
+<span class="pill in">Clean/reveal + walk-off juice</span>
+<span class="pill in">Balance/Correctness/Restraint/Finish scoring</span>
+<span class="pill in">Blood = fail state</span>
+<span class="pill in">~15 hand-built cases + guided tutorial</span>
+<span class="pill in">Core haptics + ASMR sound pass</span>
+</div>
+<h4>Out of scope (later)</h4>
+<div class="mvp-bar">
+<span class="pill out">Front feet &amp; other animals</span>
+<span class="pill out">Full pathology deck (white line, DD, crack…)</span>
+<span class="pill out">Farm-management meta &amp; map</span>
+<span class="pill out">Narrator voice packs</span>
+<span class="pill out">Cosmetics / IAP store</span>
+<span class="pill out">Procedural case generation</span>
+<span class="pill out">Exhibition / timed modes</span>
+</div>
+<p><b>Build order:</b> (1) one hoof, one tool, the clean-pass gesture + shavings + sound — find the feel. (2) Add the five-step sequence &amp; balance meter — find the puzzle. (3) Add diagnosis + a lesion case + the block — find the depth. (4) Juice pass: reveal, pressure-release, walk-off. (5) Tutorial + 15-case tuning. Ship to a small test group and measure whether players feel <i>craft</i>, not <i>grind</i>.</p>
+
+<h2 id="assumptions"><span class="num">15</span>Assumptions, Decisions &amp; Sources</h2>
+<h4>Key decisions I made</h4>
+<ul>
+<li><b>Format:</b> delivered as a self-contained HTML design doc (looks better than raw markdown and opens anywhere). Markdown export is trivial if you prefer.</li>
+<li><b>Five-step protocol as the spine.</b> I committed to mapping the trimming core 1:1 onto the Dutch five-step method — it's what turns the game into a sequencing puzzle instead of a scrubber, exactly as you asked.</li>
+<li><b>Working title "TRUE HOOF"</b> — a placeholder chosen to signal craft/realism; swap freely.</li>
+<li><b>Premium-first monetization.</b> Given the calm/ASMR identity, I prioritised a paid unlock + opt-in rewarded ads over interstitials, which would damage the mood.</li>
+<li><b>Dairy-cow/hind-foot MVP.</b> Narrowed the first build to the single most iconic, most content-rich starting point (hind feet carry the classic lesions).</li>
+<li><b>Blood as the hard fail line</b> — the clearest expression of "respect the animal, reward caution."</li>
+</ul>
+<h4>Assumptions</h4>
+<ul>
+<li>Target platform: iOS/Android, portrait, one-handed play; casual-session length (1–2 min per case).</li>
+<li>Audience: the broad "oddly satisfying" crowd Nate reaches, not just farmers — so realism is the <i>texture</i>, with assists keeping it accessible.</li>
+<li>No licensing deal with Nate Ranallo assumed; he's cited as inspiration only. (A real collaboration/endorsement would be a strong growth lever if pursued — worth a conversation.)</li>
+<li>Specific numbers (8–8.5&nbsp;cm toe, 6–8&nbsp;mm sole step) are design targets drawn from AHDB; tune for feel, and reconcile against your attached manuals once reachable.</li>
+</ul>
+<div class="callout">
+<h4>Open item — the 4 reference PDFs</h4>
+<p>I could not open the attached manuals (Cramer; the 888adc30… doc; the five-step protocol; the Hoof Care field guide) — they sit in app-internal storage this session can't mount. The design is grounded in the public, equivalent sources below, with the AHDB five-step method standing in for the attached "five-step protocol." If you re-attach the PDFs into a normal folder (e.g. Downloads) I'll fold in the exact per-manual citations and any numbers/pathologies specific to them.</p>
+</div>
+<h4>Sources used</h4>
+<ul>
+<li>AHDB — <a href="https://ahdb.org.uk/knowledge-library/trimming-cows-feet-the-five-step-dutch-method">Trimming cows' feet: the five-step Dutch method</a> (trimming backbone, toe/sole targets, dish, block, loose horn, golden rule)</li>
+<li>AHDB — <a href="https://ahdb.org.uk/knowledge-library/cattle-foot-care-what-s-in-your-tool-kit">Cattle foot care: what's in your tool kit</a>; <a href="https://ahdb.org.uk/knowledge-library/treating-injuries-of-the-horn-in-lame-cows">Treating injuries of the horn in lame cows</a></li>
+<li>USU Extension / dvm360 — sole ulcer, white-line &amp; toe abscess, digital dermatitis pathology &amp; treatment principles</li>
+<li>Review of cattle hoof-trimming instruments (rimag.ir) — grinders, discs, knives, safety</li>
+<li>Hoard's Dairyman, Outside, Boing Boing, Ambrook, NYT/The Nightly — on Nate Ranallo: platforms, format, why it's satisfying, the "forbidden parmesan" and screw-in-sole details, "instant gratification"</li>
+</ul>
+
+<footer>
+TRUE HOOF — game design concept, v1. Prepared for Ben, 8 Oct 2026. Realism grounded in the AHDB five-step Dutch method and veterinary pathology sources; inspired by the work of Nate Ranallo ("Nate the Hoof Guy"). Working title and all specifics are tunable.
+</footer>
+
+</div>
+</body>
+</html>
