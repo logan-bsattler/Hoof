@@ -7,6 +7,8 @@ import { HoofArt } from '../src/hoofart.js';
 import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
 
 const CROP = { x: 24, y: 165, w: 352, h: 480 };
+// ?focus=lesion crops a close-up around the ulcer.
+if (new URLSearchParams(location.search).get('focus') === 'lesion') Object.assign(CROP, { x: 132, y: 248, w: 80, h: 80 });
 // ?stage=2 renders one stage; ?zoom=2 draws larger.
 const Q = new URLSearchParams(location.search);
 const ZOOM = Number(Q.get('zoom')) || 1.225;

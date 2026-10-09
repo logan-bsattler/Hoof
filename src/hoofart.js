@@ -582,24 +582,31 @@ export class HoofArt {
 
           // 4. Opened cavity: wet peach/pink tissue in layers, corium at the core.
           if (dL < L.r * 2) {
-            const thr = 0.3 + 0.4 * ncv;
-            const open = smoothstep(thr + 0.12, thr - 0.12, lf);
+            // Ragged opening: the edge wanders with two scales of noise.
+            const thr = 0.22 + 0.36 * ncv + 0.3 * (nIsle[p] / 255 - 0.5);
+            // Fade out before the gate at 2r so the pocket never shows a circular edge.
+            const open = smoothstep(thr + 0.08, thr - 0.08, lf) * smoothstep(2, 1.65, dL / L.r);
             if (open > 0) {
               const u = dL / L.r;
-              const fl = 0.5 + 0.5 * Math.sin(dL * 1.7 + ncv * 7);
-              let cr = 238 - 40 * fl * 0.6, cg = 212 - 62 * fl * 0.6, cb = 192 - 64 * fl * 0.6;
-              const mid = smoothstep(1.25, 0.95, u);
-              const mr = 232 - 54 * ncv, mg = 168 - 64 * ncv, mb = 150 - 58 * ncv;
-              cr += (mr - cr) * mid; cg += (mg - cg) * mid; cb += (mb - cb) * mid;
-              const core = smoothstep(0.65, 0.4, u);
-              cr += (196 - 46 * ngr - cr) * core; cg += (86 - 34 * ngr - cg) * core; cb += (92 - 30 * ngr - cb) * core;
-              if (ngr > 0.86 && u < 1.2) { cr *= 0.55; cg *= 0.5; cb *= 0.5; } // dark pits
+              // Loose layers: translucent cream flaps over mauve-grey shadowed tissue, with dark
+              // pits between them. Noise contours, not rings, so no two flaps are the same.
+              const ls = nStreak[p] / 255;
+              const flap = smoothstep(0.46, 0.6, ncv * 0.7 + ls * 0.3);
+              let cr = 176 + 58 * flap, cg = 146 + 70 * flap, cb = 140 + 44 * flap;
+              const pit = smoothstep(0.3, 0.2, ncv);
+              cr += (78 - cr) * pit; cg += (50 - cg) * pit; cb += (62 - cb) * pit;
+              // Flap edges catch a bright rim.
+              const fe = smoothstep(0.4, 0.5, ncv * 0.7 + ls * 0.3) * (1 - flap);
+              cr += 40 * fe; cg += 36 * fe; cb += 30 * fe;
+              // The corium shows pink-red at the very centre.
+              const core = smoothstep(0.55, 0.25, u + (ncv - 0.5) * 0.4);
+              cr += (198 - 40 * ngr - cr) * core; cg += (92 - 30 * ngr - cg) * core; cb += (100 - 28 * ngr - cb) * core;
               // Inner shadow: the rim of horn on the lamp side overhangs the hole.
               const sh = looseAt(lx - 1.7, ly - 2.4);
               const dk = (1 - 0.5 * sh) * (0.8 + 0.2 * Math.min(1, u));
               cr *= dk; cg *= dk; cb *= dk;
-              // Antiseptic pools in the crevices: blue-green.
-              const tn = sm(tint) * (0.45 + 0.55 * ncv);
+              // Antiseptic pools in the crevices and stains the rest only faintly.
+              const tn = sm(tint) * (0.18 + 0.7 * smoothstep(0.5, 0.25, ncv));
               cr += (96 - cr) * tn * 0.75; cg += (196 - cg) * tn * 0.75; cb += (164 - cb) * tn * 0.75;
               R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
               wetness = Math.max(wetness, open);
@@ -663,8 +670,8 @@ export class HoofArt {
         const nh4 = nh * nh * nh * nh, nh16 = nh4 * nh4 * nh4 * nh4;
         const clean = (1 - cov) * (c >= 3 ? 0.4 : 1);
         spec += clean * sheen * (30 * nh16 * nh4 + 12 * nh4 * nh4);
-        spec += 210 * mudSp + 230 * (wetSpec[p] / 255) * wetness;
-        spec += nh16 * nh16 * (60 * cov + 70 * wetness);
+        spec += 210 * mudSp + 110 * (wetSpec[p] / 255) * wetness;
+        spec += nh16 * nh16 * 60 * cov + (nh16 * 40 + nh4 * 10) * wetness;
         d[o] = R + spec;
         d[o + 1] = G + spec;
         d[o + 2] = B + spec * 0.92;
