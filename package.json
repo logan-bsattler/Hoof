@@ -1,0 +1,12 @@
+{
+  "name": "true-hoof",
+  "version": "0.1.0",
+  "description": "TRUE HOOF: a calm, craftsmanlike cattle hoof-trimming game (web prototype).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#1d1611">
+  <meta name="description" content="TRUE HOOF: a calm, craftsmanlike cattle hoof-trimming game.">
+  <title>True Hoof</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">TRUE <span>HOOF</span></div>
+      <div id="caseTitle">Case B · Pressure Point</div>
+      <div class="top-actions">
+        <button id="btnGuides" class="chip on" aria-pressed="true" title="Guided lines (G)">Guides</button>
+        <button id="btnSound" class="chip on" aria-pressed="true" title="Sound (M)">Sound</button>
+        <button id="btnSteps" class="chip narrow-only" title="Show steps">Steps</button>
+      </div>
+    </header>
+
+    <div id="stepBar" class="narrow-only">
+      <div>
+        <div id="stepBarLabel"></div>
+        <div id="stepBarTip"></div>
+      </div>
+      <button id="btnReleaseBar" class="primary small">Release</button>
+    </div>
+
+    <main id="stage">
+      <aside id="stepsPanel">
+        <div class="panel-inner">
+          <h2>The trim</h2>
+          <ol id="stepsList"></ol>
+          <p id="stepTip"></p>
+          <button id="btnRelease" class="primary">Release the cow</button>
+          <p class="fine">Balance and correctness score. Speed doesn’t. Drawing blood ends the case.</p>
+        </div>
+      </aside>
+      <div id="canvasWrap">
+        <canvas id="game" aria-label="Hoof trimming play area"></canvas>
+        <div id="toast" role="status" aria-live="polite"></div>
+      </div>
+    </main>
+
+    <footer id="dock">
+      <div id="toolInfo"></div>
+      <div id="tools" role="toolbar" aria-label="Tools"></div>
+    </footer>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="card" id="modalCard"></div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
