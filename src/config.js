@@ -21,7 +21,8 @@ export const CFG = {
   // or below its zone target — the "you're nearly there" assist.
   tools: {
     brush:   { radius: 34, mudRate: 0.02 },
-    knife:   { radius: 9,  rate: 0.09, resist: 0.35 },
+    // Knife: hold and pull. It bites once pulled `engage` px, then cuts a wide, even strip.
+    knife:   { radius: 14, rate: 0.12, resist: 0.35, engage: 6 },
     grinder: { radius: 20, rate: 14, resist: 0.3, resistThin: 0.15 },
     // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take.
     nippers: { radius: 17, liveBite: 3.5, liveCore: 0.4, spacing: 16, jawDepth: 22 },

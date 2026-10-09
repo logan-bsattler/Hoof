@@ -120,6 +120,40 @@ export class Renderer {
   weep(x, y, amount) { this.art?.weep(x, y, amount); }
   sprayDecal(x, y, r, dt) { this.art?.spray(x, y, r, dt); }
 
+  // Guided run: a pulsing brass outline around where to work, plus a progress arc on rings.
+  coach(target, progress, time) {
+    if (!target) return;
+    const c = this.ctx;
+    const pulse = 0.55 + 0.45 * Math.sin(time * 4);
+    c.save();
+    c.lineWidth = 2.5;
+    c.setLineDash([7, 5]);
+    c.lineDashOffset = -time * 18;
+    c.strokeStyle = `rgba(240,196,110,${0.5 + 0.5 * pulse})`;
+    c.shadowColor = 'rgba(0,0,0,0.6)';
+    c.shadowBlur = 4;
+    const rects = target.kind === 'rects' ? target.list : target.kind === 'rect' ? [target] : [];
+    for (const r of rects) {
+      c.beginPath();
+      roundRect(c, r.x, r.y, r.w, r.h, 16);
+      c.stroke();
+    }
+    if (target.kind === 'ring') {
+      c.beginPath();
+      c.arc(target.x, target.y, target.r + 3 * pulse, 0, Math.PI * 2);
+      c.stroke();
+      if (progress > 0) {
+        c.setLineDash([]);
+        c.lineWidth = 4;
+        c.strokeStyle = '#7bbf6a';
+        c.beginPath();
+        c.arc(target.x, target.y, target.r + 8, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+        c.stroke();
+      }
+    }
+    c.restore();
+  }
+
   guides() {
     const c = this.ctx;
     c.save();

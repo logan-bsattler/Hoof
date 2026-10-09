@@ -132,6 +132,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #toast.warn { border-color: var(--warn); color: #ffd2cc; }
 #toast.good { border-color: var(--sound); }
 
+/* ---- guided run coach card ---- */
+#coach {
+  margin: 0 0 12px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--brass);
+}
+#coach[hidden] { display: none; }
+#coachCount { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brass); }
+#coachTitle { font-weight: 700; font-size: 15px; margin: 2px 0 4px; }
+#coachText { font-size: 13px; line-height: 1.4; color: var(--text); }
+.coach-track { margin-top: 8px; height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.coach-track[hidden] { display: none; }
+#coachBar { height: 100%; width: 0; background: var(--sound); transition: width 0.25s; }
+
 /* ---- tool dock ---- */
 #dock {
   background: var(--panel);
@@ -255,3 +271,6 @@ button.primary.small { width: auto; padding: 6px 12px; font-size: 12px; }
   #dock { padding-left: 8px; padding-right: 8px; }
   #tools { gap: 4px; }
 }
+
+/* The coach card replaces the plain step tip during the guided run. */
+body.tutorial #stepTip { display: none; }

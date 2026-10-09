@@ -24,7 +24,7 @@ export const TOOLS = {
   },
   knife: {
     name: 'Hoof knife', icon: '🔪', mode: 'stroke', key: '5',
-    hint: 'Short swipes pare thin horn. For the dish and for loose horn.',
+    hint: 'Press, hold and pull to take off a strip of horn. For the dish and for loose horn.',
   },
   rasp: {
     name: 'Rasp', icon: '🪵', mode: 'stroke', key: '6',
@@ -124,7 +124,8 @@ export function applyStroke(hoof, tool, x, y, dist) {
       // Fresh cuts expose untreated tissue: the flush has to be repeated.
       hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * dist * f);
       if (clearLoose(hoof, i, ev)) return;
-      const d = cut(hoof, i, cfg.rate * dist * f, ev, cfg.resist);
+      // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
+      const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f * 2.5), ev, cfg.resist);
       // A clean knife pass leaves a smooth surface.
       hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
     });

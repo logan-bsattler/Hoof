@@ -59,10 +59,37 @@ export class UI {
     const tip = current < 0 ? DONE_TIP : STEPS[current].tip;
     const label = current < 0 ? 'All steps done' : STEPS[current].label;
     $('stepTip').textContent = tip;
-    $('stepBarLabel').textContent = label;
-    $('stepBarTip').textContent = tip;
+    if (!this.coaching) {
+      $('stepBarLabel').textContent = label;
+      $('stepBarTip').textContent = tip;
+    }
     const hintTool = current < 0 ? null : STEPS[current].tool;
     for (const [k, b] of Object.entries(this.toolButtons)) b.classList.toggle('suggested', k === hintTool);
+  }
+
+  // Guided-run coach card: beat n of N, what to do, and a progress bar.
+  setCoach(t) {
+    const el = $('coach');
+    this.coaching = !!t;
+    if (!t) { el.hidden = true; return; }
+    el.hidden = false;
+    const b = t.beat;
+    const n = t.beats.length;
+    if (!b) {
+      $('coachCount').textContent = 'Guided trim · done';
+      $('coachTitle').textContent = 'That’s a good foot';
+      $('coachText').textContent = 'Every step done. Hit “Release the cow” and watch her walk off.';
+      $('coachBar').style.width = '100%';
+      return;
+    }
+    $('coachCount').textContent = `Guided trim · ${t.index + 1} of ${n} · ${TOOLS[b.tool].name}`;
+    $('coachTitle').textContent = b.title;
+    $('coachText').textContent = b.text;
+    $('coachBar').style.width = `${Math.round((b.measure ? t.progress : 0) * 100)}%`;
+    $('coachBar').parentElement.hidden = !b.measure;
+    // Narrow screens hide the panel: the step bar carries the coaching instead.
+    $('stepBarLabel').textContent = `${t.index + 1}/${n} · ${b.title}`;
+    $('stepBarTip').textContent = b.text;
   }
 
   toast(msg, kind = 'info', ms = 2800) {

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { CFG } from '../src/config.js';
 import { Hoof, Z, CLAW, LOOSE, GEOM } from '../src/hoof.js';
 import { CASE_B } from '../src/case.js';
-import { applyStroke, applyGrind, applyBite, applySpray, applyWrap } from '../src/tools.js';
+import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase } from '../src/scoring.js';
 
@@ -222,4 +222,21 @@ test('an untreated ulcer leaves the treat step open and costs correctness', () =
   const r = scoreCase(m, s, h, CASE_B);
   assert.ok(r.parts.correctness <= 90);
   assert.ok(r.notes.some((n) => n.includes('untreated')));
+});
+
+test('guided run starts at cleaning, tracks progress, and finishes on an ideal trim', async () => {
+  const { Tutorial } = await import('../src/tutorial.js');
+  const h = new Hoof(CASE_B);
+  const t = new Tutorial(CASE_B);
+  t.update(h.metrics(), newSession(), h);
+  assert.equal(t.beat.id, 'clean');
+  assert.equal(t.progress, 0);
+  for (let k = 0; k < 20; k++) applyStroke(h, 'brush', 200, 400, 10);
+  t.update(h.metrics(), newSession(), h);
+  assert.ok(t.progress > 0, 'brushing moves the progress bar');
+  // Every beat has a tool and a target.
+  for (const b of t.beats) assert.ok(TOOLS_OK.includes(b.tool) && b.target, b.id);
+  idealTrim(h);
+  t.update(h.metrics(), idealSession(), h);
+  assert.equal(t.finished, true);
 });

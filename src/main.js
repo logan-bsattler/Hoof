@@ -12,6 +12,7 @@ import { Particles } from './particles.js';
 import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
+import { Tutorial } from './tutorial.js';
 
 const caseDef = CASE_B;
 const canvas = document.getElementById('game');
@@ -32,12 +33,14 @@ const game = {
   metricsTimer: 0,
   scrubLevel: 0,
   knifeAccum: 0,
+  pullRemoved: 0,
   failTimer: 0,
   weepT: 0,
   holdLast: null,
   walkoff: null,
   result: null,
   lastWarn: {},
+  tutorial: null,       // a Tutorial during the guided first run, else null
   ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null },
 };
 
@@ -69,7 +72,7 @@ function newCase() {
 async function showIntro() {
   game.state = 'intro';
   newCase();
-  await ui.modal(
+  const mode = await ui.modal(
     `<div class="eyebrow">Case ${caseDef.id} · Trimmer tier</div>
      <h1>${caseDef.title}</h1>
      <p class="sub">${caseDef.subtitle}</p>
@@ -81,12 +84,30 @@ async function showIntro() {
        <li><b>Treat</b> it: flush, pad and wrap before she goes.</li>
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
-    [{ id: 'start', label: 'Lift the foot', primary: true }],
+    [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }],
   );
   Sound.init();
   Sound.setEnabled(game.sound);
   game.state = 'play';
-  ui.toast(STEPS[0].tip, 'info', 4500);
+  game.tutorial = mode === 'guided' ? new Tutorial(caseDef) : null;
+  document.body.classList.toggle('tutorial', !!game.tutorial);
+  if (game.tutorial) updateCoach();
+  else { ui.setCoach(null); ui.toast(STEPS[0].tip, 'info', 4500); }
+}
+
+// Guided run: move to the next beat when the current one is done.
+function updateCoach() {
+  const t = game.tutorial;
+  if (!t) return;
+  const changed = t.update(game.metrics, game.session, game.hoof);
+  if (changed) {
+    const b = t.beat;
+    if (b) {
+      if (t.index > 0) { Sound.step(); particles.spawn('spark', game.ptr.x, game.ptr.y, '#7bbf6a', 8); }
+      selectTool(b.tool);
+    }
+  }
+  ui.setCoach(t);
 }
 
 function stopHoldSounds() {
@@ -135,7 +156,9 @@ canvas.addEventListener('pointermove', (e) => {
   ptr.moved += dist;
   if (game.state === 'play') {
     const mode = TOOLS[game.tool].mode;
-    if (mode === 'stroke' && dist > 0) {
+    // The knife only bites once it's been pulled: a press alone does nothing.
+    const engaged = game.tool !== 'knife' || ptr.moved >= CFG.tools.knife.engage;
+    if (mode === 'stroke' && dist > 0 && engaged) {
       // Interpolate stamps so fast strokes don't skip cells.
       const steps = Math.ceil(dist / 3);
       for (let s = 1; s <= steps; s++) {
@@ -161,6 +184,12 @@ function endPointer(e) {
   if (!ptr.down || e.pointerId !== ptr.id) return;
   ptr.down = false;
   if (TOOLS[game.tool].mode === 'hold') stopHoldSounds();
+  // End of a knife pull: the strip curls off the blade.
+  if (game.tool === 'knife' && game.pullRemoved > 1) {
+    particles.spawn('shaving', ptr.x, ptr.y, '#f4ead2', Math.min(6, 1 + Math.round(game.pullRemoved / 15)));
+    Sound.knife();
+  }
+  game.pullRemoved = 0;
   if (game.state === 'play' && TOOLS[game.tool].mode === 'tap' && ptr.moved < 12) tap(ptr.x, ptr.y);
   if (e.pointerType !== 'mouse') ptr.over = false;
 }
@@ -301,6 +330,7 @@ function handle(ev, x, y) {
     if (tool === 'knife') {
       if (Math.random() < Math.min(1, ev.removed * 0.15)) particles.spawn('shaving', x, y, '#f4ead2');
       game.knifeAccum += ev.removed;
+      game.pullRemoved += ev.removed;
       if (game.knifeAccum > 6) { game.knifeAccum = 0; Sound.knife(); buzz(4); }
     } else if (tool === 'grinder') {
       // The disc throws a spray of white dust off its trailing edge.
@@ -454,7 +484,8 @@ function frame(now) {
       const prevDone = game.steps.status.filter((s) => s.done).length;
       game.steps = evaluateSteps(game.metrics, game.session, game.hoof, game.time);
       const nowDone = game.steps.status.filter((s) => s.done).length;
-      if (nowDone > prevDone) {
+      if (game.tutorial) updateCoach();
+      else if (nowDone > prevDone) {
         Sound.step();
         particles.spawn('spark', game.ptr.x, game.ptr.y, '#7bbf6a', 8);
         const c = game.steps.current;
@@ -509,6 +540,7 @@ function draw() {
   renderer.block(hoof, game.tool === 'block' ? aim : 0);
   renderer.dressing(hoof, game.tool === 'wrap' ? aim : 0);
   if (game.guides) renderer.guides(hoof);
+  if (game.tutorial?.beat && game.state === 'play') renderer.coach(game.tutorial.beat.target, game.tutorial.progress, game.time);
   renderer.labels();
   particles.draw(ctx);
   renderer.meter(game.metrics);
