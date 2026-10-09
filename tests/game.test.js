@@ -98,3 +98,45 @@ test('drawing blood fails the case', () => {
   assert.equal(r.failed, true);
   assert.equal(r.total, 0);
 });
+
+// Set every weight-bearing cell of one claw to a given sole thickness.
+function setClawSole(hoof, claw, mm) {
+  for (let i = 0; i < hoof.n; i++) {
+    const z = hoof.zone[i];
+    if (hoof.claw[i] !== claw || !(z & Z.LIVE) || (z & (Z.HEEL | Z.ULCER | Z.DISH)) || hoof.looseInit[i]) continue;
+    hoof.thick[i] = mm;
+  }
+}
+
+test('over-trimmed inner claw still completes step 1 and unlocks step 2', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  setClawSole(h, CLAW.INNER, 5.9);
+  const { status } = evaluateSteps(h.metrics(), idealSession(), h, 1);
+  const st = Object.fromEntries(status.map((x) => [x.id, x.done]));
+  assert.equal(st.step1, true);
+  assert.equal(st.step2, false, 'outer at 7 mm is 1.1 mm off the inner claw');
+  // Matching the outer claw to the inner's actual height completes step 2.
+  setClawSole(h, CLAW.OUTER, 5.9);
+  assert.equal(evaluateSteps(h.metrics(), idealSession(), h, 1).status.find((x) => x.id === 'step2').done, true);
+});
+
+test('a claw still above the band does not complete step 1', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  setClawSole(h, CLAW.INNER, 8.0);
+  assert.equal(evaluateSteps(h.metrics(), idealSession(), h, 1).status[2].done, false);
+});
+
+test('over-trimming scores lower than trimming to target', () => {
+  const good = new Hoof(CASE_B);
+  idealTrim(good);
+  const over = new Hoof(CASE_B);
+  idealTrim(over);
+  setClawSole(over, CLAW.INNER, 5.9);
+  setClawSole(over, CLAW.OUTER, 5.9);
+  const rGood = scoreCase(good.metrics(), idealSession(), good, CASE_B);
+  const rOver = scoreCase(over.metrics(), idealSession(), over, CASE_B);
+  assert.ok(rOver.total < rGood.total - 10, `${rOver.total} vs ${rGood.total}`);
+  assert.ok(rOver.notes.some((n) => n.includes('over-trimmed')));
+});

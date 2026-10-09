@@ -6,7 +6,9 @@ import { CLAW, LOOSE } from './hoof.js';
 
 const { target: T, dishTarget: D, tolerance: TOL } = CFG.sole;
 
-const levelled = (k) => k.deadRemain < 0.12 && Math.abs(k.wbMean - T) <= TOL;
+// One-sided on purpose: horn can't be put back, so an over-trimmed claw must
+// still let the case progress. Over-trimming is charged in scoring instead.
+const levelled = (k) => k.deadRemain < 0.12 && k.wbMean <= T + TOL;
 
 export const STEPS = [
   {
@@ -27,6 +29,7 @@ export const STEPS = [
   {
     id: 'step2', label: '2 · Match the outer claw', tool: 'grinder',
     tip: 'Bring the outer claw down to match the inner. Watch the balance beam: level is the goal.',
+    // Match the outer claw to the inner claw's actual height, not the fixed target.
     done: (m) => levelled(m.claws[CLAW.OUTER]) && Math.abs(m.levelDiff) <= 0.6,
   },
   {

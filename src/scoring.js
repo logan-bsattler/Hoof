@@ -59,7 +59,18 @@ export function scoreCase(m, session, hoof, caseDef) {
   // Restraint: the golden rule. Err on the side of caution.
   const overFrac = (m.overWB + m.overDish) / Math.max(1, m.wbN + m.dishN);
   const triFrac = m.triCut / Math.max(1, m.triN);
-  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5));
+  // Whole-claw over-trimming: below the target band costs, below thin costs a lot.
+  let clawOver = 0;
+  for (const [name, k] of [['Inner', inner], ['Outer', outer]]) {
+    if (k.wbMean < CFG.sole.thin) {
+      clawOver += 40;
+      notes.push(`${name} claw ground to ${k.wbMean.toFixed(1)} mm: dangerously thin sole.`);
+    } else if (k.wbMean < T - CFG.sole.tolerance) {
+      clawOver += 15;
+      notes.push(`${name} claw over-trimmed to ${k.wbMean.toFixed(1)} mm (target ~${T}). Err on the side of caution.`);
+    }
+  }
+  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver);
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 

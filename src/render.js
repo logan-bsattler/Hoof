@@ -338,12 +338,16 @@ export class Renderer {
     c.fillRect(x, y, 16, h);
     c.fillStyle = 'rgba(123,191,106,0.45)';
     c.fillRect(x, ty(T + tol), 16, ty(T - tol) - ty(T + tol));
-    c.fillStyle = Math.abs(v - T) <= tol ? '#7bbf6a' : '#d8a64a';
+    c.fillStyle = v < T - tol ? '#ff6b5b' : Math.abs(v - T) <= tol ? '#7bbf6a' : '#d8a64a';
     c.fillRect(x - 3, ty(v) - 1.5, 22, 3);
     c.font = '9px system-ui, sans-serif';
     c.textAlign = 'center';
     c.fillStyle = deadRemain < 0.12 ? '#7bbf6a' : 'rgba(241,231,208,0.6)';
     c.fillText(deadRemain < 0.12 ? 'toe ✓' : 'toe long', x + 8, y + h + 6);
+    if (v < T - tol) {
+      c.fillStyle = '#ff6b5b';
+      c.fillText('too thin', x + 8, y - 3);
+    }
   }
 
   cursor(tool, ptr, hoof, guides, time) {
