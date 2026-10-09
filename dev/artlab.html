@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hoof Art Lab</title>
+  <style>
+    body { margin: 0; background: #16120f; color: #d8c8b0; font: 13px system-ui, sans-serif; }
+    header { padding: 8px 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    #grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 8px 8px; }
+    figure { margin: 0; }
+    figcaption { padding: 4px 2px; color: #a89478; }
+    canvas, img { display: block; background: #2a2219; }
+    img { height: 588px; width: auto; }
+    img[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <!-- Dev only: renders the hoof material in fixed states for art passes. -->
+  <header>
+    <strong>Hoof art lab</strong>
+    <label><input type="checkbox" id="showRef"> reference frames (local, git-ignored)</label>
+    <span id="timing"></span>
+  </header>
+  <div id="grid"></div>
+  <script type="module" src="artlab.js"></script>
+</body>
+</html>
