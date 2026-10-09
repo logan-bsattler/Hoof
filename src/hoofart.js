@@ -36,9 +36,9 @@ function norm3(x, y, z) {
 // Sole colour by remaining thickness (mm). Ground horn is near-white ivory; it warms
 // to cream when overgrown and goes translucent pink as the corium shows through.
 const SOLE_RAMP = [
-  [0, [196, 52, 58]], [1, [214, 122, 124]], [2.5, [236, 184, 170]], [3.5, [246, 214, 196]],
-  [4.5, [250, 230, 206]], [7, [250, 234, 206]], [9, [242, 222, 184]], [12, [228, 204, 154]],
-  [16, [210, 182, 124]],
+  [0, [196, 52, 58]], [1, [214, 122, 124]], [2.5, [234, 180, 166]], [3.5, [242, 204, 188]],
+  [4.5, [246, 220, 200]], [7, [245, 226, 202]], [9, [240, 218, 182]], [12, [226, 200, 150]],
+  [16, [208, 180, 122]],
 ];
 const RAMP_N = 256, RAMP_MAX = 16;
 const RAMP = (() => {
@@ -155,7 +155,9 @@ export class HoofArt {
     const N4 = valueNoise(rand), N5 = valueNoise(rand), N6 = valueNoise(rand);
     const nMudThr = new Uint8Array(n), nStain = new Uint8Array(n), nCav = new Uint8Array(n);
     const nGrain = new Uint8Array(n), nStreak = new Uint8Array(n), nIsle = new Uint8Array(n);
-    const lump = new Float32Array(n), wet = new Float32Array(n);
+    const lump = new Float32Array(n), wet = new Float32Array(n), glint = new Float32Array(n);
+    const nTone = new Uint8Array(n), nFleck = new Uint8Array(n);
+    const N7 = valueNoise(rand), N8 = valueNoise(rand);
     for (let p = 0; p < n; p++) {
       if (!cls[p]) continue;
       const lx = X0 + ((p % w) + 0.5) / S, ly = Y0 + (Math.floor(p / w) + 0.5) / S;
@@ -171,6 +173,12 @@ export class HoofArt {
       nStreak[p] = clamp255(fbm(N5, lx / 1.4, ly / 10, 3) * 255);
       lump[p] = fbm(N5, lx / 2.4 + 91, ly / 2.4, 3);
       wet[p] = fbm(N3, lx / 3.2 + 40, ly / 3.2, 2);
+      // Fine wet bumps on the manure: each crest throws a small sharp glint.
+      glint[p] = fbm(N8, lx / 0.9, ly / 0.9, 2);
+      // Broad peach/cream mottling in the horn, as in a waxy, translucent material.
+      nTone[p] = clamp255(fbm(N7, lx / 34, ly / 40, 3) * 255);
+      // Sparse dark flecks of grit pressed into the sole.
+      nFleck[p] = clamp255(N7(lx * 1.9 + 300, ly * 1.9) * 255);
     }
     // Wet specular from micro-normals (pixel gradients) on top of the dome normal.
     const mudSpec = new Uint8Array(n), wetSpec = new Uint8Array(n);
@@ -179,12 +187,30 @@ export class HoofArt {
       const x = p % w, y = (p / w) | 0;
       const pl = x > 0 ? p - 1 : p, pr = x < w - 1 ? p + 1 : p;
       const pu = y > 0 ? p - w : p, pd = y < h - 1 ? p + w : p;
-      mudSpec[p] = specFrom(dnx[p], dny[p], (lump[pr] - lump[pl]) * S * 6, (lump[pd] - lump[pu]) * S * 6, 30);
+      const broad = specFrom(dnx[p], dny[p], (lump[pr] - lump[pl]) * S * 6, (lump[pd] - lump[pu]) * S * 6, 30);
+      const sharp = specFrom(dnx[p], dny[p], (glint[pr] - glint[pl]) * S * 5, (glint[pd] - glint[pu]) * S * 5, 140);
+      mudSpec[p] = Math.min(255, broad * 0.3 + sharp * 0.5);
       wetSpec[p] = specFrom(dnx[p], dny[p], (wet[pr] - wet[pl]) * S * 4, (wet[pd] - wet[pu]) * S * 4, 60);
     }
+    // Manure relief: lumps at two scales plus fine wet ripples. Its slope tilts the normal,
+    // so the lamp itself picks out the clumps and throws glints off their wet crests.
+    const mudX = new Float32Array(n), mudY = new Float32Array(n);
+    for (let p = 0; p < n; p++) {
+      if (!cls[p]) continue;
+      const x = p % w, y = (p / w) | 0;
+      const pl = x > 0 ? p - 1 : p, pr = x < w - 1 ? p + 1 : p;
+      const pu = y > 0 ? p - w : p, pd = y < h - 1 ? p + w : p;
+      // Some stretches are slick and smooth, others clumpy.
+      const clumpy = 0.25 + 1.1 * smoothstep(0.35, 0.7, nStain[p] / 255);
+      const hx = (lump[pr] - lump[pl]) * 1.4 * clumpy + (glint[pr] - glint[pl]) * 0.35 + (wet[pr] - wet[pl]) * 1.8;
+      const hy = (lump[pd] - lump[pu]) * 1.4 * clumpy + (glint[pd] - glint[pu]) * 0.35 + (wet[pd] - wet[pu]) * 1.8;
+      mudX[p] = (hx * S) / (pr - pl || 1);
+      mudY[p] = (hy * S) / ((pd - pu) / w || 1);
+    }
+    this.mudX = mudX; this.mudY = mudY;
     const nLump = new Uint8Array(n);
     for (let p = 0; p < n; p++) nLump[p] = clamp255(lump[p] * 255);
-    Object.assign(this, { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, mudSpec, wetSpec });
+    Object.assign(this, { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec });
 
     // Straw and fibre strands embedded in the manure.
     this.straw = paintStraw(this, mulberry32(4411));
@@ -250,7 +276,12 @@ export class HoofArt {
       };
       this.looseF = new Float32Array(hoof.n);
       this.bloodF = new Float32Array(hoof.n);
-      for (let i = 0; i < hoof.n; i++) { this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i]; }
+      // Where the ulcer's cap of loose horn started: the pocket can only open inside it.
+      this.ulcerF = new Float32Array(hoof.n);
+      for (let i = 0; i < hoof.n; i++) {
+        this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i];
+        this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
+      }
       this.markT.fill(0);
       this.octx.save();
       this.octx.setTransform(1, 0, 0, 1, 0, 0);
@@ -390,11 +421,11 @@ export class HoofArt {
   compose(x0, y0, x1, y1) {
     const hoof = this.hoof;
     const { S, w, X0, Y0, cls, edge, sx0, sy0, cellCls, fallback } = this;
-    const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, mudSpec, wetSpec, straw, hash, markT, markA, arcX, arcY } = this;
+    const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec, straw, hash, markT, markA, arcX, arcY } = this;
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell;
     const d = this.img.data;
     const { thick, init, mud, rough, tint } = hoof;
-    const looseF = this.looseF, bloodF = this.bloodF;
+    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const lesionC = L.claw, heelC = LH.claw;
     const heelY = GEOM.heelY;
@@ -402,6 +433,13 @@ export class HoofArt {
     let i0 = 0, i1 = 0, i2 = 0, i3 = 0, w0 = 0, w1 = 0, w2 = 0, w3 = 0;
     const sm = (a) => a[i0] * w0 + a[i1] * w1 + a[i2] * w2 + a[i3] * w3;
     // Plain bilinear sample of looseF at a logical point (for the cavity's inner shadow).
+    const fieldAt = (a, lx, ly) => {
+      const fx = (lx - g.x0) / cell - 0.5, fy = (ly - g.y0) / cell - 0.5;
+      const ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      if (ix < 0 || iy < 0 || ix >= cols - 1 || iy >= rows - 1) return 0;
+      const j = iy * cols + ix;
+      return (a[j] * (1 - tx) + a[j + 1] * tx) * (1 - ty) + (a[j + cols] * (1 - tx) + a[j + cols + 1] * tx) * ty;
+    };
     const looseAt = (lx, ly) => {
       const fx = (lx - g.x0) / cell - 0.5, fy = (ly - g.y0) / cell - 0.5;
       const ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
@@ -412,6 +450,7 @@ export class HoofArt {
 
     const RG = this.reliefGrid();
     const PER = Math.max(2.4, 0.9 * S);  // striation spacing, render px
+    const GPER = 2.6 * S;                // grinder arcs are broader
     const kx = new Float32Array(4), kdx = new Float32Array(4), ky = new Float32Array(4), kdy = new Float32Array(4);
     const reliefOut = new Float32Array(3);
     // Cubic B-spline over the padded relief grid: smooth value and slope (mm per cell).
@@ -467,8 +506,9 @@ export class HoofArt {
         const t = sm(thick), m = sm(mud);
         const e = edge[p];
         const ns = nStain[p] / 255, ncv = nCav[p] / 255, ngr = nGrain[p] / 255;
-        const wallW = 5.2 + 3 * ns;
-        let R, G, B, spec = 0, wetness = 0;
+        // The wall band wanders in width, and its inner edge is ragged where the crust broke off.
+        const wallW = 5.5 + 5 * ns + (ncv - 0.5) * 2.2;
+        let R, G, B, spec = 0, wetness = 0, crust = 0;
         // Surface slope (height per logical px): the claw's dome plus cut relief and tool marks.
         let gx = sx0[p], gy = sy0[p];
         let sheen = 1;
@@ -508,9 +548,16 @@ export class HoofArt {
           // Heel bulb horn is softer and yellower.
           const heel = smoothstep(heelY + 8, heelY - 12, ly + (ns - 0.5) * 18);
           if (heel > 0) { R += (222 - R) * heel; G += (194 - G) * heel; B += (138 - B) * heel; }
-          // Growth lines follow the outline; fine grain everywhere.
-          const gl = 1 - 0.035 * Math.sin(e * 1.3 + ns * 10) + (ngr - 0.5) * 0.07;
+          // Waxy horn: broad patches drift between peach and cream, and the sole warms to
+          // amber as it rolls toward the wall.
+          const tone = nTone[p] / 255 - 0.5;
+          R += 10 * tone; G -= 4 * tone; B -= 12 * tone;
+          const amber = smoothstep(wallW + 14, wallW + 2, e) * 0.35;
+          R += (232 - R) * amber; G += (192 - G) * amber; B += (130 - B) * amber;
+          // Growth lines follow the outline; a faint grain, and the odd fleck of grit.
+          const gl = 1 - 0.025 * Math.sin(e * 1.3 + ns * 10) + (ngr - 0.5) * 0.025;
           R *= gl; G *= gl; B *= gl;
+          if (nFleck[p] > 246 && ngr > 0.5) { const k = 0.62 + 0.2 * ncv; R *= k; G *= k * 0.95; B *= k * 0.9; }
 
           // Directional striations left by the tools.
           const mt = markT[p];
@@ -518,15 +565,17 @@ export class HoofArt {
             const qa = markA[p];
             let v;
             if (mt === MARK.GRINDER) {
-              // Fine, even arcs from the disc rim: tiny ridges that catch the lamp.
+              // Soft, shallow arcs from the disc rim: broad ridges a few px apart that catch the
+              // lamp, fading in and out along their length, with the odd deeper score.
               const ax = px - arcX[p], ay = py - arcY[p];
               const sr = Math.sqrt(ax * ax + ay * ay) || 1;
-              const f = sr / PER, ring = Math.floor(f), ph = (f - ring) * 6.2832;
+              const f = sr / GPER, ring = Math.floor(f), ph = (f - ring) * 6.2832;
               const hv = hash[ring & 1023];
-              const amp = (hv < 0 ? 1 : 0.45 + hv) * (0.15 + 1.2 * r);
-              const sl = -Math.sin(ph) * amp * 0.16;
+              const fade = 0.35 + 0.65 * (nStreak[p] / 255);
+              const amp = (hv < 0 ? 1 : 0.35 + hv) * (0.3 + 1.2 * r) * fade;
+              const sl = -Math.sin(ph) * amp * 0.05;
               gx += (ax / sr) * sl; gy += (ay / sr) * sl;
-              v = Math.cos(ph) * amp * 0.012 - (hv < 0 ? 0.035 * (0.3 + r) * (1 - Math.abs(f - ring - 0.5) * 2) : 0);
+              v = Math.cos(ph) * amp * 0.006 - (hv < 0 ? 0.02 * (0.3 + r) * Math.max(0, 1 - Math.abs(f - ring - 0.5) * 5) : 0);
             } else if (mt === MARK.RASP) {
               const s = px * COS[qa] + py * SIN[qa], s2 = px * SIN[qa] - py * COS[qa];
               v = (hash[Math.floor(s / PER) & 1023] + hash[(Math.floor(s2 / PER) + 512) & 1023]) * (0.02 + 0.2 * r);
@@ -549,7 +598,7 @@ export class HoofArt {
 
           // Lesion cap: a small dark hole in the horn over the ulcer.
           let lf = 0;
-          if (dL < L.r * 2) {
+          if (dL < L.r * 2.4) {
             lf = sm(looseF);
             const holeR = 2.1 + ncv * 1.1;
             if (dL < holeR * 2.4) {
@@ -569,11 +618,15 @@ export class HoofArt {
           if (isWall) {
             // Stained, speckled wall horn. Once the grinder takes it down, the inner part of
             // the cut face comes up a cleaner tan; the outer edge stays dark and dirty.
+            // Crusted with dried manure: dark brown-black lumps, the odd paler fleck.
+            const lu = nLump[p] / 255;
             const k = 0.5 + 0.5 * ngr;
-            R = 96 - 34 * k + 20 * ns; G = 80 - 28 * k + 14 * ns; B = 44 - 14 * k;
-            if (ngr > 0.82) { R *= 0.7; G *= 0.7; B *= 0.7; }
+            R = 70 - 30 * k + 34 * lu * ns; G = 56 - 24 * k + 24 * lu * ns; B = 34 - 12 * k + 10 * lu;
+            if (ngr > 0.86) { R *= 0.6; G *= 0.6; B *= 0.6; }
+            else if (ngr < 0.06 && lu > 0.5) { R += 60; G += 50; B += 26; }
             const face = 0.55 * smoothstep(0.3, 1.6, removed) * smoothstep(wallW * 0.4, wallW * 0.75, e);
             R += (192 - 30 * k - R) * face; G += (166 - 26 * k - G) * face; B += (112 - 20 * k - B) * face;
+            crust = 1 - face / 0.55;
             if (e < 1.4) { R *= 0.55; G *= 0.55; B *= 0.55; }
           } else if (e < wallW + 1.4) {
             // White line: a yellowish seam between wall and sole.
@@ -597,34 +650,37 @@ export class HoofArt {
               if (dL < L.r * 1.9) {
                 const k = smoothstep(L.r * 1.9, L.r * 0.4, dL) * 0.55;
                 sr *= 1 - k; sg *= 1 - k; sb *= 1 - k;
-                if (Math.abs(ncv - 0.5) < 0.035) { sr *= 0.45; sg *= 0.45; sb *= 0.45; }
+                if (Math.abs(ncv - 0.5) < 0.02 && ngr > 0.35) { sr *= 0.7; sg *= 0.7; sb *= 0.7; }
               }
               R += (sr - R) * st; G += (sg - G) * st; B += (sb - B) * st;
             }
           }
 
           // 4. Opened cavity: wet peach/pink tissue in layers, corium at the core.
-          if (dL < L.r * 2) {
-            // Ragged opening: the edge wanders with two scales of noise.
+          if (dL < L.r * 2.4) {
+            // Ragged opening: the edge wanders with two scales of noise. It follows the knife
+            // where the cap was cut, and the cap's own ragged outline where it is all gone.
             const thr = 0.22 + 0.36 * ncv + 0.3 * (nIsle[p] / 255 - 0.5);
-            // Fade out before the gate at 2r so the pocket never shows a circular edge.
-            const open = smoothstep(thr + 0.08, thr - 0.08, lf) * smoothstep(2, 1.65, dL / L.r);
+            // Sample the cap footprint through a warped lookup so its edge never shows the cell grid.
+            const uf = fieldAt(ulcerF, lx + (nIsle[p] / 255 - 0.5) * 9, ly + (nStain[p] / 255 - 0.5) * 9), ut = 0.3 + 0.4 * ncv + 0.2 * (ngr - 0.5);
+            const open = smoothstep(thr + 0.08, thr - 0.08, lf) * smoothstep(ut - 0.06, ut + 0.06, uf);
             if (open > 0) {
               const u = dL / L.r;
-              // Loose layers: translucent cream flaps over mauve-grey shadowed tissue, with dark
-              // pits between them. Noise contours, not rings, so no two flaps are the same.
+              // Loose layers: wet, translucent pale-yellow horn, greyer where it sits deeper, with
+              // dark crevices between flaps. Noise contours, not rings, so no two flaps match.
               const ls = nStreak[p] / 255;
               const flap = smoothstep(0.46, 0.6, ncv * 0.7 + ls * 0.3);
-              let cr = 126 + 96 * flap, cg = 96 + 112 * flap, cb = 92 + 82 * flap;
-              // Pits only in the deepest noise troughs, so they stay small and scattered.
-              const pit = smoothstep(0.26, 0.15, ncv) * 0.85;
-              cr += (92 - cr) * pit; cg += (60 - cg) * pit; cb += (68 - cb) * pit;
+              const deep = smoothstep(1.4, 0.4, u) * (1 - flap);
+              let cr = 192 + 26 * flap - 46 * deep, cg = 184 + 22 * flap - 44 * deep, cb = 146 + 20 * flap - 30 * deep;
+              // Crevices only in the deepest noise troughs, so they stay small and scattered.
+              const pit = smoothstep(0.26, 0.15, ncv) * 0.9;
+              cr += (66 - cr) * pit; cg += (42 - cg) * pit; cb += (44 - cb) * pit;
               // Flap edges catch a bright rim.
               const fe = smoothstep(0.4, 0.5, ncv * 0.7 + ls * 0.3) * (1 - flap);
               cr += 40 * fe; cg += 36 * fe; cb += 30 * fe;
               // The corium shows pink-red at the very centre.
-              const core = smoothstep(0.55, 0.25, u + (ncv - 0.5) * 0.4);
-              cr += (198 - 40 * ngr - cr) * core; cg += (92 - 30 * ngr - cg) * core; cb += (100 - 28 * ngr - cb) * core;
+              const core = smoothstep(0.45, 0.2, u + (ncv - 0.5) * 0.4);
+              cr += (176 - 40 * ngr - cr) * core; cg += (78 - 30 * ngr - cg) * core; cb += (84 - 28 * ngr - cb) * core;
               // Walls: the rim of horn on the lamp side overhangs the hole and shades it,
               // while the far wall faces the lamp and shows a band of pale cut horn.
               const sh = looseAt(lx - 1.7, ly - 2.4);
@@ -678,8 +734,14 @@ export class HoofArt {
         const cov = smoothstep(thr - 0.05, thr + 0.05, m);
         let mudSp = 0;
         if (cov > 0) {
+          const rel = cov * (0.35 + 0.65 * smoothstep(thr, thr + 0.3, m));
+          gx += this.mudX[p] * rel; gy += this.mudY[p] * rel;
+          // Thin smears are a translucent orange-brown; thick, wet clumps go near black.
           const lu = nLump[p] / 255;
-          let mr = 32 + 56 * lu, mg = 24 + 42 * lu, mb = 15 + 22 * lu;
+          const deep = smoothstep(thr - 0.05, thr + 0.25, m + (lu - 0.5) * 0.4);
+          const tk = 0.8 + 0.4 * lu;
+          let mr = 92 * tk, mg = 62 * tk, mb = 32 * tk;
+          mr += (28 + 30 * lu - mr) * deep; mg += (20 + 21 * lu - mg) * deep; mb += (12 + 11 * lu - mb) * deep;
           const sa = (straw[o + 3] / 255) * smoothstep(0.3, 0.75, cov);
           if (sa > 0) { mr += (straw[o] - mr) * sa; mg += (straw[o + 1] - mg) * sa; mb += (straw[o + 2] - mb) * sa; }
           R += (mr - R) * cov; G += (mg - G) * cov; B += (mb - B) * cov;
@@ -692,13 +754,14 @@ export class HoofArt {
         const nx = -gx * nl, ny = -gy * nl, nz = nl;
         const diff = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
         const sh = Math.max(0.24, Math.min(1.14, 0.2 + (0.8 * diff) / LIGHT[2])) * (c >= 3 ? 0.88 : 1);
-        R *= sh; G *= sh; B *= sh;
+        // Horn is translucent, so its shadows warm instead of going grey.
+        R *= sh < 1 ? Math.pow(sh, 0.8) : sh; G *= sh; B *= sh < 1 ? Math.pow(sh, 1.2) : sh;
         const nh = Math.max(0, nx * HALF[0] + ny * HALF[1] + nz * HALF[2]);
         const nh4 = nh * nh * nh * nh, nh16 = nh4 * nh4 * nh4 * nh4;
         const clean = (1 - cov) * (c >= 3 ? 0.4 : 1);
         spec += clean * sheen * (30 * nh16 * nh4 + 12 * nh4 * nh4);
-        spec += 210 * mudSp + 110 * (wetSpec[p] / 255) * wetness;
-        spec += nh16 * nh16 * 60 * cov + (nh16 * 40 + nh4 * 10) * wetness;
+        spec += 210 * mudSp + 120 * (mudSpec[p] / 255) * crust * (1 - cov) + 110 * (wetSpec[p] / 255) * wetness;
+        spec += (nh16 * nh16 * 170 + nh16 * 25) * cov * (1 - 0.6 * (straw[o + 3] / 255)) + (nh16 * 40 + nh4 * 10) * wetness;
         d[o] = R + spec;
         d[o + 1] = G + spec;
         d[o + 2] = B + spec * 0.92;
@@ -900,27 +963,37 @@ function paintStraw(art, rand) {
   c.setTransform(S, 0, 0, S, -X0 * S, -Y0 * S);
   c.lineCap = 'round';
   let placed = 0;
-  for (let tries = 0; placed < 1100 && tries < 20000; tries++) {
+  for (let tries = 0; placed < 950 && tries < 20000; tries++) {
     const x = 30 + rand() * 340, y = 160 + rand() * 470;
     const heel = smoothstep(330, 190, y), gap = smoothstep(40, 6, Math.abs(x - GEOM.midX));
-    if (rand() > 0.35 + 0.5 * heel + 0.4 * gap) continue;
+    if (rand() > 0.2 + 0.6 * heel + 0.5 * gap) continue;
     placed++;
-    const len = 4 + rand() ** 2 * 20;
+    const len = 3 + rand() ** 2 * 16;
     const a = rand() * Math.PI;
-    const green = rand();
-    const lum = 0.7 + rand() * 0.45;
-    c.strokeStyle = `rgb(${(200 - 40 * green) * lum | 0},${(166 - 10 * green) * lum | 0},${(78 - 20 * green) * lum | 0})`;
-    c.lineWidth = 0.45 + rand() * 0.9;
-    c.beginPath();
+    // Mostly muted, manure-soaked fibres; a few pale dry stalks stand out.
+    const kind = rand();
+    const lum = 0.7 + rand() * 0.4;
+    const col = kind < 0.3 ? [100, 76, 42] : kind < 0.75 ? [168, 146, 90] : [214, 192, 132];
+    c.strokeStyle = `rgb(${col[0] * lum | 0},${col[1] * lum | 0},${col[2] * lum | 0})`;
+    c.lineWidth = 0.3 + rand() * 0.6;
     const bend = (rand() - 0.5) * 0.5;
-    c.moveTo(x, y);
-    c.quadraticCurveTo(
-      x + Math.cos(a + bend) * len * 0.5, y + Math.sin(a + bend) * len * 0.5,
-      x + Math.cos(a) * len, y + Math.sin(a) * len,
-    );
-    c.stroke();
+    const strand = (ox, oy) => {
+      c.beginPath();
+      c.moveTo(x + ox, y + oy);
+      c.quadraticCurveTo(
+        x + ox + Math.cos(a + bend) * len * 0.5, y + oy + Math.sin(a + bend) * len * 0.5,
+        x + ox + Math.cos(a) * len, y + oy + Math.sin(a) * len,
+      );
+    };
+    // A soft shadow on the manure, down-right of the strand (the lamp is upper left).
+    const lw = c.lineWidth, sc = c.strokeStyle;
+    c.strokeStyle = 'rgba(10,6,2,0.55)';
+    c.lineWidth = lw * 1.6;
+    strand(0.45, 0.6); c.stroke();
+    c.strokeStyle = sc; c.lineWidth = lw;
+    strand(0, 0); c.stroke();
     // A highlight along the strand.
-    c.strokeStyle = 'rgba(255,240,190,0.35)';
+    c.strokeStyle = 'rgba(255,240,190,0.22)';
     c.lineWidth *= 0.35;
     c.stroke();
   }

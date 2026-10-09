@@ -11,6 +11,9 @@ const CROP = { x: 24, y: 165, w: 352, h: 480 };
 // ?focus=lesion crops a close-up around the ulcer; ?focus=toe the nipped toe tips.
 const FOCUS = { lesion: { x: 132, y: 248, w: 80, h: 80 }, toe: { x: 70, y: 500, w: 260, h: 130 } };
 Object.assign(CROP, FOCUS[new URLSearchParams(location.search).get('focus')] || {});
+// ?crop=x,y,w,h crops any logical rectangle.
+const CROPQ = new URLSearchParams(location.search).get('crop');
+if (CROPQ) { const [x, y, w, h] = CROPQ.split(',').map(Number); Object.assign(CROP, { x, y, w, h }); }
 // ?stage=2 renders one stage; ?zoom=2 draws larger.
 const Q = new URLSearchParams(location.search);
 const ZOOM = Number(Q.get('zoom')) || 1.225;
