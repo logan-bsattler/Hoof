@@ -23,7 +23,8 @@ export const CFG = {
     brush:   { radius: 34, mudRate: 0.02 },
     knife:   { radius: 9,  rate: 0.09, resist: 0.35 },
     grinder: { radius: 20, rate: 14, resist: 0.3, resistThin: 0.15 },
-    nippers: { radius: 12, liveBite: 3.5, spacing: 16 },
+    // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take.
+    nippers: { radius: 17, liveBite: 3.5, liveCore: 0.4, spacing: 16, jawDepth: 22 },
     rasp:    { radius: 26, smooth: 0.02, rate: 0.003 },
     // tint gained per second at full strength; pareWash is lost per px of knife travel.
     spray:   { radius: 22, rate: 1.6, hornRate: 0.3, rinse: 0.6, pareWash: 0.05 },

@@ -321,6 +321,7 @@ function handle(ev, x, y) {
     s.dirtyCuts++;
     warnOnce('dirty', 'You’re cutting through muck. Clean the foot first: you can’t read what you can’t see.');
   }
+  if (ev.tooDeep) warnOnce('nipDeep', 'Too much horn for one bite. Start at the tip and work back toward the hoof.', 'info');
   if (ev.nipLive) warnOnce('nip', 'Nippers are for the overgrown toe. Too blunt for the living sole.');
   if (ev.grinderLesion) {
     s.grinderLesion = true;

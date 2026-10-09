@@ -71,6 +71,22 @@ test('nippers remove dead toe horn entirely', () => {
   assert.equal(ev.blood, false);
 });
 
+test('nippers work tip first: a deep bite takes nothing, tip-to-hoof bites clear the toe', () => {
+  const h = new Hoof(CASE_B);
+  const deadLeft = () => h.metrics().claws[CLAW.INNER].deadLeft;
+  const start = deadLeft();
+  // Bite right at the toe line with the whole overgrowth still on: too much horn.
+  const deep = applyBite(h, 300, GEOM.overgrowY + 20);
+  assert.equal(deep.tooDeep, true);
+  assert.equal(deep.removed, 0);
+  assert.equal(deadLeft(), start);
+  // Work up from the tip in small bites across the toe.
+  for (let y = 640; y >= GEOM.overgrowY; y -= 8) {
+    for (let x = 200; x <= 370; x += 16) applyBite(h, x, y);
+  }
+  assert.ok(deadLeft() < start * 0.1, `dead left: ${deadLeft()} of ${start}`);
+});
+
 test('knife opening the ulcer clears loose horn first', () => {
   const h = new Hoof(CASE_B);
   const L = CASE_B.lesion;

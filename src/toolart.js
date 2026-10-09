@@ -155,6 +155,8 @@ export function drawNippers(c, x, y, open) {
   c.save();
   c.translate(x, y);
   c.rotate(0.8);
+  c.scale(1.4, 1.4);
+  c.translate(-22, 0); // jaws centred on the bite
   dropShadow(c, 8, 4, 6, 0.45);
   const a = 0.12 + open * 0.28;
   for (const s of [-1, 1]) {

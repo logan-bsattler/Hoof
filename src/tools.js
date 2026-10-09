@@ -3,7 +3,7 @@
 // into particles, sound, haptics and log entries. No DOM in here.
 
 import { CFG } from './config.js';
-import { Z, LOOSE } from './hoof.js';
+import { Z, LOOSE, CLAW } from './hoof.js';
 
 export const TOOLS = {
   brush: {
@@ -55,7 +55,7 @@ function newEvents() {
     removed: 0, mud: 0, dead: 0,
     loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0 },
     blood: false, thin: false, lesionCut: false, grinderLesion: false,
-    dirtyCut: false, nipLive: false, blockedSkip: false, claws: new Set(),
+    dirtyCut: false, nipLive: false, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
   };
 }
@@ -159,16 +159,42 @@ export function applyGrind(hoof, x, y, dt) {
   return ev;
 }
 
-// Nippers: one bite. Dead toe horn goes entirely; living horn loses a chunk.
+// Nippers: one bite, worked from the tip back toward the hoof. The jaws cut
+// across the toe at y and take every scrap of dead horn distal to the cut
+// (toes point down, so distal = larger y). It's all or nothing: if the horn
+// beyond the cut runs deeper than the jaws can close on, nothing comes off.
 export function applyBite(hoof, x, y) {
   const ev = newEvents();
   const cfg = CFG.tools.nippers;
-  hoof.stamp(x, y, cfg.radius, (i) => {
-    if (blocked(hoof, i, ev)) return;
-    if (hoof.zone[i] & Z.DEAD) {
-      cut(hoof, i, hoof.thick[i], ev, 1);
-      return;
+  const { x0, y0, cell, cols, rows } = hoof.g;
+  const c0 = Math.max(0, Math.floor((x - cfg.radius - x0) / cell));
+  const c1 = Math.min(cols - 1, Math.floor((x + cfg.radius - x0) / cell));
+  const r0 = Math.max(0, Math.floor((y - y0) / cell));
+  const chunk = { [CLAW.OUTER]: [], [CLAW.INNER]: [] };
+  const reach = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
+  for (let cy = r0; cy < rows; cy++) {
+    for (let cx = c0; cx <= c1; cx++) {
+      const i = cy * cols + cx;
+      if (!(hoof.zone[i] & Z.DEAD) || hoof.thick[i] <= 0.05) continue;
+      const c = hoof.claw[i];
+      chunk[c].push(i);
+      reach[c] = Math.max(reach[c], hoof.cellY(i) - y);
     }
+  }
+  let bit = false;
+  for (const c of [CLAW.OUTER, CLAW.INNER]) {
+    if (!chunk[c].length) continue;
+    if (reach[c] > cfg.jawDepth) { ev.tooDeep = true; continue; }
+    bit = true;
+    for (const i of chunk[c]) if (!blocked(hoof, i, ev)) cut(hoof, i, hoof.thick[i], ev, 1);
+  }
+  if (ev.tooDeep && !bit) return ev;
+
+  hoof.stamp(x, y, cfg.radius, (i, f) => {
+    if (hoof.zone[i] & Z.DEAD) return;
+    if (blocked(hoof, i, ev)) return;
+    // Only the middle of the jaws bites living horn; the edges just graze it.
+    if (f < 1 - cfg.liveCore ** 2) return;
     clearLoose(hoof, i, ev);
     ev.nipLive = true;
     cut(hoof, i, cfg.liveBite, ev, 1);

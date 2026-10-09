@@ -151,7 +151,7 @@ export class HoofArt {
       // Manure clings thickest toward the heel and in the interdigital gap.
       const heelness = smoothstep(300, 195, ly);
       const gapness = smoothstep(26, 6, Math.abs(lx - GEOM.midX) - 7);
-      const thr = 0.1 + 0.8 * fbm(N1, lx / 13, ly / 13, 4) - 0.16 * (heelness + gapness);
+      const thr = Math.max(0.18, 0.12 + 0.8 * fbm(N1, lx / 13, ly / 13, 4) - 0.16 * (heelness + gapness));
       nMudThr[p] = clamp255(thr * 255);
       nStain[p] = clamp255(fbm(N2, lx / 21, ly / 21, 4) * 255);
       nIsle[p] = clamp255(fbm(N6, lx / 15, ly / 26, 3) * 255);
@@ -382,9 +382,12 @@ export class HoofArt {
         if (c >= 3) {
           // Overgrown dead toe horn: stained, layered, and gone once nipped.
           if (t + (ngr - 0.5) * 1.6 < 1.3) { d[o + 3] = 0; continue; }
+          // Kept dark and cool (slate-brown) so it reads against the warm straw floor.
           const layer = 0.5 + 0.5 * Math.sin(e * 1.15 + ns * 9);
-          R = 104 - 30 * layer + 20 * ngr; G = 86 - 24 * layer + 14 * ngr; B = 52 - 14 * layer + 8 * ngr;
-          if (e < wallW) { R *= 0.72; G *= 0.72; B *= 0.7; }
+          R = 78 - 22 * layer + 16 * ngr; G = 70 - 20 * layer + 14 * ngr; B = 62 - 14 * layer + 12 * ngr;
+          if (e < 1.6) { R *= 0.35; G *= 0.35; B *= 0.38; }
+          else if (e < wallW) { R *= 0.6; G *= 0.6; B *= 0.62; }
+          else if (e < wallW + 1.5) { R += 26; G += 24; B += 22; }
         } else {
           const ti = sm(init), r = sm(rough);
           const removed = ti - t;
@@ -455,8 +458,8 @@ export class HoofArt {
 
           // 3. Stained outer horn: the first fraction of a mm, deeper in low spots.
           if (!isWall) {
-            const isle = 4.5 * smoothstep(0.64, 0.8, nIsle[p] / 255);
-            const sd = 0.3 + 0.7 * ns + isle;
+            const isle = 0.9 * smoothstep(0.66, 0.82, nIsle[p] / 255);
+            const sd = 0.2 + 0.4 * ns + isle;
             const st = smoothstep(sd + 0.3, sd - 0.05, removed);
             if (st > 0) {
               let sr = 136 - 66 * ns, sg = 108 - 48 * ns, sb = 60 - 26 * ns;
@@ -528,8 +531,7 @@ export class HoofArt {
         }
 
         // 5. Manure and straw on top. A film lingers even after the clumps go.
-        const grime = e < wallW + 1 ? 0.3 : 0;
-        const film = Math.min(0.55, m * 0.7 + grime) * 0.55;
+        const film = smoothstep(0.03, 0.5, m) * 0.4;
         R += (104 - R) * film; G += (80 - G) * film; B += (48 - B) * film;
         const thr = nMudThr[p] / 255;
         const cov = smoothstep(thr - 0.05, thr + 0.05, m);
