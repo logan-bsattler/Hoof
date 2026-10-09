@@ -705,16 +705,29 @@ export class HoofArt {
             R += (140 - R) * k; G += (206 - G) * k; B += (184 - B) * k;
           }
 
-          // Loose, undermined heel horn: a lifted flake with a dark crack around it.
+          // Loose, undermined heel horn: a lifted, curling flake of old stained horn. Its outline
+          // is read through a warped lookup so it tears raggedly instead of tracing cells; the
+          // free toe-side edge stands proud, catching the lamp and shadowing the sole below.
           if (c === heelC) {
             const dH = Math.hypot(lx - LH.x, ly - LH.y);
-            if (dH < LH.r * 1.8) {
-              const hl = sm(looseF);
-              if (hl > 0.55) {
-                const k = 0.55 + 0.45 * Math.sin(dH * 1.4 + ncv * 5);
-                R = 228 - 26 * k; G = 208 - 26 * k; B = 160 - 20 * k;
+            if (dH < LH.r * 2.2) {
+              const wx = (nIsle[p] / 255 - 0.5) * 7, wy = (nStain[p] / 255 - 0.5) * 7;
+              const ft = 0.5 + (ncv - 0.5) * 0.5;
+              const on = smoothstep(ft - 0.05, ft + 0.05, fieldAt(looseF, lx + wx, ly + wy));
+              // Shadow cast onto the sole by the flake's lifted edge (lamp at upper left).
+              const by = smoothstep(ft - 0.05, ft + 0.05, fieldAt(looseF, lx + wx - 1.4, ly + wy - 2.2));
+              const shade = by * (1 - on) * 0.55;
+              R *= 1 - shade; G *= 1 - shade; B *= 1 - shade * 0.9;
+              if (on > 0) {
+                const lift = smoothstep(LH.y - LH.r, LH.y + LH.r * 1.2, ly + (ncv - 0.5) * 8);
+                const layer = 0.5 + 0.5 * Math.sin((ly - LH.y) * 1.1 + ncv * 6 + (lx - LH.x) * 0.25);
+                let fr = 168 - 30 * layer + 24 * lift, fg = 140 - 26 * layer + 22 * lift, fb = 92 - 18 * layer + 14 * lift;
+                // Dark seam of dirt where the flake parts from the sole beneath.
+                const seam = on * (1 - on) * 4;
+                fr *= 1 - 0.6 * seam; fg *= 1 - 0.6 * seam; fb *= 1 - 0.6 * seam;
+                R += (fr - R) * on; G += (fg - G) * on; B += (fb - B) * on;
+                gy -= 0.5 * lift * on;
               }
-              if (hl > 0.3 && hl < 0.6) { R *= 0.4; G *= 0.36; B *= 0.32; }
             }
           }
 
