@@ -4,7 +4,7 @@
 // 0-3 mobility scale.
 
 import { CFG } from './config.js';
-import { roundRect } from './render.js';
+import { roundRect } from './toolart.js';
 import { CLAW, clawPolygon } from './hoof.js';
 import { mulberry32, valueNoise, fbm, smoothstep } from './noise.js';
 

@@ -13,14 +13,19 @@ function lin(c, x0, y0, x1, y1, stops) {
 }
 const STEEL = [[0, '#5b5f66'], [0.45, '#eef1f4'], [0.6, '#b9bec5'], [1, '#4a4e55']];
 
-function rrect(c, x, y, w, h, r) {
-  c.beginPath();
+// Rounded-rect subpath, added to the current path (render.js and walkoff.js use it too).
+export function roundRect(c, x, y, w, h, r) {
   c.moveTo(x + r, y);
   c.arcTo(x + w, y, x + w, y + h, r);
   c.arcTo(x + w, y + h, x, y + h, r);
   c.arcTo(x, y + h, x, y, r);
   c.arcTo(x, y, x + w, y, r);
   c.closePath();
+}
+
+function rrect(c, x, y, w, h, r) {
+  c.beginPath();
+  roundRect(c, x, y, w, h, r);
 }
 
 function dropShadow(c, blur = 8, dx = 4, dy = 6, a = 0.45) {

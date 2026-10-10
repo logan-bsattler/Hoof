@@ -89,6 +89,13 @@ function newCase() {
   game.result = null;
   game.weepT = 0;
   game.found = [];      // marks the testers have read this case, in order
+  // Nothing carries over from the last foot: no held stroke, shake or half-pulled strip.
+  stopHoldSounds();
+  Object.assign(game.ptr, { down: false, moved: 0, biteAccum: 0, id: null });
+  Object.assign(game, { shake: 0, scrubLevel: 0, holdLast: null, knifeAccum: 0, pullRemoved: 0, metricsTimer: 0, failTimer: 0, buzzT: 0 });
+  game.tutorial = null;
+  document.body.classList.remove('tutorial');
+  ui.setCoach(null);
   particles.list = [];
   ui.setSteps(game.steps, caseDef);
   ui.setReadable(false);

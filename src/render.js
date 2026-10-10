@@ -8,7 +8,7 @@ import { HoofArt } from './hoofart.js';
 import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
 import {
   drawKnife, drawGrinder, drawBrush, drawNippers, drawRasp, drawTesters, drawSpray,
-  drawWrapRoll, drawBlock, drawPad, drawWrap,
+  drawWrapRoll, drawBlock, drawPad, drawWrap, roundRect,
 } from './toolart.js';
 
 const { w: W, h: H } = CFG.view;
@@ -443,14 +443,5 @@ function label(c, text, x, y, color, fs) {
 function path(c, pts) {
   c.beginPath();
   pts.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y)));
-  c.closePath();
-}
-
-export function roundRect(c, x, y, w, h, r) {
-  c.moveTo(x + r, y);
-  c.arcTo(x + w, y, x + w, y + h, r);
-  c.arcTo(x + w, y + h, x, y + h, r);
-  c.arcTo(x, y + h, x, y, r);
-  c.arcTo(x, y, x + w, y, r);
   c.closePath();
 }

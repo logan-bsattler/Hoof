@@ -1,7 +1,7 @@
 // Service worker: precaches the app shell so TRUE HOOF installs and plays offline.
 // Network-first, so a reachable server always wins and dev edits show up on reload;
-// the cache is the fallback when offline. Bump VERSION when the asset list changes.
-const VERSION = 'true-hoof-v4';
+// the cache is the fallback when offline or slow. Bump VERSION when the asset list changes.
+const VERSION = 'true-hoof-v5';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
@@ -27,19 +27,31 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// A hung network (captive Wi-Fi, one bar) never fails fast: after this long, serve the cached
+// copy and let the fetch finish in the background to refresh the cache.
+const NETWORK_TIMEOUT = 2500; // ms
+
+const cached = (req) => caches.match(req, { ignoreSearch: true })
+  .then((hit) => hit ?? (req.mode === 'navigate' ? caches.match('index.html') : undefined));
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  e.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put(req, copy));
-        }
-        return res;
-      })
-      .catch(() => caches.match(req, { ignoreSearch: true })
-        .then((hit) => hit ?? (req.mode === 'navigate' ? caches.match('index.html') : Response.error()))),
-  );
+  const net = fetch(req).then((res) => {
+    if (res.ok) {
+      const copy = res.clone();
+      e.waitUntil(caches.open(VERSION).then((c) => c.put(req, copy)));
+    }
+    return res;
+  });
+  const slow = new Promise((resolve) => setTimeout(resolve, NETWORK_TIMEOUT)).then(() => cached(req));
+  e.respondWith(new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (res) => { if (!settled && res) { settled = true; resolve(res); } };
+    net.then(done, () => cached(req).then((hit) => {
+      if (hit) done(hit); else if (!settled) { settled = true; reject(new TypeError('offline')); }
+    }));
+    // Timed out with a cached copy: use it. With none, keep waiting on the network.
+    slow.then(done);
+  }));
 });

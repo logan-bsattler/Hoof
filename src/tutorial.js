@@ -78,6 +78,13 @@ export function tutorialBeats(caseDef) {
       done: step('step3'),
     },
     {
+      id: 'rasp', tool: 'rasp', title: 'Rasp it smooth',
+      text: 'Scrub the rasp over both soles to true up the grinder marks before the block covers one.',
+      target: { kind: 'rect', x: 50, y: 260, w: 300, h: 300 },
+      measure: (m) => m.roughMean, goal: 0.15,
+      done: step('finish'),
+    },
+    {
       id: 'openUlcer', tool: 'knife', title: 'Open the ulcer',
       text: 'Pull the knife across the circle to flake off the loose horn capping the ulcer. Stop when the ring fills. Open it, don’t carve it.',
       target: { kind: 'ring', x: L.x, y: L.y, r: L.r * 1.75 },
@@ -96,13 +103,6 @@ export function tutorialBeats(caseDef) {
       target: { kind: 'ring', x: H.x, y: H.y, r: H.r * 1.4 },
       measure: (m) => m.looseRemain[LOOSE.HEEL], goal: 0.1,
       done: step('step5'),
-    },
-    {
-      id: 'rasp', tool: 'rasp', title: 'Rasp it smooth',
-      text: 'Scrub the rasp over both soles to true up the grinder marks before anything gets covered.',
-      target: { kind: 'rect', x: 50, y: 260, w: 300, h: 300 },
-      measure: (m) => m.roughMean, goal: 0.15,
-      done: step('finish'),
     },
     {
       id: 'spray', tool: 'spray', title: 'Flush the ulcer',

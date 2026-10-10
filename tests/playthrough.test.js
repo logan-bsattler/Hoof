@@ -76,6 +76,15 @@ function playthrough(cd) {
     }
   });
 
+  // Rasp both soles before the block covers one.
+  until('finish', () => {
+    for (const c of [CLAW.INNER, CLAW.OUTER]) {
+      const bx = clawBox(c, side);
+      const [a, b] = [bx.x - 8, bx.x + bx.w - 3];
+      for (let y = 190; y < 600; y += 16) p.drag('rasp', [[a, y], [b, y + 4], [a, y + 8]], 400);
+    }
+  }, 20);
+
   // Step 4: pare the loose horn off the ulcer, then block the sound claw.
   for (let k = 0; k < 8 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) {
     for (let a = 0; a < 6; a++) {
@@ -94,13 +103,6 @@ function playthrough(cd) {
   until('step5', () => {
     for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
   });
-
-  // Finish: rasp the claw the block leaves open.
-  const open = clawBox(L.claw, side);
-  until('finish', () => {
-    const [a, b] = [open.x - 8, open.x + open.w - 3];
-    for (let y = 190; y < 600; y += 16) p.drag('rasp', [[a, y], [b, y + 4], [a, y + 8]], 400);
-  }, 20);
 
   // Treat: flush the opened ulcer, then pad and wrap it.
   until('treat', () => {

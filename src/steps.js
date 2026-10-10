@@ -1,4 +1,4 @@
-// The case checklist: clean → diagnose → five-step trim → finish.
+// The case checklist: clean → diagnose → five-step trim (rasp after step 3) → treat.
 // Each step is a predicate over hoof metrics + the session log. A tip is a string, or a
 // function of the case for copy that names a claw (read it through stepTip).
 
@@ -38,6 +38,12 @@ export const STEPS = [
     tip: 'With the knife, carve the dish along the inner edge of each claw (dashed channel) so weight comes off the ulcer site. Stay out of the toe triangle.',
     done: (m) => m.claws[CLAW.INNER].dishMean <= D + TOL && m.claws[CLAW.OUTER].dishMean <= D + TOL,
   },
+  // The rasp trues up the sole before the block goes on and covers one claw.
+  {
+    id: 'finish', label: 'Rasp it smooth', tool: 'rasp',
+    tip: 'True up the grinder marks on both soles with the rasp before the block covers one of them.',
+    done: (m) => m.roughMean < 0.15 && m.claws[CLAW.OUTER].deadRemain < 0.12,
+  },
   {
     id: 'step4', label: '4 · Open the ulcer, block the sound claw', tool: 'knife',
     tip: 'Pare the loose horn off the ulcer with the knife: open it, don’t carve it. Then glue the block on the SOUND claw.',
@@ -47,11 +53,6 @@ export const STEPS = [
     id: 'step5', label: '5 · Remove loose heel horn', tool: 'knife',
     tip: (cd) => `There’s a curl of loose horn at the ${CLAW_NAME[cd.looseHorn.claw]} heel. Flick it off with the knife and leave the heel itself alone.`,
     done: (m) => m.looseRemain[LOOSE.HEEL] < 0.1,
-  },
-  {
-    id: 'finish', label: 'Finish: rasp it smooth', tool: 'rasp',
-    tip: 'True up the grinder marks with the rasp before anything gets covered up.',
-    done: (m) => m.roughMean < 0.15 && m.claws[CLAW.OUTER].deadRemain < 0.12,
   },
   {
     id: 'treat', label: 'Treat: flush, pad and wrap the ulcer', tool: 'spray',

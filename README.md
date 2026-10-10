@@ -104,9 +104,9 @@ a progress bar. **Lift the foot** plays it unguided.
 | 1 | Inner claw first: nip the overgrown toe from the tip back to the dashed line, level the sole to ~7 mm | ✂️ Nippers, ⚙️ Grinder |
 | 2 | Match the outer claw until the balance beam reads LEVEL | ⚙️ Grinder |
 | 3 | Carve the dish along each claw's inner edge (dashed channel), staying out of the toe triangle | 🔪 Knife |
+| Rasp | Rasp out the grinder swirls on both soles, before the block covers one | 🪵 Rasp |
 | 4 | Pare the loose horn off the ulcer (pressure release), then glue the block on the **sound** claw | 🔪 Knife, 🧱 Block |
 | 5 | Flick off the curl of loose heel horn | 🔪 Knife |
-| Finish | Rasp out the grinder swirls | 🪵 Rasp |
 | Treat | Flush the opened ulcer, then pad and wrap it. **Release the cow** and watch her walk | 🧴 Spray bottle, 🩹 Pad + wrap |
 
 **Controls:** mouse or touch. Tap a tool (or press keys `1`–`9`).

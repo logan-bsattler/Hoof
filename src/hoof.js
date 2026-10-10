@@ -2,6 +2,8 @@
 // Pure data + geometry — no DOM, so it can be unit-tested in Node.
 
 import { CFG } from './config.js';
+// Seeded PRNG so hoofs (and tests) are reproducible.
+import { mulberry32, smoothstep } from './noise.js';
 
 // Zone bit flags per cell.
 export const Z = {
@@ -144,16 +146,6 @@ export function insideClaw(claw, x, y, side = 'LH', margin = 0) {
   return pointInPoly(x, y, pts) && distToPoly(x, y, pts) >= margin;
 }
 
-// Deterministic PRNG so hoofs (and tests) are reproducible.
-function mulberry32(seed) {
-  return () => {
-    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function smoothNoise(x, y) {
   return (
     Math.sin(x * 0.13 + 1.7) * Math.sin(y * 0.11 + 0.3) +
@@ -161,11 +153,6 @@ function smoothNoise(x, y) {
     Math.sin(x * 0.05 - y * 0.07 + 2) * 0.7
   ) / 2.2;
 }
-
-const smoothstep = (e0, e1, v) => {
-  const t = Math.max(0, Math.min(1, (v - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
 
 export class Hoof {
   constructor(caseDef, seed = caseDef.seed ?? 214) {
