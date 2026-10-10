@@ -68,5 +68,19 @@ if (Test-Path $res) {
     # Adaptive foreground: 108dp canvas, motif inside the 66dp safe zone; background colour is set in XML.
     New-Icon ([int](108 * $k)) "$res\mipmap-$d\ic_launcher_foreground.png" 0.6 $true
   }
+  # Launch splash: replace Capacitor's default artwork with the icon on the game's background.
+  Get-ChildItem $res -Recurse -Filter splash.png | ForEach-Object {
+    $img = [System.Drawing.Image]::FromFile($_.FullName); $w = $img.Width; $h = $img.Height; $img.Dispose()
+    $bmp = New-Object System.Drawing.Bitmap $w, $h
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.Clear([System.Drawing.Color]::FromArgb(255, 0x1d, 0x16, 0x11))
+    $side = [int]([Math]::Min($w, $h) * 0.35)
+    $tmp = Join-Path $env:TEMP 'truehoof-splash-icon.png'
+    New-Icon $side $tmp 1.0 $true
+    $ico = [System.Drawing.Image]::FromFile($tmp)
+    $g.DrawImage($ico, [int](($w - $side) / 2), [int](($h - $side) / 2), $side, $side)
+    $ico.Dispose(); $g.Dispose()
+    $bmp.Save($_.FullName, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+  }
 }
 Write-Host 'Icons written.'

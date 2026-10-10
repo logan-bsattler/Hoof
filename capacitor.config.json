@@ -1,0 +1,8 @@
+{
+  "appId": "com.bsattler.truehoof",
+  "appName": "True Hoof",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#1d1611"
+  }
+}

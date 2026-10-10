@@ -7,7 +7,19 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "start:local": "node scripts/serve.mjs --host 127.0.0.1",
-    "test": "node --test"
+    "test": "node --test",
+    "build:web": "node scripts/build-web.mjs",
+    "android:apk": "node scripts/build-apk.mjs",
+    "android:install": "node scripts/build-apk.mjs --install"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3"
+  }
 }

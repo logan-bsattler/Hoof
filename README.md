@@ -13,13 +13,15 @@ the corium and drawing blood is a hard fail.
 
 ## Run it
 
-Requires Node 18+ (no `npm install`; there are zero dependencies).
+Requires Node 18+. Playing needs no `npm install`: the game itself has zero dependencies
+(Capacitor is only used to build the Android app, below).
 
 ```bash
 npm start
 ```
 
-Open http://localhost:5173. Use another port with `npm start -- --port 8080`.
+Open http://localhost:5173. Use another port with `npm start -- --port 8080`. The server listens on
+your whole network so a phone can reach it (see below); `npm run start:local` keeps it on this PC only.
 
 It's plain ES modules, so any static file server works (for example
 `python -m http.server`). Opening `index.html` straight from disk won't work,
@@ -30,6 +32,56 @@ Run the tests (Node's built-in test runner):
 ```bash
 npm test
 ```
+
+## Play on a phone
+
+### Option A: Android app (APK), the best experience on Android
+
+Full-screen, portrait-locked, works offline, has its own launcher icon. Needs the Android SDK
+(Android Studio's default `%LOCALAPPDATA%\Android\Sdk` is found automatically, or set `ANDROID_HOME`),
+JDK 21 and Node 22+. Gradle comes from the bundled wrapper.
+
+```bash
+npm install
+```
+
+```bash
+npm run android:apk
+```
+
+That copies the game into `www/`, syncs it into the Capacitor project in `android/`, runs Gradle and
+writes **`dist/true-hoof-debug.apk`**. Rebuild after changing the game. To get it onto the phone:
+
+- **USB:** turn on Developer options → USB debugging on the phone, plug it in, accept the prompt,
+  then `npm run android:install` (builds and runs `adb install -r`).
+- **No cable:** `dist/` is inside OneDrive, so open the OneDrive app on the phone, go to
+  `Documents/Personal/Hoof/dist`, tap `true-hoof-debug.apk`, and allow "Install unknown apps" for
+  OneDrive when Android asks. Emailing or Drive-sharing the file and tapping it works the same way.
+
+It's a debug build (signed with the local debug key), fine for sideloading but not for the Play Store.
+Android launcher icons and the splash screen are drawn by `scripts/make-icons.ps1`.
+
+### Option B: PWA over Wi-Fi (Android or iPhone, nothing to install)
+
+1. `npm start` on the PC. It prints the LAN address, e.g. `http://192.168.0.78:5173`
+   (use the `Wi-Fi` line, not the virtual adapters).
+2. On the phone, on the same Wi-Fi, open that address. If it doesn't load, allow Node.js through
+   Windows Firewall for **Private** networks (Windows usually asks the first time).
+3. Add it to the home screen: Chrome menu → **Add to Home screen**, or Safari Share → **Add to Home Screen**.
+
+Caveat: browsers only enable the service worker (offline play) and Chrome's true "Install app"
+over **HTTPS or localhost**. Over a plain `http://192.168…` address you get a home-screen shortcut
+that needs the PC running; iPhone still opens it full-screen. To get the full installable PWA:
+
+- **Quick HTTPS tunnel, no install** (uses the built-in Windows `ssh`, makes the game public while it runs):
+  `ssh -R 80:localhost:5173 nokey@localhost.run` and open the `https://…` URL it prints on the phone.
+- **Android Chrome on the LAN:** in `chrome://flags`, enable *Insecure origins treated as secure*
+  and add `http://192.168.0.78:5173`, then relaunch Chrome.
+- **Permanent:** host the folder on any HTTPS static host (e.g. GitHub Pages). No build step needed.
+
+Once installed over HTTPS, it plays offline: `sw.js` precaches the app shell (network-first, so
+updates arrive whenever the server is reachable). If you add a file under `src/`, add it to
+`ASSETS` in `sw.js` and bump `VERSION`; `tests/pwa.test.js` fails if you forget.
 
 ## How to play (MVP: Case B, "Pressure Point")
 
@@ -88,8 +140,14 @@ src/particles.js         shavings, mud, dust, flakes, release puff, blood
 src/audio.js             procedural WebAudio SFX (no asset files) + haptics
 src/walkoff.js           the walk-off reward scene
 src/ui.js                DOM tool dock, steps panel, guided-run coach card, toasts, modals
-scripts/serve.mjs        zero-dependency static dev server
-tests/                   node:test unit tests for model, tools, steps, scoring
+manifest.webmanifest     PWA manifest (standalone, portrait); icons/ holds its icons
+sw.js                    service worker: offline precache of the app shell
+scripts/serve.mjs        zero-dependency static dev server (LAN-visible, prints the phone URL)
+scripts/build-web.mjs    copies just the game into www/ for Capacitor
+scripts/build-apk.mjs    www/ → cap sync → Gradle → dist/true-hoof-debug.apk (--install to adb it)
+scripts/make-icons.ps1   draws PWA, Android launcher and splash icons
+android/                 Capacitor Android project (generated; build output is git-ignored)
+tests/                   node:test unit tests for model, tools, steps, scoring, PWA wiring
 ```
 
 The simulation (`hoof`, `tools`, `steps`, `scoring`, `tutorial`) has no DOM dependency and is unit-tested.
@@ -102,11 +160,11 @@ A vanilla JS + HTML5 Canvas web prototype, with no build step:
 - It's playable instantly on any device with a browser, and links are shareable for playtests.
 - Touch and pointer events cover mouse and phone with the same code.
 - It's a 2D, gesture-driven game, so a full engine (Unity/Godot) adds weight without adding feel at this stage.
-- It can later be wrapped for the App Store or Play Store with Capacitor. If the art needs grow
+- It's wrapped for Android with Capacitor (see above); iOS would need a Mac with Xcode. If the art needs grow
   (layered 3D hoof, shaders), port the tested simulation core to Godot/Unity.
 
 ## Roadmap (from the design doc)
 
 More cases (overgrowth tutorial, embedded screw, white line, DD, crack), the case select and
 apprentice→pro progression, a real cow sprite, a
-recorded ASMR audio pass, a narrator, and a Capacitor mobile wrap.
+recorded ASMR audio pass, a narrator, and a signed Play Store / iOS build.
