@@ -44,6 +44,10 @@ export class Renderer {
   }
 
   resize(cssW, cssH, dpr) {
+    // Same size: keep the scenery and shadow buffers (repainting them is the costly part).
+    const key = `${cssW}x${cssH}@${dpr}`;
+    if (key === this.sizeKey && this.scenery) return;
+    this.sizeKey = key;
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
     this.canvas.width = Math.round(cssW * dpr);
@@ -322,13 +326,16 @@ export class Renderer {
     c.restore();
 
     c.save();
-    this.font(11, true);
+    // Corners stack name over mm: on a phone the min-text floor makes one line run into the centre.
+    const fb = this.font(11, true);
     c.fillStyle = '#f1e7d0';
-    c.textAlign = 'left';
     const mm = (v) => (clean ? `${v.toFixed(1)} mm` : '— mm');
-    c.fillText(`${name(lc)} ${mm(left)}`, 22, 28);
+    c.textAlign = 'left';
+    c.fillText(name(lc), 22, 28);
+    c.fillText(mm(left), 22, 28 + fb);
     c.textAlign = 'right';
-    c.fillText(`${name(rc)} ${mm(right)}`, W - 22, 28);
+    c.fillText(name(rc), W - 22, 28);
+    c.fillText(mm(right), W - 22, 28 + fb);
     c.textAlign = 'center';
     c.fillStyle = !clean ? 'rgba(241,231,208,0.6)' : level ? '#7bbf6a' : '#d8a64a';
     c.fillText(!clean ? 'clean to read' : level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, 200, 28);
@@ -336,8 +343,9 @@ export class Renderer {
     c.fillStyle = 'rgba(241,231,208,0.7)';
     c.fillText(`target sole ≈ ${T} mm`, 200, 30 + fs);
     // Per-claw height gauges against the target band.
-    this.gauge(c, 30, 46, clean ? left : null, m.claws[lc].deadRemain);
-    this.gauge(c, W - 46, 46, clean ? right : null, m.claws[rc].deadRemain);
+    const gy = Math.max(46, 34 + fb);
+    this.gauge(c, 30, gy, clean ? left : null, m.claws[lc].deadRemain);
+    this.gauge(c, W - 46, gy, clean ? right : null, m.claws[rc].deadRemain);
     c.restore();
   }
 

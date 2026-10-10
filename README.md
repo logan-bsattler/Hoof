@@ -122,6 +122,9 @@ a progress bar. **Lift the foot** plays it unguided.
 - **Nippers:** tap or drag to bite, working from the tip of the toe back toward the hoof. Each bite
   takes all the dead horn beyond the jaws, or nothing if that's more than one bite can hold.
 - **Testers, block, pad + wrap:** taps.
+- **On a phone** the tools sit in two rows, and tapping one shows its hint as a toast. The bar
+  under the top bar carries the current step (and, in the guided run, a progress strip along its
+  bottom edge); tap its text, or **Steps**, for the full checklist and coach card.
 - `G` toggles the guided lines and `M` toggles sound. The lines follow the step: none while you clean and read, then the trim line, heel line, toe triangle or dish as each step needs them. The balance beam shows no figures until the foot is clean.
 
 **Reading the hoof:** horn colour tracks sole thickness: weathered yellow-brown when overgrown,

@@ -511,11 +511,18 @@ async function showFail() {
 
 // --------------------------------------------------------------------- loop
 
+// Window resize and the ResizeObserver can both fire in one frame: fit once per frame.
+let resizeQueued = false;
 function resize() {
-  const wrap = document.getElementById('canvasWrap');
-  const { w, h } = CFG.view;
-  const s = Math.min(wrap.clientWidth / w, wrap.clientHeight / h);
-  renderer.resize(Math.floor(w * s), Math.floor(h * s), Math.min(2.5, window.devicePixelRatio || 1));
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => {
+    resizeQueued = false;
+    const wrap = document.getElementById('canvasWrap');
+    const { w, h } = CFG.view;
+    const s = Math.min(wrap.clientWidth / w, wrap.clientHeight / h);
+    renderer.resize(Math.floor(w * s), Math.floor(h * s), Math.min(2.5, window.devicePixelRatio || 1));
+  });
 }
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(document.getElementById('canvasWrap'));

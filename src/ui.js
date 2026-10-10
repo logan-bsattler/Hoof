@@ -17,7 +17,11 @@ export class UI {
       b.dataset.tool = id;
       b.title = `${t.name} (${t.key})`;
       b.innerHTML = `<canvas class="icon" aria-hidden="true"></canvas><span class="name">${t.name}</span><kbd>${t.key}</kbd>`;
-      b.addEventListener('click', () => onTool(id));
+      b.addEventListener('click', () => {
+        onTool(id);
+        // Phones hide the hint line to fit two rows of tools: show it briefly instead.
+        if (!$('toolInfo').offsetParent) this.toast(`${t.name} · ${t.hint}`, 'info', 2200);
+      });
       dock.appendChild(b);
       this.toolButtons[id] = b;
     }
@@ -47,6 +51,8 @@ export class UI {
     $('btnSound').addEventListener('click', onToggleSound);
     $('btnLefty').addEventListener('click', onToggleLefty);
     $('btnSteps').addEventListener('click', () => document.body.classList.toggle('steps-open'));
+    // The step bar clamps its tip; a tap on the text shows the full card.
+    $('stepBar').firstElementChild.addEventListener('click', () => document.body.classList.add('steps-open'));
     $('stepsPanel').addEventListener('click', (e) => {
       if (e.target === $('stepsPanel')) document.body.classList.remove('steps-open');
     });
@@ -102,8 +108,9 @@ export class UI {
   // Guided-run coach card: beat n of N, what to do, and a progress bar.
   setCoach(t) {
     const el = $('coach');
+    const prog = $('stepBarProg');
     this.coaching = !!t;
-    if (!t) { el.hidden = true; return; }
+    if (!t) { el.hidden = true; prog.hidden = true; return; }
     el.hidden = false;
     const b = t.beat;
     const n = t.beats.length;
@@ -112,13 +119,17 @@ export class UI {
       $('coachTitle').textContent = 'That’s a good foot';
       $('coachText').textContent = 'Every step done. Hit “Release the cow” and watch her walk off.';
       $('coachBar').style.width = '100%';
+      prog.hidden = true;
       return;
     }
+    const pct = `${Math.round((b.measure ? t.progress : 0) * 100)}%`;
     $('coachCount').textContent = `Guided trim · ${t.index + 1} of ${n} · ${TOOLS[b.tool].name}`;
     $('coachTitle').textContent = b.title;
     $('coachText').textContent = b.text;
-    $('coachBar').style.width = `${Math.round((b.measure ? t.progress : 0) * 100)}%`;
+    $('coachBar').style.width = pct;
     $('coachBar').parentElement.hidden = !b.measure;
+    prog.firstElementChild.style.width = pct;
+    prog.hidden = !b.measure;
     // Narrow screens hide the panel: the step bar carries the coaching instead.
     $('stepBarLabel').textContent = `${t.index + 1}/${n} · ${b.title}`;
     $('stepBarTip').textContent = b.text;

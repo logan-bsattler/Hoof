@@ -44,7 +44,7 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'nipInner', tool: 'nippers', title: 'Nip the inner toe',
-      text: `${cap(where(CLAW.INNER))} claw first. Bite at the very tip of the overgrown toe, then work back toward the dashed trim line. A bite that’s too deep takes nothing.`,
+      text: `${cap(where(CLAW.INNER))} claw first. Bite the very tip of the long toe, then work back to the dashed trim line. Too deep a bite takes nothing.`,
       target: { kind: 'rect', ...toeRect(box(CLAW.INNER)) },
       measure: (m) => inner(m).deadRemain, goal: 0.12,
       done: (m) => inner(m).deadRemain < 0.12,
@@ -79,7 +79,7 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'openUlcer', tool: 'knife', title: 'Open the ulcer',
-      text: 'Pull the knife across the circle. Each pull flakes off the loose horn capping the ulcer. Keep going until the ring fills and the flakes stop. Open it, don’t carve it.',
+      text: 'Pull the knife across the circle to flake off the loose horn capping the ulcer. Stop when the ring fills. Open it, don’t carve it.',
       target: { kind: 'ring', x: L.x, y: L.y, r: L.r * 1.75 },
       measure: (m) => m.looseRemain[LOOSE.ULCER], goal: 0.1,
       done: (m) => m.looseRemain[LOOSE.ULCER] < 0.1,
