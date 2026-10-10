@@ -109,6 +109,7 @@ a progress bar. **Lift the foot** plays it unguided.
   centimetre up-left of your fingertip, so the horn you're cutting stays visible. Tune it with
   `CFG.touch` in `src/config.js` (`grip` distance, `angle`). Left-handed? Tap the **Lefty** chip
   in the top bar to mirror it (tip up-right of your finger); it's remembered on that device.
+  The spray bottle and hoof testers are the exception: they work right under your finger.
   Mouse and pen work right at the pointer.
 - **Brush and rasp:** scrub back and forth.
 - **Hoof knife:** press, hold and pull. It bites once pulled and takes off a strip of horn.

@@ -11,7 +11,8 @@ export const CFG = {
   // the touch point (along `angle`, radians, pointing tip → handle) and the cut stays visible.
   // Mouse and pen work at the pointer as before.
   // leftHanded mirrors it (tip up-right, handle to the lower left); toggled by the Lefty chip.
-  touch: { grip: 68, angle: 1.05, leftHanded: false },
+  // Tools in `direct` (spray, testers) still work right under the finger: you aim them, not hold them.
+  touch: { grip: 68, angle: 1.05, leftHanded: false, direct: ['spray', 'probe'] },
 
   // Simulation grid laid over the hoof. Each cell tracks sole thickness, mud, etc.
   grid: { cell: 4, x0: 32, y0: 150, cols: 84, rows: 120 },
@@ -31,8 +32,8 @@ export const CFG = {
   tools: {
     brush:   { radius: 34, mudRate: 0.02 },
     // Knife: hold and pull. It bites once pulled `engage` px, then cuts a wide, even strip.
-    knife:   { radius: 14, rate: 0.12, resist: 0.35, engage: 6 },
-    grinder: { radius: 20, rate: 14, resist: 0.3, resistThin: 0.15 },
+    knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6 },
+    grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15 },
     // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take.
     nippers: { radius: 17, liveBite: 3.5, liveCore: 0.4, spacing: 16, jawDepth: 22 },
     rasp:    { radius: 26, smooth: 0.02, rate: 0.003 },

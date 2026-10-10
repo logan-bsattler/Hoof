@@ -137,7 +137,7 @@ function selectTool(id) {
 // point is the tool tip, offset up-left of the finger (CFG.touch); the sprite is drawn back to it.
 function toLogical(e) {
   const r = canvas.getBoundingClientRect();
-  const touch = e.pointerType === 'touch';
+  const touch = e.pointerType === 'touch' && !CFG.touch.direct.includes(game.tool);
   const { grip } = CFG.touch, angle = touchAngle();
   return {
     x: ((e.clientX - r.left) / r.width) * CFG.view.w - (touch ? grip * Math.cos(angle) : 0),
