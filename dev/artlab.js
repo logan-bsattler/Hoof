@@ -1,11 +1,10 @@
 // Dev-only art lab: replays scripted tool work on fresh hoofs and draws each stage large,
 // so texture and cut edges can be judged side by side. Not loaded by the game.
 
-import { Hoof, CLAW, Z } from '../src/hoof.js';
-import { CFG } from '../src/config.js';
+import { Hoof, CLAW } from '../src/hoof.js';
 import { CASE_B } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
-import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
+import { makePlayer } from '../tests/player.js';
 
 const CROP = { x: 24, y: 165, w: 352, h: 480 };
 // ?focus=lesion crops a close-up around the ulcer; ?focus=toe the nipped toe tips.
@@ -18,70 +17,18 @@ if (CROPQ) { const [x, y, w, h] = CROPQ.split(',').map(Number); Object.assign(CR
 const Q = new URLSearchParams(location.search);
 const ZOOM = Number(Q.get('zoom')) || 1.225;
 const ONLY = Q.has('stage') ? Number(Q.get('stage')) : -1;
-const DT = 1 / 60;
 
 function session() {
   const hoof = new Hoof(CASE_B);
   const art = new HoofArt(3);
   art.sync(hoof);
-  const s = {
-    hoof, art,
-    // Drag a tool along a polyline at a steady speed (px/s), like a player would.
-    drag(tool, pts, speed = 160) {
-      for (let k = 1; k < pts.length; k++) {
-        const [ax, ay] = pts[k - 1], [bx, by] = pts[k];
-        const len = Math.hypot(bx - ax, by - ay);
-        const steps = Math.max(1, Math.ceil(len / (speed * DT)));
-        let px = ax, py = ay;
-        for (let j = 1; j <= steps; j++) {
-          const x = ax + ((bx - ax) * j) / steps, y = ay + ((by - ay) * j) / steps;
-          const dx = x - px, dy = y - py;
-          // A careful hand: the grinder and knife lift off once the horn under them is at target.
-          const i = hoof.cellAt(x, y);
-          const done = i >= 0 && (tool === 'grinder' || tool === 'knife') && !hoof.loose[i] &&
-            hoof.thick[i] <= hoof.zoneTarget(i) + 0.4;
-          if (done) { px = x; py = y; continue; }
-          if (tool === 'grinder') applyGrind(hoof, x, y, DT);
-          else if (tool === 'spray') applySpray(hoof, x, y, DT);
-          else applyStroke(hoof, tool, x, y, Math.hypot(dx, dy));
-          art.mark(tool, x, y, dx, dy, tool === 'grinder' ? 20 : tool === 'knife' ? 14 : 26);
-          px = x; py = y;
-        }
-      }
-      art.sync(hoof);
-      return s;
+  const p = makePlayer(hoof, {
+    onStamp(tool, x, y, dx, dy) {
+      if (tool !== 'nippers') art.mark(tool, x, y, dx, dy, tool === 'grinder' ? 20 : tool === 'knife' ? 14 : 26);
     },
-    brushAll() {
-      for (let y = 180; y < 640; y += 14) s.drag('brush', [[30, y], [370, y + 6], [30, y + 12]], 900);
-      return s;
-    },
-    // Nip each column from the tip back, stopping before the jaws' core would reach live horn.
-    nip() {
-      const core = CFG.tools.nippers.radius * CFG.tools.nippers.liveCore;
-      const touchesLive = (x, y) => {
-        let live = false;
-        hoof.stamp(x, y, core, (i) => { if (!(hoof.zone[i] & Z.DEAD)) live = true; });
-        return live;
-      };
-      for (const x of [158, 242, 128, 272, 100, 300, 190, 210, 80, 320, 70, 330, 112, 288, 143, 257, 174, 226]) {
-        for (let y = 640; y >= 520 && !touchesLive(x, y); y -= 6) applyBite(hoof, x, y);
-      }
-      art.sync(hoof);
-      return s;
-    },
-    // Sweeping grinder passes over one claw, rows top to bottom, like 0:35-1:15.
-    grind(claw, y0 = 270, y1 = 580, passes = 3) {
-      const [xa, xb] = claw === CLAW.INNER ? [222, 340] : [60, 178];
-      for (let p = 0; p < passes; p++) {
-        const off = p * 5;
-        for (let y = y0 + off; y < y1; y += 14) {
-          s.drag('grinder', [[xa, y], [xb, y - 10], [xa, y + 7]], 190);
-        }
-      }
-      return s;
-    },
-  };
-  return s;
+    onAction: () => art.sync(hoof),
+  });
+  return Object.assign(p, { art });
 }
 
 const L = CASE_B.lesion;
