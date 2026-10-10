@@ -376,3 +376,31 @@ test('50 dealt cows all build, keep the lesion in its claw, and trim to Textbook
   assert.equal(sides.size, 2, 'both hind feet dealt');
   assert.equal(sore.size, 2, 'both claws ulcerate');
 });
+
+test('weight test: an ideal trim stands on the blocked sound claw, never on the ulcer', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  const map = h.contactMap();
+  let onBlock = 0, onSore = 0, onUlcer = 0;
+  for (let i = 0; i < map.length; i++) {
+    if (!map[i]) continue;
+    if (h.claw[i] === h.block) onBlock++; else onSore++;
+    if (h.looseInit[i] === LOOSE.ULCER || (h.zone[i] & Z.ULCER)) onUlcer++;
+  }
+  assert.ok(onBlock > 50, `block contact ${onBlock}`);
+  assert.equal(onSore, 0);
+  assert.equal(onUlcer, 0);
+  // Unblocked, both claws bear weight on their highest horn.
+  h.block = 0;
+  const free = h.contactMap();
+  const claws = new Set([...free.keys()].filter((i) => free[i]).map((i) => h.claw[i]));
+  assert.deepEqual([...claws].sort(), [CLAW.OUTER, CLAW.INNER]);
+});
+
+test('mobility score follows the gait: ideal is 0, a block on the sore claw is 3', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  assert.equal(scoreCase(h.metrics(), idealSession(), h, CASE_B).mobility, 0);
+  h.block = CASE_B.lesion.claw;
+  assert.equal(scoreCase(h.metrics(), idealSession(), h, CASE_B).mobility, 3);
+});

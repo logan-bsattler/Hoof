@@ -293,6 +293,69 @@ export function drawWrapRoll(c, x, y, ox = 18, oy = 18) {
   c.restore();
 }
 
+// -------------------------------------------------------------- dock icons
+
+// Each tool laid across a 128-unit square: working point upper left, handle to the lower right.
+const ICON = 128;
+const Q = Math.PI / 4;
+const ICON_DRAW = {
+  brush: (c) => { c.translate(64, 64); c.rotate(Q); c.scale(1.3, 1.3); drawBrush(c, -32, -2, 0); },
+  probe: (c) => { c.scale(1.02, 1.02); drawTesters(c, 14, 22, 0.4, 0.62); },
+  nippers: (c) => { c.scale(0.68, 0.68); drawNippers(c, 34, 34, 0.7, Q); },
+  grinder: (c) => { c.scale(0.66, 0.66); drawGrinder(c, 40, 40, 0.3, false, 20, Q); },
+  knife: (c) => { c.scale(1.45, 1.45); drawKnife(c, 11, 11, Q); },
+  rasp: (c) => { c.translate(64, 64); c.rotate(Q); c.scale(1.22, 1.22); drawRasp(c, -18, 0, 0); },
+  block: (c) => miniBlock(c),
+  spray: (c) => { c.scale(1.12, 1.12); drawSpray(c, 108, 8, false, 0, 74, 44); },
+  wrap: (c) => { c.translate(64, 64); c.rotate(-0.35); c.scale(2.1, 2.1); drawWrapRoll(c, -2, -2, 0, 0); },
+};
+
+// The rubber block on its own: a tilted black superellipse with its rim and lugs.
+function miniBlock(c) {
+  c.translate(64, 66);
+  c.rotate(-0.5);
+  dropShadow(c, 8, 4, 6, 0.5);
+  superellipse(c, 0, 0, 34, 50);
+  c.fillStyle = '#1b1b1d';
+  c.fill();
+  c.shadowColor = 'transparent';
+  superellipse(c, 0, 0, 30, 46);
+  c.strokeStyle = lin(c, -34, -50, 34, 50, [[0, '#85858d'], [0.5, '#3a3a3e'], [1, '#111113']]);
+  c.lineWidth = 5;
+  c.stroke();
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * TAU;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    lug(c, 20 * Math.sign(ca) * Math.abs(ca) ** (2 / 2.6), 34 * Math.sign(sa) * Math.abs(sa) ** (2 / 2.6), 5);
+  }
+  c.fillStyle = '#2c2c30';
+  for (let k = -1; k <= 1; k++) {
+    c.beginPath();
+    c.moveTo(-9, k * 12 + 5); c.lineTo(9, k * 12 - 5); c.lineTo(9, k * 12 - 1); c.lineTo(-9, k * 12 + 9);
+    c.closePath();
+    c.fill();
+  }
+}
+
+const iconCache = new Map();
+
+// Draw the dock icon for tool `id` into a `size` px square at (0, 0). Rendered once at full
+// scale and then shrunk, so the drop shadows shrink with the tool.
+export function drawToolIcon(c, id, size) {
+  let img = iconCache.get(id);
+  if (!img) {
+    img = document.createElement('canvas');
+    img.width = img.height = ICON;
+    const g = img.getContext('2d');
+    g.save();
+    ICON_DRAW[id]?.(g);
+    g.restore();
+    iconCache.set(id, img);
+  }
+  c.imageSmoothingQuality = 'high';
+  c.drawImage(img, 0, 0, size, size);
+}
+
 // -------------------------------------------------------------- block, pad, wrap
 
 // Outline of a block or pad: the claw outline clipped to a superellipse.

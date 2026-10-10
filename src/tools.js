@@ -8,39 +8,39 @@ import { smoothstep } from './noise.js';
 
 export const TOOLS = {
   brush: {
-    name: 'Wire brush', icon: '🖌️', mode: 'stroke', key: '1',
+    name: 'Wire brush', mode: 'stroke', key: '1',
     hint: 'Scrub back and forth to clear the muck. Can’t cut horn.',
   },
   probe: {
-    name: 'Hoof testers', icon: '🧪', mode: 'tap', key: '2',
+    name: 'Hoof testers', mode: 'tap', key: '2',
     hint: 'Tap a spot to test it. Reads sole thickness; springs on a soft lesion.',
   },
   nippers: {
-    name: 'Nippers', icon: '✂️', mode: 'bite', key: '3',
+    name: 'Nippers', mode: 'bite', key: '3',
     hint: 'Tap or drag to bite off overgrown toe. Too blunt for the sole.',
   },
   grinder: {
-    name: 'Grinder', icon: '⚙️', mode: 'hold', key: '4',
+    name: 'Grinder', mode: 'hold', key: '4',
     hint: 'Press, hold and glide to level the sole. Linger and you’ll draw blood.',
   },
   knife: {
-    name: 'Hoof knife', icon: '🔪', mode: 'stroke', key: '5',
+    name: 'Hoof knife', mode: 'stroke', key: '5',
     hint: 'Press, hold and pull to take off a strip of horn. For the dish and for loose horn.',
   },
   rasp: {
-    name: 'Rasp', icon: '🪵', mode: 'stroke', key: '6',
+    name: 'Rasp', mode: 'stroke', key: '6',
     hint: 'Scrub to smooth grinder marks and true the surface.',
   },
   block: {
-    name: 'Block + glue', icon: '🧱', mode: 'tap', key: '7',
+    name: 'Block + glue', mode: 'tap', key: '7',
     hint: 'Tap a claw to glue on the block. It goes on the sound claw.',
   },
   spray: {
-    name: 'Spray bottle', icon: '🧴', mode: 'hold', key: '8',
+    name: 'Spray bottle', mode: 'hold', key: '8',
     hint: 'Hold to flush the opened lesion. Flush, pare, flush: fresh cuts need another rinse.',
   },
   wrap: {
-    name: 'Pad + wrap', icon: '🩹', mode: 'tap', key: '9',
+    name: 'Pad + wrap', mode: 'tap', key: '9',
     hint: 'The last beat. Tap the treated claw: white pad first, then the pink wrap.',
   },
 };

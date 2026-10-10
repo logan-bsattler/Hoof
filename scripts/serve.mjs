@@ -17,6 +17,7 @@ const TYPES = {
   '.json': 'application/json', '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.md': 'text/markdown; charset=utf-8',
+  '.mp3': 'audio/mpeg',
 };
 
 // Virtual adapters (Hyper-V, WSL, VMware, VirtualBox, Docker) aren't reachable from a phone.

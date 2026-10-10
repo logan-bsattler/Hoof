@@ -183,7 +183,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   border: 1px solid var(--line);
   background: var(--panel-2);
 }
-.tool .icon { font-size: 22px; line-height: 1.1; }
+.tool .icon { width: 30px; height: 30px; display: block; }
 .tool .name { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .tool kbd { position: absolute; top: 3px; right: 5px; font-size: 9px; color: var(--muted); font-family: inherit; }
 .tool.active { border-color: var(--brass); background: #4a3826; box-shadow: 0 0 0 1px var(--brass) inset; }
@@ -282,7 +282,7 @@ button.primary[hidden] { display: none; }
   #stepsPanel .panel-inner { background: var(--panel); max-width: 320px; height: 100%; overflow-y: auto; }
   body.steps-open #stepsPanel { display: block; }
   .tool { padding: 5px 2px; }
-  .tool .icon { font-size: 20px; }
+  .tool .icon { width: 28px; height: 28px; }
   .tool kbd { display: none; }
   .tool { min-height: 52px; }
   .chip { padding: 7px 10px; }

@@ -122,7 +122,7 @@ a progress bar. **Lift the foot** plays it unguided.
 - **Nippers:** tap or drag to bite, working from the tip of the toe back toward the hoof. Each bite
   takes all the dead horn beyond the jaws, or nothing if that's more than one bite can hold.
 - **Testers, block, pad + wrap:** taps.
-- `G` toggles the guided lines and `M` toggles sound.
+- `G` toggles the guided lines and `M` toggles sound. The lines follow the step: none while you clean and read, then the trim line, heel line, toe triangle or dish as each step needs them. The balance beam shows no figures until the foot is clean.
 
 **Reading the hoof:** horn colour tracks sole thickness: weathered yellow-brown when overgrown,
 cream at target, pink when thin. With guides on, a mm gauge follows the cursor. Cuts ease off over the
@@ -131,7 +131,7 @@ harder buzz, as the sole under it thins. Lingering, especially with the grinder,
 at a first small nick (the grade is capped at Sound); a second nick or a deep cut ends the case.
 
 You're graded on Balance 35%, Correctness 30%, Restraint 20% and Finish 15%, which
-gives Textbook / Clean / Sound / Needs work. Notes explain what to fix. The walk-off gait
+gives Textbook / Clean / Sound / Needs work. Notes explain what to fix. Before she walks, a weight test lights up where the trimmed foot meets the floor (the ulcer should be off it), and the stamp gives her AHDB mobility score (0 good to 3 severely impaired). The walk-off gait
 (sound / tender / lame) reflects your work.
 
 ## Project layout
@@ -150,7 +150,8 @@ src/render.js            canvas rendering: scene, guides, coach highlight, block
 src/hoofart.js           layered hoof material: horn, stain, manure + straw, tool marks, blood
 src/toolart.js           drawn tool sprites
 src/particles.js         shavings, mud, dust, flakes, release puff, blood
-src/audio.js             procedural WebAudio SFX (no asset files) + haptics
+src/audio.js             WebAudio SFX: CC0 recordings + procedural layers/fallbacks, haptics
+audio/                   short CC0 MP3s (sources and licenses in audio/CREDITS.md)
 src/walkoff.js           the walk-off reward scene
 src/ui.js                DOM tool dock, steps panel, guided-run coach card, toasts, modals
 manifest.webmanifest     PWA manifest (standalone, portrait); icons/ holds its icons

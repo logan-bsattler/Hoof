@@ -2,6 +2,7 @@
 
 import { TOOLS, TOOL_ORDER } from './tools.js';
 import { STEPS, DONE_TIP, stepTip } from './steps.js';
+import { drawToolIcon } from './toolart.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -15,11 +16,20 @@ export class UI {
       b.className = 'tool';
       b.dataset.tool = id;
       b.title = `${t.name} (${t.key})`;
-      b.innerHTML = `<span class="icon" aria-hidden="true">${t.icon}</span><span class="name">${t.name}</span><kbd>${t.key}</kbd>`;
+      b.innerHTML = `<canvas class="icon" aria-hidden="true"></canvas><span class="name">${t.name}</span><kbd>${t.key}</kbd>`;
       b.addEventListener('click', () => onTool(id));
       dock.appendChild(b);
       this.toolButtons[id] = b;
     }
+
+    this.drawIcons();
+    // Redraw sharp when the device pixel ratio changes (zoom, moving to another screen).
+    const watchDpr = () => {
+      matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', () => { this.drawIcons(); watchDpr(); }, { once: true });
+    };
+    watchDpr();
+    // The icon's CSS size changes with the layout breakpoint.
+    addEventListener('resize', () => this.drawIcons());
 
     const list = $('stepsList');
     this.stepItems = STEPS.map((s) => {
@@ -41,6 +51,18 @@ export class UI {
       if (e.target === $('stepsPanel')) document.body.classList.remove('steps-open');
     });
     this.toastTimer = null;
+  }
+
+  // Paint each dock icon from the in-hand tool art, at the icon's CSS size x DPR.
+  drawIcons() {
+    const dpr = devicePixelRatio || 1;
+    for (const [id, b] of Object.entries(this.toolButtons)) {
+      const cv = b.querySelector('canvas.icon');
+      const px = Math.round((cv.clientWidth || 28) * dpr);
+      if (cv.width === px) continue;
+      cv.width = cv.height = px;
+      drawToolIcon(cv.getContext('2d'), id, px);
+    }
   }
 
   setTool(id) {

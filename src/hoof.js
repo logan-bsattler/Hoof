@@ -345,6 +345,29 @@ export class Hoof {
   }
 
   // One pass over the grid: everything the steps tracker and scorer need.
+  // Where she stands on the trimmed foot: 1 for each cell touching the floor, else 0.
+  // With a block on, only the blocked claw bears weight, flat across its sole and dish. Otherwise each claw
+  // bears on horn within CFG.contact.band of its highest sole cell. The opened ulcer, the dish and
+  // the heel bulb are off the floor.
+  contactMap() {
+    const n = this.thick.length;
+    const out = new Float32Array(n);
+    const bears = (i) => (this.zone[i] & Z.LIVE) && !(this.zone[i] & (Z.DEAD | Z.DISH | Z.HEEL | Z.ULCER))
+      && this.looseInit[i] !== LOOSE.ULCER && this.thick[i] > 0.05;
+    const top = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
+    for (let i = 0; i < n; i++) if (bears(i)) top[this.claw[i]] = Math.max(top[this.claw[i]], this.thick[i]);
+    for (let i = 0; i < n; i++) {
+      const c = this.claw[i];
+      if (this.block) {
+        out[i] = c === this.block && (this.zone[i] & Z.LIVE) && !(this.zone[i] & (Z.DEAD | Z.HEEL)) ? 1 : 0;
+        continue;
+      }
+      if (!bears(i)) continue;
+      else out[i] = this.thick[i] >= top[c] - CFG.contact.band ? 1 : 0;
+    }
+    return out;
+  }
+
   metrics() {
     const { target: T, dishTarget: D, thin } = CFG.sole;
     const acc = () => ({ wbSum: 0, wbN: 0, dishSum: 0, dishN: 0, deadN: 0, deadLeft: 0 });

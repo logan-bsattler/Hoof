@@ -36,7 +36,7 @@ export function scoreCase(m, session, hoof, caseDef) {
 
   if (session.blood) {
     return {
-      failed: true, total: 0, grade: 'Failed', medal: 'none', gait: 'lame',
+      failed: true, total: 0, grade: 'Failed', medal: 'none', gait: 'lame', mobility: CFG.mobility.lame,
       parts: { balance: 0, correctness: 0, restraint: 0, finish: 0 },
       notes: ['You cut into the corium and drew blood. Ease off as the sole thins: the gauge and the pink tint are your warning.'],
     };
@@ -115,6 +115,9 @@ export function scoreCase(m, session, hoof, caseDef) {
   const gait = hoof.block === caseDef.lesion.claw ? 'lame'
     : gaitScore >= 75 ? 'sound' : gaitScore >= 50 ? 'tender' : 'lame';
 
+  // AHDB mobility score: a block on the sore claw is the worst case, severely impaired.
+  const mobility = hoof.block === caseDef.lesion.claw ? CFG.mobility.blockedSore : CFG.mobility[gait];
+
   if (!notes.length) notes.push('Textbook. Level, relieved, and nothing taken that didn’t need to go.');
-  return { failed: false, total, grade: g.name, medal: g.medal, gait, parts, notes };
+  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes };
 }

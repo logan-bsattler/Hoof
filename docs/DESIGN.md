@@ -84,7 +84,7 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 | Steps | Live checklist (clean, read, five steps, finish, treat) with per-step tips and a suggested tool |
 | Feedback | Thickness colour ramp, mm gauge, balance beam, toe-length gauges, resistance easing in over the last 1.5 mm above target, grinder pitch/whine and haptics that tighten as the sole thins, thin-sole warnings |
 | Blood | Living cells cut to 0 mm. First stroke that bloods ≤ 3 cells is a nick: flinch, moo, one drop, the tool comes off, grade capped at Sound, Restraint −40. A second nick or a deeper cut: case failed |
-| Scoring | Weighted 4-part score + teaching notes; gait (sound/tender/lame) drives the walk-off |
+| Scoring | Weighted 4-part score + teaching notes; gait (sound/tender/lame) drives the walk-off: a weight-test beat, a 4-beat walk and an AHDB mobility score (0–3) |
 | Juice | Curled shavings, mud clods, grinder dust, flakes, release puff, screen shake, procedural WebAudio SFX, vibration on supported devices |
 
 ### Deliberate simplifications

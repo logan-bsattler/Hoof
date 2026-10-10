@@ -14,17 +14,32 @@ import {
 const { w: W, h: H } = CFG.view;
 const CLAWS = [CLAW.OUTER, CLAW.INNER];
 
+// Which guides each step shows. Cleaning and the read show none (don't spoil the reveal),
+// and neither do the finish and the treatment.
+const GUIDE_SETS = {
+  step1: ['trim', 'heel', 'tri'],
+  step2: ['trim', 'heel', 'tri'],
+  step3: ['dish', 'tri'],
+  step4: ['tri'],
+  step5: ['heel'],
+};
+const GUIDE_FADE = 0.4; // s
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.k = 1;
+    this.cssScale = 1; // CSS px per logical px
     this.art = null;
     this.scenery = null;
     this.shadows = null;
     // Tool-in-hand state driven by the game loop.
     this.fx = { ang: 0.7, spin: 0, grindOn: false, biteT: 0, squeezeT: 0 };
     this.placed = { block: -9, pad: -9, wrap: -9 };
+    // Each guide fades toward on/off as the step changes.
+    this.guideOn = new Set();
+    this.guideAlpha = { trim: 0, heel: 0, tri: 0, dish: 0 };
     this.time = 0;
   }
 
@@ -36,6 +51,7 @@ export class Renderer {
     const k = (cssW * dpr) / W;
     if (!k || !isFinite(k)) return;
     this.k = k;
+    this.cssScale = cssW / W;
     // Hoof buffers are sized once: 2× logical, 3× on dense screens.
     this.scenery = paintScenery(k);
     this.shadows = {};
@@ -53,6 +69,13 @@ export class Renderer {
     return this.shadows[side];
   }
 
+  // A canvas font at `base` logical px, raised so it never renders under CFG.view.minText CSS px.
+  font(base, bold = false) {
+    const px = Math.max(base, CFG.view.minText / this.cssScale);
+    this.ctx.font = `${bold ? 'bold ' : ''}${px.toFixed(1)}px system-ui, sans-serif`;
+    return px;
+  }
+
   begin(shake = 0) {
     const c = this.ctx;
     c.setTransform(this.k, 0, 0, this.k, 0, 0);
@@ -65,6 +88,11 @@ export class Renderer {
     if (f.grindOn) f.spin += dt * 30;
     f.biteT = Math.max(0, f.biteT - dt * 5);
     f.squeezeT = Math.max(0, f.squeezeT - dt * 4);
+    for (const g in this.guideAlpha) {
+      const to = this.guideOn.has(g) ? 1 : 0;
+      const a = this.guideAlpha[g];
+      this.guideAlpha[g] = to > a ? Math.min(to, a + dt / GUIDE_FADE) : Math.max(to, a - dt / GUIDE_FADE);
+    }
     this.art?.update(dt);
   }
 
@@ -111,9 +139,9 @@ export class Renderer {
       c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
       c.stroke();
       c.setLineDash([]);
-      c.font = 'bold 11px system-ui, sans-serif';
+      const fs = this.font(11, true);
       c.textAlign = 'center';
-      label(c, 'ulcer ▼', L.x, L.y - L.r * 2.1 - 4, '#ff6b5b');
+      label(c, 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
       c.restore();
     }
   }
@@ -163,11 +191,16 @@ export class Renderer {
     c.restore();
   }
 
+  // Choose the guides for the current step (an id from STEPS, or null when all are done).
+  setGuides(stepId) { this.guideOn = new Set(GUIDE_SETS[stepId] ?? []); }
+
   guides(hoof) {
     const c = this.ctx;
     const side = hoof.side;
+    const A = this.guideAlpha;
+    if (!(A.trim || A.heel || A.tri || A.dish)) return;
     c.save();
-    c.font = '10px system-ui, sans-serif';
+    const fs = this.font(10);
     c.textAlign = 'center';
     for (const claw of CLAWS) {
       const s = clawSide(claw, side), box = clawBox(claw, side);
@@ -175,6 +208,7 @@ export class Renderer {
 
       // Trim line at the front of the living toe.
       const tl = toeLine(claw, side);
+      c.globalAlpha = A.trim;
       c.setLineDash([5, 4]);
       c.strokeStyle = 'rgba(232,190,100,0.95)';
       c.lineWidth = 1.5;
@@ -183,6 +217,7 @@ export class Renderer {
       c.stroke();
 
       // Dish channel along the axial wall.
+      c.globalAlpha = A.dish;
       c.strokeStyle = 'rgba(120,190,210,0.9)';
       c.beginPath();
       const dr = dishRect(claw, side);
@@ -193,6 +228,7 @@ export class Renderer {
       // open edges (the claw's own outline closes it).
       const triX = GEOM.midX + s * (8 + GEOM.triW);
       c.save();
+      c.globalAlpha = A.tri;
       path(c, clawPolygon(claw, false, side));
       c.clip();
       c.fillStyle = 'rgba(255,107,91,0.1)';
@@ -206,6 +242,7 @@ export class Renderer {
 
       // Heel line, across the claw.
       const heel = clawSpan(claw, GEOM.heelY, side);
+      c.globalAlpha = A.heel;
       c.setLineDash([2, 3]);
       c.strokeStyle = 'rgba(255,255,255,0.45)';
       c.beginPath();
@@ -213,10 +250,15 @@ export class Renderer {
       c.stroke();
       c.setLineDash([]);
 
-      label(c, 'trim line', box.cx, box.y + box.h + 21, 'rgba(232,190,100,0.95)');
-      label(c, 'dish', dr.x + dr.w / 2, GEOM.dishY0 - 4, 'rgba(120,190,210,0.95)');
-      label(c, 'no-cut', ax(228), 520, 'rgba(255,107,91,0.95)');
-      label(c, 'heel: leave it', (heel[0] + heel[1]) / 2 + s * 10, GEOM.heelY + 13, 'rgba(255,255,255,0.8)');
+      c.globalAlpha = A.trim;
+      label(c, 'trim line', box.cx, box.y + box.h + 21, 'rgba(232,190,100,0.95)', fs);
+      c.globalAlpha = A.dish;
+      label(c, 'dish', dr.x + dr.w / 2, GEOM.dishY0 - 6, 'rgba(120,190,210,0.95)', fs);
+      c.globalAlpha = A.tri;
+      label(c, 'no-cut', ax(228), 520, 'rgba(255,107,91,0.95)', fs);
+      c.globalAlpha = A.heel;
+      label(c, 'heel: leave it', (heel[0] + heel[1]) / 2 + s * 10, GEOM.heelY + fs + 6, 'rgba(255,255,255,0.85)', fs);
+      c.globalAlpha = 1;
     }
     c.restore();
   }
@@ -246,25 +288,27 @@ export class Renderer {
   labels(hoof) {
     const c = this.ctx;
     c.save();
-    c.font = 'bold 12px system-ui, sans-serif';
+    const fs = this.font(12, true);
     c.textAlign = 'center';
     for (const claw of CLAWS) {
-      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, clawBox(claw, hoof.side).cx, 652, 'rgba(241,231,208,0.9)');
+      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, clawBox(claw, hoof.side).cx, 652, 'rgba(241,231,208,0.9)', fs);
     }
     c.restore();
   }
 
   // Balance beam: tilts toward the taller claw. Each claw's readout sits on its own side.
-  meter(m, side = 'LH') {
+  // Until the foot is clean the beam sits neutral and shows no figures: the muck hides the read.
+  meter(m, side = 'LH', clean = true) {
     const c = this.ctx;
     const T = CFG.sole.target;
     const [lc, rc] = clawSide(CLAW.OUTER, side) < 0 ? [CLAW.OUTER, CLAW.INNER] : [CLAW.INNER, CLAW.OUTER];
     const name = (k) => (k === CLAW.OUTER ? 'OUTER' : 'INNER');
     const left = m.claws[lc].wbMean, right = m.claws[rc].wbMean;
-    const diff = right - left;
-    const level = Math.abs(diff) <= 0.6;
+    const diff = clean ? right - left : 0;
+    const level = clean && Math.abs(diff) <= 0.6;
     c.save();
-    c.fillStyle = 'rgba(20,14,10,0.7)';
+    // Near-opaque, so the strap and the chute read as passing under the HUD.
+    c.fillStyle = 'rgba(20,14,10,0.92)';
     c.beginPath(); roundRect(c, 10, 8, W - 20, 104, 12); c.fill();
 
     c.translate(200, 74);
@@ -272,44 +316,46 @@ export class Renderer {
     c.beginPath(); c.moveTo(0, 0); c.lineTo(-12, 22); c.lineTo(12, 22); c.closePath(); c.fill();
     const ang = Math.max(-0.3, Math.min(0.3, -diff * 0.06));
     c.rotate(ang);
-    c.fillStyle = level ? '#7bbf6a' : '#d8a64a';
+    c.fillStyle = !clean ? '#8a7a64' : level ? '#7bbf6a' : '#d8a64a';
     c.fillRect(-110, -4, 220, 6);
     c.beginPath(); c.arc(-110, -1, 8, 0, Math.PI * 2); c.arc(110, -1, 8, 0, Math.PI * 2); c.fill();
     c.restore();
 
     c.save();
-    c.font = 'bold 11px system-ui, sans-serif';
+    this.font(11, true);
     c.fillStyle = '#f1e7d0';
     c.textAlign = 'left';
-    c.fillText(`${name(lc)} ${left.toFixed(1)} mm`, 22, 28);
+    const mm = (v) => (clean ? `${v.toFixed(1)} mm` : '— mm');
+    c.fillText(`${name(lc)} ${mm(left)}`, 22, 28);
     c.textAlign = 'right';
-    c.fillText(`${name(rc)} ${right.toFixed(1)} mm`, W - 22, 28);
+    c.fillText(`${name(rc)} ${mm(right)}`, W - 22, 28);
     c.textAlign = 'center';
-    c.fillStyle = level ? '#7bbf6a' : '#d8a64a';
-    c.fillText(level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, 200, 28);
-    c.font = '10px system-ui, sans-serif';
-    c.fillStyle = 'rgba(241,231,208,0.6)';
-    c.fillText(`target sole ≈ ${T} mm`, 200, 42);
+    c.fillStyle = !clean ? 'rgba(241,231,208,0.6)' : level ? '#7bbf6a' : '#d8a64a';
+    c.fillText(!clean ? 'clean to read' : level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, 200, 28);
+    const fs = this.font(10);
+    c.fillStyle = 'rgba(241,231,208,0.7)';
+    c.fillText(`target sole ≈ ${T} mm`, 200, 30 + fs);
     // Per-claw height gauges against the target band.
-    this.gauge(c, 30, 48, left, m.claws[lc].deadRemain);
-    this.gauge(c, W - 46, 48, right, m.claws[rc].deadRemain);
+    this.gauge(c, 30, 46, clean ? left : null, m.claws[lc].deadRemain);
+    this.gauge(c, W - 46, 46, clean ? right : null, m.claws[rc].deadRemain);
     c.restore();
   }
 
   gauge(c, x, y, v, deadRemain) {
-    const h = 56, max = 15;
+    const h = 46, max = 15;
     const ty = (mm) => y + h - (Math.min(max, mm) / max) * h;
     const { target: T, tolerance: tol } = CFG.sole;
     c.fillStyle = 'rgba(255,255,255,0.08)';
     c.fillRect(x, y, 16, h);
     c.fillStyle = 'rgba(123,191,106,0.45)';
     c.fillRect(x, ty(T + tol), 16, ty(T - tol) - ty(T + tol));
+    if (v === null) return; // not read yet
     c.fillStyle = v < T - tol ? '#ff6b5b' : Math.abs(v - T) <= tol ? '#7bbf6a' : '#d8a64a';
     c.fillRect(x - 3, ty(v) - 1.5, 22, 3);
-    c.font = '9px system-ui, sans-serif';
+    const fs = this.font(9);
     c.textAlign = 'center';
     c.fillStyle = deadRemain < 0.12 ? '#7bbf6a' : 'rgba(241,231,208,0.6)';
-    c.fillText(deadRemain < 0.12 ? 'toe ✓' : 'toe long', x + 8, y + h + 6);
+    c.fillText(deadRemain < 0.12 ? 'toe ✓' : 'toe long', x + 8, y + h + fs * 0.95);
     if (v < T - tol) {
       c.fillStyle = '#ff6b5b';
       c.fillText('too thin', x + 8, y - 3);
@@ -355,25 +401,33 @@ export class Renderer {
         const dirty = hoof.mud[i] > 0.35;
         const txt = dirty ? '— mm' : `${t.toFixed(1)} mm`;
         const col = dirty ? '#999' : t < CFG.sole.thin ? '#ff6b5b' : Math.abs(t - tgt) <= CFG.sole.tolerance ? '#7bbf6a' : t > tgt ? '#d8a64a' : '#f0a090';
-        c.font = 'bold 11px system-ui, sans-serif';
+        const fs = this.font(11, true);
         const tw = c.measureText(txt).width + 10;
         const flip = ptr.touch && CFG.touch.leftHanded; // keep the gauge away from the finger
         const bx = flip ? Math.max(4, ptr.x - r - 6 - tw) : Math.min(W - tw - 4, ptr.x + r + 6);
-        const by = ptr.y - r - 18;
+        const bh = fs + 5;
+        const by = ptr.y - r - bh - 2;
         c.fillStyle = 'rgba(20,14,10,0.85)';
-        c.beginPath(); roundRect(c, bx, by, tw, 16, 6); c.fill();
+        c.beginPath(); roundRect(c, bx, by, tw, bh, 6); c.fill();
         c.fillStyle = col;
         c.textAlign = 'left';
-        c.fillText(txt, bx + 5, by + 12);
+        c.fillText(txt, bx + 5, by + fs * 0.85 + 2);
       }
     }
     c.restore();
   }
 }
 
-function label(c, text, x, y, color) {
-  c.fillStyle = 'rgba(0,0,0,0.6)';
-  c.fillText(text, x + 0.8, y + 0.8);
+// Centred text on a small dark pill, so it reads over the busy horn texture.
+// Inherits the caller's globalAlpha (guides fade in and out).
+function label(c, text, x, y, color, fs) {
+  const w = c.measureText(text).width + fs * 0.7;
+  const h = fs * 1.35;
+  const a = c.globalAlpha;
+  c.globalAlpha = a * 0.75;
+  c.fillStyle = '#140e0a';
+  c.beginPath(); roundRect(c, x - w / 2, y - fs * 0.95, w, h, Math.min(6, h / 2)); c.fill();
+  c.globalAlpha = a;
   c.fillStyle = color;
   c.fillText(text, x, y);
 }

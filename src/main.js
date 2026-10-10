@@ -464,7 +464,15 @@ async function requestRelease() {
   }
   game.metrics = game.hoof.metrics();
   game.result = scoreCase(game.metrics, game.session, game.hoof, caseDef);
-  game.walkoff = new Walkoff(game.result, Sound, { wrapped: game.hoof.wrap >= 2, side: game.hoof.side });
+  const hoof = game.hoof;
+  // The weight test shows the trimmed foot as it stands, without guides or HUD.
+  const drawFoot = () => {
+    renderer.background();
+    renderer.hoof(hoof, false, game.metrics);
+    renderer.block(hoof);
+    renderer.dressing(hoof);
+  };
+  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrap >= 2, side: hoof.side, hoof, drawFoot });
   game.state = 'walkoff';
 }
 
@@ -606,6 +614,18 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// The foot has been brushed clean at least once (sticky: a little fresh muck doesn't hide the read).
+const wasCleaned = () => game.session.stepDoneAt.clean != null;
+
+// Guides follow the trim step in hand. None during the read, unless the player starts
+// cutting before committing it: then they get the lines for the step they're on.
+function guideStep() {
+  if (!wasCleaned()) return null;
+  const st = game.steps.status;
+  if (!st[1].done && game.session.firstCutClaw == null) return null;
+  return st.find((s) => !s.done && s.id !== 'diagnose')?.id ?? null;
+}
+
 function draw() {
   const ctx = renderer.ctx;
   renderer.begin(game.shake);
@@ -619,13 +639,17 @@ function draw() {
   const aim = game.ptr.over && game.state === 'play' ? hoof.claw[hoof.cellAt(game.ptr.x, game.ptr.y)] ?? 0 : 0;
   renderer.block(hoof, game.tool === 'block' ? aim : 0);
   renderer.dressing(hoof, game.tool === 'wrap' ? aim : 0);
-  if (game.guides) renderer.guides(hoof);
+  renderer.setGuides(game.guides && game.state === 'play' ? guideStep() : null);
+  renderer.guides(hoof);
   if (game.tutorial?.beat && game.state === 'play') renderer.coach(game.tutorial.beat.target, game.tutorial.progress, game.time);
   renderer.labels(hoof);
   particles.draw(ctx);
-  renderer.meter(game.metrics, hoof.side);
+  renderer.meter(game.metrics, hoof.side, wasCleaned());
   if (game.state === 'play') renderer.cursor(game.tool, game.ptr, hoof, game.guides, game.time);
 }
+
+// Dev aid: ?debug exposes the game state for inspection in the console.
+if (new URLSearchParams(location.search).has('debug')) window.hoofGame = game;
 
 resize();
 showIntro();

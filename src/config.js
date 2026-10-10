@@ -5,7 +5,8 @@ export const touchAngle = () => (CFG.touch.leftHanded ? Math.PI - CFG.touch.angl
 
 export const CFG = {
   // Logical play-field size (portrait). The canvas is scaled to fit the screen.
-  view: { w: 400, h: 720 },
+  // minText: smallest canvas text in CSS px, however far a small phone scales the field down.
+  view: { w: 400, h: 720, minText: 11 },
 
   // Touch: the finger holds the tool's handle, so the working tip sits `grip` px up-left of
   // the touch point (along `angle`, radians, pointing tip → handle) and the cut stays visible.
@@ -44,6 +45,11 @@ export const CFG = {
 
   // Blood: the first shallow cut (at most `maxCells` cells in one stroke) is a nick she flinches at.
   // A second nick, or a deeper cut, fails the case. A nick caps the grade and costs Restraint.
+  // Walk-off weight test: horn within `band` mm of its claw's highest bearing point touches the floor.
+  // Mobility follows the AHDB 0-3 scale from the gait.
+  contact: { band: 0.5 },
+  mobility: { sound: 0, tender: 1, lame: 2, blockedSore: 3 },
+
   nick: { maxCells: 3, restraint: 40, capGrade: 'Sound' },
 
   // Treatment: how well-flushed the opened ulcer must be before it's padded and wrapped.
