@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#1d1611">
   <meta name="description" content="TRUE HOOF: a calm, craftsmanlike cattle hoof-trimming game.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="True Hoof">
   <title>True Hoof</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -61,5 +68,11 @@
   </div>
 
   <script type="module" src="src/main.js"></script>
+  <script>
+    // Offline + installable PWA. Skipped inside the Capacitor app, which already ships the files.
+    if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
+      addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
 </body>
 </html>

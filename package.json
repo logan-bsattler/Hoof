@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "start": "node scripts/serve.mjs",
+    "start:local": "node scripts/serve.mjs --host 127.0.0.1",
     "test": "node --test"
   },
   "engines": { "node": ">=18" }
