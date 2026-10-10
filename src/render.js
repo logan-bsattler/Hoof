@@ -1,7 +1,7 @@
 // Scene composition for the trimming view: backdrop, contact shadows, the layered
 // hoof material (hoofart.js), strap, block and dressings, guides, HUD and the tool in hand.
 
-import { CFG } from './config.js';
+import { CFG, touchAngle } from './config.js';
 import { Z, CLAW, GEOM, clawPolygon, toeLine } from './hoof.js';
 import { toolRadius } from './tools.js';
 import { HoofArt } from './hoofart.js';
@@ -306,8 +306,8 @@ export class Renderer {
       c.stroke();
     }
     // On touch the finger is on the handle: every tool points from its tip back to the finger.
-    const g = ptr.touch ? CFG.touch.angle : null;
-    const gx = Math.cos(CFG.touch.angle) * CFG.touch.grip, gy = Math.sin(CFG.touch.angle) * CFG.touch.grip;
+    const g = ptr.touch ? touchAngle() : null;
+    const gx = Math.cos(touchAngle()) * CFG.touch.grip, gy = Math.sin(touchAngle()) * CFG.touch.grip;
     switch (tool) {
       case 'knife': drawKnife(c, ptr.x, ptr.y, g ?? f.ang); break;
       case 'grinder': drawGrinder(c, ptr.x, ptr.y, f.spin, ptr.down, r, g ?? undefined); break;
@@ -317,7 +317,7 @@ export class Renderer {
       case 'probe': drawTesters(c, ptr.x, ptr.y, f.squeezeT, g ?? undefined); break;
       case 'spray': g === null ? drawSpray(c, ptr.x, ptr.y, ptr.down, time)
         : drawSpray(c, ptr.x, ptr.y, ptr.down, time, ptr.x + gx * 1.15, ptr.y + gy * 1.15); break;
-      case 'wrap': g === null ? drawWrapRoll(c, ptr.x, ptr.y) : drawWrapRoll(c, ptr.x, ptr.y, gx - 11, gy); break;
+      case 'wrap': g === null ? drawWrapRoll(c, ptr.x, ptr.y) : drawWrapRoll(c, ptr.x, ptr.y, gx - 11 * Math.sign(gx), gy); break;
       default: break;
     }
 
@@ -332,7 +332,8 @@ export class Renderer {
         const col = dirty ? '#999' : t < CFG.sole.thin ? '#ff6b5b' : Math.abs(t - tgt) <= CFG.sole.tolerance ? '#7bbf6a' : t > tgt ? '#d8a64a' : '#f0a090';
         c.font = 'bold 11px system-ui, sans-serif';
         const tw = c.measureText(txt).width + 10;
-        const bx = Math.min(W - tw - 4, ptr.x + r + 6);
+        const flip = ptr.touch && CFG.touch.leftHanded; // keep the gauge away from the finger
+        const bx = flip ? Math.max(4, ptr.x - r - 6 - tw) : Math.min(W - tw - 4, ptr.x + r + 6);
         const by = ptr.y - r - 18;
         c.fillStyle = 'rgba(20,14,10,0.85)';
         c.beginPath(); roundRect(c, bx, by, tw, 16, 6); c.fill();

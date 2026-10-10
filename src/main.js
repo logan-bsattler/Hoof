@@ -1,7 +1,7 @@
 // Game bootstrap: state machine, input, and the frame loop.
 // intro → play → (failing → fail) | (walkoff → results)
 
-import { CFG } from './config.js';
+import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
 import { CASE_B } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
@@ -49,7 +49,16 @@ const ui = new UI({
   onRelease: () => requestRelease(),
   onToggleGuides: () => { game.guides = !game.guides; ui.setToggle('btnGuides', game.guides); },
   onToggleSound: () => { game.sound = !game.sound; Sound.setEnabled(game.sound); ui.setToggle('btnSound', game.sound); },
+  onToggleLefty: () => setLefty(!CFG.touch.leftHanded),
 });
+
+// Left-handed touch grip, remembered on this device.
+function setLefty(on) {
+  CFG.touch.leftHanded = on;
+  ui.setToggle('btnLefty', on);
+  try { localStorage.setItem('truehoof.lefty', on ? '1' : '0'); } catch { /* storage blocked */ }
+}
+try { setLefty(localStorage.getItem('truehoof.lefty') === '1'); } catch { /* storage blocked */ }
 
 // ---------------------------------------------------------------- lifecycle
 
@@ -129,7 +138,7 @@ function selectTool(id) {
 function toLogical(e) {
   const r = canvas.getBoundingClientRect();
   const touch = e.pointerType === 'touch';
-  const { grip, angle } = CFG.touch;
+  const { grip } = CFG.touch, angle = touchAngle();
   return {
     x: ((e.clientX - r.left) / r.width) * CFG.view.w - (touch ? grip * Math.cos(angle) : 0),
     y: ((e.clientY - r.top) / r.height) * CFG.view.h - (touch ? grip * Math.sin(angle) : 0),

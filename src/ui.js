@@ -6,7 +6,7 @@ import { STEPS, DONE_TIP } from './steps.js';
 const $ = (id) => document.getElementById(id);
 
 export class UI {
-  constructor({ onTool, onRelease, onToggleGuides, onToggleSound }) {
+  constructor({ onTool, onRelease, onToggleGuides, onToggleSound, onToggleLefty }) {
     this.toolButtons = {};
     const dock = $('tools');
     for (const id of TOOL_ORDER) {
@@ -33,6 +33,7 @@ export class UI {
     $('btnReleaseBar').addEventListener('click', onRelease);
     $('btnGuides').addEventListener('click', onToggleGuides);
     $('btnSound').addEventListener('click', onToggleSound);
+    $('btnLefty').addEventListener('click', onToggleLefty);
     $('btnSteps').addEventListener('click', () => document.body.classList.toggle('steps-open'));
     $('stepsPanel').addEventListener('click', (e) => {
       if (e.target === $('stepsPanel')) document.body.classList.remove('steps-open');

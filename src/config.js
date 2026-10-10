@@ -1,5 +1,8 @@
 // Central tunables. Everything that changes how the game *feels* lives here.
 
+// Tip → handle direction for touch, mirrored for left-handed players.
+export const touchAngle = () => (CFG.touch.leftHanded ? Math.PI - CFG.touch.angle : CFG.touch.angle);
+
 export const CFG = {
   // Logical play-field size (portrait). The canvas is scaled to fit the screen.
   view: { w: 400, h: 720 },
@@ -7,7 +10,8 @@ export const CFG = {
   // Touch: the finger holds the tool's handle, so the working tip sits `grip` px up-left of
   // the touch point (along `angle`, radians, pointing tip → handle) and the cut stays visible.
   // Mouse and pen work at the pointer as before.
-  touch: { grip: 68, angle: 1.05 },
+  // leftHanded mirrors it (tip up-right, handle to the lower left); toggled by the Lefty chip.
+  touch: { grip: 68, angle: 1.05, leftHanded: false },
 
   // Simulation grid laid over the hoof. Each cell tracks sole thickness, mud, etc.
   grid: { cell: 4, x0: 32, y0: 150, cols: 84, rows: 120 },
