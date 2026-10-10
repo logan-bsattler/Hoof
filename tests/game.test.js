@@ -6,7 +6,7 @@ import { Hoof, Z, CLAW, LOOSE, GEOM } from '../src/hoof.js';
 import { CASE_B } from '../src/case.js';
 import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
-import { newSession, scoreCase } from '../src/scoring.js';
+import { newSession, scoreCase, judgeBlood } from '../src/scoring.js';
 
 const { target: T, dishTarget: D } = CFG.sole;
 
@@ -250,4 +250,55 @@ test('the block does not lock out the loose heel horn or the rasp step', () => {
   // Rough inner sole under the block, smooth outer sole: the finish step only sees the outer.
   for (let i = 0; i < h.n; i++) if (h.claw[i]) h.rough[i] = h.claw[i] === CLAW.INNER ? 1 : 0;
   assert.ok(h.metrics().roughMean < 0.15, 'horn under the block no longer counts toward finish');
+});
+
+test('cuts ease in above target: full rate well above, slowed near, `resist` below', () => {
+  const h = new Hoof(CASE_B);
+  const [x, y] = findCell(h, (i) => (h.zone[i] & Z.LIVE) && !(h.zone[i] & (Z.HEEL | Z.DISH | Z.ULCER | Z.WALL)) &&
+    !h.looseInit[i] && h.claw[i] === CLAW.INNER && h.cellY(i) > 380);
+  const i = h.cellAt(x, y);
+  const { rate, resist } = CFG.tools.grinder;
+  const dt = 0.001;
+  // Removal at the cell itself (falloff 1 at the disc centre) from a given starting thickness.
+  const removedFrom = (mm) => {
+    h.thick[i] = mm;
+    applyGrind(h, h.cellX(i), h.cellY(i), dt);
+    return (mm - h.thick[i]) / (rate * dt);
+  };
+  assert.ok(Math.abs(removedFrom(T + 2) - 1) < 0.01, 'full rate 2 mm above target');
+  assert.ok(removedFrom(T + 0.5) < 0.7, 'slowed 0.5 mm above target');
+  assert.ok(Math.abs(removedFrom(T - 0.5) - resist) < 0.01, '`resist` below target');
+});
+
+test('grinder danger is quiet on a fresh hoof and loud over thin horn', () => {
+  const h = new Hoof(CASE_B);
+  const [x, y] = [280, 400];
+  assert.ok(applyGrind(h, x, y, 0.001).danger < 0.05, 'fresh hoof');
+  h.thick[h.cellAt(x, y)] = 3.2;
+  assert.ok(applyGrind(h, x, y, 0.001).danger > 0.8, 'one thin cell under the disc');
+});
+
+test('a shallow first nick is graded, a second nick or a deep cut fails', () => {
+  const s = newSession();
+  assert.equal(judgeBlood(s, 2), 'nick');
+  assert.equal(s.blood, false);
+  assert.equal(judgeBlood(s, 1), 'fail', 'second nick');
+  assert.equal(s.blood, true);
+  const deep = newSession();
+  assert.equal(judgeBlood(deep, CFG.nick.maxCells + 1), 'fail', 'deep cut');
+});
+
+test('a nicked but otherwise ideal trim still scores, capped at Sound with a Restraint cost', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  const clean = scoreCase(h.metrics(), idealSession(), h, CASE_B);
+  const s = idealSession();
+  judgeBlood(s, 1);
+  const r = scoreCase(h.metrics(), s, h, CASE_B);
+  assert.equal(r.failed, false);
+  assert.equal(r.grade, CFG.nick.capGrade);
+  assert.equal(r.parts.restraint, clean.parts.restraint - CFG.nick.restraint);
+  assert.ok(r.notes.some((n) => n.includes('nicked')));
+  judgeBlood(s, 1);
+  assert.equal(scoreCase(h.metrics(), s, h, CASE_B).failed, true, 'two nicks fail');
 });

@@ -11,7 +11,8 @@ weight-bearing surface so she walks off sound. The feel to aim for is the Nate-t
 methodical, informative, quietly triumphant. (He's inspiration only; there's no licensing deal.)
 
 **Anti-cheese principle:** this is not a pimple-popper. It rewards judgment, not gross-out or
-tapping. Respect for the animal is a design constraint, and drawing blood is always a failure.
+tapping. Respect for the animal is a design constraint: drawing blood always costs. One small nick
+caps the grade at Sound; a second nick or a deep cut fails the case.
 
 ## Pillars
 
@@ -45,7 +46,7 @@ Each does one job well and the wrong job badly. Picking the tool is the decision
 ## Scoring
 
 Balance 35%, Correctness 30%, Restraint 20%, Finish 15%. **Speed is never scored.**
-Fails and penalties: drawing blood (hard fail), over-thinning the sole, cutting the toe triangle/axial wall,
+Fails and penalties: drawing blood (a first small nick caps the grade at Sound; a second nick or a deep cut fails), over-thinning the sole, cutting the toe triangle/axial wall,
 blocking the wrong claw, removing healthy horn. The grade tiers are Sound, Clean and Textbook.
 
 ## Juice
@@ -80,8 +81,8 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 | Reveal | Mud hides the bruise-coloured ulcer patch until scrubbed |
 | Diagnosis | Testers spring on the lesion, then you pick from 4 diagnoses; wrong picks are explained |
 | Steps | Live checklist (clean, read, five steps, finish, treat) with per-step tips and a suggested tool |
-| Feedback | Thickness colour ramp, mm gauge, balance beam, toe-length gauges, near-target resistance, thin-sole warnings |
-| Hard fail | Any living cell cut to 0 mm: flinch, moo, blood, case failed |
+| Feedback | Thickness colour ramp, mm gauge, balance beam, toe-length gauges, resistance easing in over the last 1.5 mm above target, grinder pitch/whine and haptics that tighten as the sole thins, thin-sole warnings |
+| Blood | Living cells cut to 0 mm. First stroke that bloods ≤ 3 cells is a nick: flinch, moo, one drop, the tool comes off, grade capped at Sound, Restraint −40. A second nick or a deeper cut: case failed |
 | Scoring | Weighted 4-part score + teaching notes; gait (sound/tender/lame) drives the walk-off |
 | Juice | Curled shavings, mud clods, grinder dust, flakes, release puff, screen shake, procedural WebAudio SFX, vibration on supported devices |
 

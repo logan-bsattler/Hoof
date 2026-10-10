@@ -6,7 +6,8 @@ read it, then pick the right tool in the right order to restore a flat,
 balanced, weight-bearing surface, so the cow walks off sound.
 
 Scoring rewards **balance, correctness and restraint, not speed**. Cutting into
-the corium and drawing blood is a hard fail.
+the corium draws blood: one small nick caps the grade at Sound, and a second nick or a
+deep cut fails the case.
 
 - Full design concept: [`docs/design-concept.html`](docs/design-concept.html)
 - Distilled spec + what the MVP covers: [`docs/DESIGN.md`](docs/DESIGN.md)
@@ -120,8 +121,10 @@ a progress bar. **Lift the foot** plays it unguided.
 - `G` toggles the guided lines and `M` toggles sound.
 
 **Reading the hoof:** horn colour tracks sole thickness: weathered yellow-brown when overgrown,
-cream at target, pink when thin. With guides on, a mm gauge follows the cursor. Cuts slow down as you
-reach target (that's the resistance), but lingering, especially with the grinder, draws blood and ends the case.
+cream at target, pink when thin. With guides on, a mm gauge follows the cursor. Cuts ease off over the
+last 1.5 mm above target (that's the resistance), and the grinder bogs down into a tighter whine, with a
+harder buzz, as the sole under it thins. Lingering, especially with the grinder, draws blood. She flinches
+at a first small nick (the grade is capped at Sound); a second nick or a deep cut ends the case.
 
 You're graded on Balance 35%, Correctness 30%, Restraint 20% and Finish 15%, which
 gives Textbook / Clean / Sound / Needs work. Notes explain what to fix. The walk-off gait

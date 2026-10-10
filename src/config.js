@@ -24,11 +24,12 @@ export const CFG = {
     thin: 3,          // below this the sole flexes: warning zone
     heel: 5,          // heel bulb horn: leave it alone
     tolerance: 0.75,  // +/- band that counts as "on target"
+    ramp: 1.5,        // cuts slow over this many mm above a zone's target, down to the tool's `resist`
   },
 
   // Tool behaviour. Rates are mm removed per px of movement (stroke tools)
-  // or per second (grinder). `resist` multiplies removal once a cell is at
-  // or below its zone target — the "you're nearly there" assist.
+  // or per second (grinder). `resist` is the removal multiplier at a cell's zone target,
+  // eased in over `sole.ramp` mm above it: the "you're nearly there" assist.
   tools: {
     brush:   { radius: 34, mudRate: 0.02 },
     // Knife: hold and pull. It bites once pulled `engage` px, then cuts a wide, even strip.
@@ -40,6 +41,10 @@ export const CFG = {
     // tint gained per second at full strength; pareWash is lost per px of knife travel.
     spray:   { radius: 22, rate: 1.6, hornRate: 0.3, rinse: 0.6, pareWash: 0.05 },
   },
+
+  // Blood: the first shallow cut (at most `maxCells` cells in one stroke) is a nick she flinches at.
+  // A second nick, or a deeper cut, fails the case. A nick caps the grade and costs Restraint.
+  nick: { maxCells: 3, restraint: 40, capGrade: 'Sound' },
 
   // Treatment: how well-flushed the opened ulcer must be before it's padded and wrapped.
   treat: { tintMin: 0.6 },

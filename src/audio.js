@@ -102,6 +102,10 @@ export const Sound = {
     loops.grindTone = { o: osc, g: og };
   },
 
+  resume() {
+    if (ctx && ctx.state !== 'running') ctx.resume();
+  },
+
   setEnabled(on) {
     enabled = on;
     if (master) master.gain.setTargetAtTime(on ? 0.8 : 0, ctx.currentTime, 0.05);
@@ -113,12 +117,16 @@ export const Sound = {
     loops[kind].g.gain.setTargetAtTime(Math.min(1, level) * 0.22, ctx.currentTime, 0.04);
   },
 
-  grinder(on, load = 0) {
+  // load 0..1: how much horn the disc is biting. danger 0..1: how close the horn under it is
+  // to the thin line. Danger bogs the motor down and narrows the grind into a tight whine.
+  grinder(on, load = 0, danger = 0) {
     if (!ctx) return;
     const t = ctx.currentTime;
-    loops.grindTone.g.gain.setTargetAtTime(on ? 0.06 : 0, t, 0.05);
-    loops.grindTone.o.frequency.setTargetAtTime(on ? 150 - load * 40 : 130, t, 0.08);
-    loops.grindNoise.g.gain.setTargetAtTime(on ? 0.05 + load * 0.12 : 0, t, 0.05);
+    loops.grindTone.g.gain.setTargetAtTime(on ? 0.06 + danger * 0.02 : 0, t, 0.05);
+    loops.grindTone.o.frequency.setTargetAtTime(on ? 150 - load * 40 - danger * 45 : 130, t, 0.08);
+    loops.grindNoise.g.gain.setTargetAtTime(on ? 0.05 + load * 0.12 + danger * 0.04 : 0, t, 0.05);
+    loops.grindNoise.f.frequency.setTargetAtTime(3200 + danger * 2400, t, 0.06);
+    loops.grindNoise.f.Q.setTargetAtTime(1.2 + danger * 5, t, 0.06);
   },
 
   spray(on) {

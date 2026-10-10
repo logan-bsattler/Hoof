@@ -6,7 +6,7 @@ import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
 import { CASE_B } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { STEPS, evaluateSteps, trimFinished } from './steps.js';
-import { newSession, scoreCase } from './scoring.js';
+import { newSession, scoreCase, judgeBlood } from './scoring.js';
 import { Renderer } from './render.js';
 import { Particles } from './particles.js';
 import { Sound, buzz } from './audio.js';
@@ -37,6 +37,7 @@ const game = {
   failTimer: 0,
   weepT: 0,
   holdLast: null,
+  buzzT: 0,             // grinder haptic throttle
   walkoff: null,
   result: null,
   lastWarn: {},
@@ -147,6 +148,7 @@ function toLogical(e) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
+  Sound.resume(); // the context can be suspended after the app was backgrounded
   if (game.state === 'walkoff') { game.walkoff.skip(); return; }
   if (game.state !== 'play' || game.ptr.down) return;
   canvas.setPointerCapture(e.pointerId);
@@ -179,7 +181,7 @@ canvas.addEventListener('pointermove', (e) => {
         const x = ptr.x + (dx * s) / steps, y = ptr.y + (dy * s) / steps;
         renderer.stroke(game.tool, x, y, dx / steps, dy / steps);
         handle(applyStroke(game.hoof, game.tool, x, y, dist / steps), x, y);
-        if (game.state !== 'play') break;
+        if (game.state !== 'play' || !ptr.down) break;
       }
       game.scrubLevel = Math.min(1, game.scrubLevel + dist / 60);
     } else if (mode === 'bite') {
@@ -209,6 +211,20 @@ function endPointer(e) {
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
+
+// Safety net: a hold the browser never ends (capture lost, app backgrounded, window blurred)
+// must not keep the grinder cutting. Drops the tool without counting it as a tap.
+function releaseHold() {
+  const ptr = game.ptr;
+  if (!ptr.down) return;
+  ptr.down = false;
+  stopHoldSounds();
+  game.pullRemoved = 0;
+  game.holdLast = null;
+}
+canvas.addEventListener('lostpointercapture', releaseHold);
+window.addEventListener('blur', releaseHold);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseHold(); });
 canvas.addEventListener('pointerleave', (e) => { if (!game.ptr.down && e.pointerType === 'mouse') game.ptr.over = false; });
 
 window.addEventListener('keydown', (e) => {
@@ -375,7 +391,20 @@ function handle(ev, x, y) {
   else if (ev.thin) warnOnce('thin', 'Sole’s getting thin here. Ease off.');
   if (ev.blockedSkip) warnOnce('blocked', 'Can’t trim under the block.', 'info', 6);
 
-  if (ev.blood) fail(x, y);
+  if (ev.blood) {
+    if (judgeBlood(s, ev.bloodCells) === 'nick') nick(x, y);
+    else fail(x, y);
+  }
+}
+
+// A shallow first nick: she flinches, the tool comes off, and the case goes on.
+function nick(x, y) {
+  releaseHold();
+  game.shake = 6;
+  Sound.moo(true);
+  buzz([40, 30, 60]);
+  particles.spawn('blood', x, y, '#c0101c', 1);
+  ui.toast('She felt that. One more and you’re done.', 'warn', 3600);
 }
 
 function fail(x, y) {
@@ -468,8 +497,13 @@ function frame(now) {
       if (game.tool === 'grinder') {
         renderer.stroke('grinder', ptr.x, ptr.y, dx, dy);
         const ev = applyGrind(game.hoof, ptr.x, ptr.y, dt);
-        Sound.grinder(true, Math.min(1, ev.removed / 4));
-        if (ev.removed > 0.05) buzz(4);
+        Sound.grinder(true, Math.min(1, ev.removed / 4), ev.danger);
+        // The handle buzzes harder as the sole thins; throttled so it reads as a pulse, not a hum.
+        game.buzzT -= dt;
+        if (ev.removed > 0.05 && game.buzzT <= 0) {
+          buzz(4 + Math.round(ev.danger * 14));
+          game.buzzT = 0.1;
+        }
         handle(ev, ptr.x, ptr.y);
       } else if (game.tool === 'spray') {
         const ev = applySpray(game.hoof, ptr.x, ptr.y, dt);

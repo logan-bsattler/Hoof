@@ -13,8 +13,19 @@ export function newSession() {
     diagnosis: null, diagnosisCorrect: false,
     firstCutClaw: null, dirtyCuts: 0, grinderLesion: false,
     blockAttempts: [], blockBeforeDx: false,
-    dishBeforeLevel: false, stepDoneAt: {}, blood: false,
+    dishBeforeLevel: false, stepDoneAt: {}, blood: false, nicks: 0,
   };
+}
+
+// One tool event drew blood from `cells` cells: a forgivable nick, or the end of the case.
+// Records the outcome in the session and returns 'nick' or 'fail'.
+export function judgeBlood(session, cells) {
+  if (!session.nicks && cells <= CFG.nick.maxCells) {
+    session.nicks++;
+    return 'nick';
+  }
+  session.blood = true;
+  return 'fail';
 }
 
 export function scoreCase(m, session, hoof, caseDef) {
@@ -71,7 +82,9 @@ export function scoreCase(m, session, hoof, caseDef) {
       notes.push(`${name} claw over-trimmed to ${k.wbMean.toFixed(1)} mm (target ~${T}). Err on the side of caution.`);
     }
   }
-  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver);
+  const nickCost = session.nicks ? CFG.nick.restraint : 0;
+  if (session.nicks) notes.push('You nicked the corium and she felt it. Ease off as the gauge drops and the sole turns pink.');
+  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost);
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 
@@ -83,9 +96,14 @@ export function scoreCase(m, session, hoof, caseDef) {
 
   const parts = { balance, correctness, restraint, finish };
   const W = CFG.weights;
-  const total = Math.round(
+  let total = Math.round(
     W.balance * balance + W.correctness * correctness + W.restraint * restraint + W.finish * finish,
   );
+  // A nick caps the grade: nothing that drew blood scores above the cap grade's band.
+  if (session.nicks) {
+    const k = CFG.grades.findIndex((gr) => gr.name === CFG.nick.capGrade);
+    if (k > 0) total = Math.min(total, CFG.grades[k - 1].min - 1);
+  }
   const g = CFG.grades.find((gr) => total >= gr.min);
 
   // How she walks off: balance plus whether the ulcer is relieved.

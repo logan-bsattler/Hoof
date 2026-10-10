@@ -4,6 +4,7 @@
 
 import { CFG } from './config.js';
 import { Z, LOOSE, CLAW } from './hoof.js';
+import { smoothstep } from './noise.js';
 
 export const TOOLS = {
   brush: {
@@ -54,7 +55,7 @@ function newEvents() {
   return {
     removed: 0, mud: 0, dead: 0,
     loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0 },
-    blood: false, thin: false, lesionCut: false, grinderLesion: false,
+    blood: false, bloodCells: 0, thin: false, lesionCut: false, grinderLesion: false,
     dirtyCut: false, nipLive: false, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
   };
@@ -66,9 +67,9 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist) {
   const t = hoof.thick[i];
   if (t <= 0) return 0;
   if (z & Z.LIVE) {
-    const tgt = hoof.zoneTarget(i);
     if (t < CFG.sole.thin || (z & Z.ULCER)) depth *= resistThin;
-    else if (t <= tgt - 0.25 || tgt === Infinity) depth *= resist;
+    // The horn firms up over the last `ramp` mm, so a steady hand can stop on target.
+    else depth *= resistAt(t, hoof.zoneTarget(i), resist);
   }
   const d = Math.min(depth, t);
   hoof.thick[i] = t - d;
@@ -86,8 +87,14 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist) {
     hoof.thick[i] = 0;
     hoof.blood[i] = 1;
     ev.blood = true;
+    ev.bloodCells++;
   }
   return d;
+}
+
+// Cut-rate multiplier at thickness t: full speed above tgt + ramp, easing down to `resist` at tgt.
+export function resistAt(t, tgt, resist) {
+  return resist + (1 - resist) * smoothstep(tgt, tgt + CFG.sole.ramp, t);
 }
 
 function blocked(hoof, i, ev) {
@@ -143,11 +150,17 @@ export function applyStroke(hoof, tool, x, y, dist) {
 }
 
 // Grinder: continuous removal while held, scaled by time.
+// ev.danger (0..1) rises as the thinnest live horn under the disc's core nears the thin line,
+// so sound and haptics can tighten before any blood.
 export function applyGrind(hoof, x, y, dt) {
   const ev = newEvents();
   const cfg = CFG.tools.grinder;
+  ev.danger = 0;
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (blocked(hoof, i, ev)) return;
+    if (f > 0.5 && (hoof.zone[i] & Z.LIVE) && hoof.thick[i] > 0) {
+      ev.danger = Math.max(ev.danger, 1 - smoothstep(CFG.sole.thin, hoof.zoneTarget(i), hoof.thick[i]));
+    }
     hoof.mud[i] = Math.max(0, hoof.mud[i] - 2 * dt * f);
     if (hoof.zone[i] & Z.ULCER) ev.grinderLesion = true;
     if (clearLoose(hoof, i, ev)) {
