@@ -124,7 +124,9 @@ a progress bar. **Lift the foot** plays it unguided.
 - **Testers, block, pad + wrap:** taps.
 - **On a phone** the tools sit in two rows, and tapping one shows its hint as a toast. The bar
   under the top bar carries the current step (and, in the guided run, a progress strip along its
-  bottom edge); tap its text, or **Steps**, for the full checklist and coach card.
+  bottom edge); tap its text, or **Steps**, for the full checklist and coach card. The view zooms
+  onto the hoof (about 30% larger than the full scene), with the balance beam and claw readouts in
+  a compact strip across the top.
 - `G` toggles the guided lines and `M` toggles sound. The lines follow the step: none while you clean and read, then the trim line, heel line, toe triangle or dish as each step needs them. The balance beam shows no figures until the foot is clean.
 
 **Reading the hoof:** horn colour tracks sole thickness: weathered yellow-brown when overgrown,
@@ -150,6 +152,7 @@ src/steps.js             clean → diagnose → five steps → finish → treat 
 src/tutorial.js          guided first trim: coached beats with targets and progress (pure, testable)
 src/scoring.js           Balance / Correctness / Restraint / Finish grading + gait
 src/render.js            canvas rendering: scene, guides, coach highlight, block, dressings, HUD, cursor
+src/view.js              camera: full scene on desktop, zoomed onto the hoof on phones (pure, testable)
 src/hoofart.js           layered hoof material: horn, stain, manure + straw, tool marks, blood
 src/toolart.js           drawn tool sprites
 src/particles.js         shavings, mud, dust, flakes, release puff, blood

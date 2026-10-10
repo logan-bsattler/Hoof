@@ -6,12 +6,14 @@ import { Z, CLAW, GEOM, clawPolygon, toeLine, clawBox, clawSide, clawSpan, dishR
 import { toolRadius } from './tools.js';
 import { HoofArt } from './hoofart.js';
 import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
+import { fitCamera } from './view.js';
 import {
   drawKnife, drawGrinder, drawBrush, drawNippers, drawRasp, drawTesters, drawSpray,
   drawWrapRoll, drawBlock, drawPad, drawWrap, roundRect,
 } from './toolart.js';
 
 const { w: W, h: H } = CFG.view;
+const BLEED = CFG.view.phone.bleed;
 const CLAWS = [CLAW.OUTER, CLAW.INNER];
 
 // Which guides each step shows. Cleaning and the read show none (don't spoil the reveal),
@@ -31,6 +33,8 @@ export class Renderer {
     this.ctx = canvas.getContext('2d');
     this.k = 1;
     this.cssScale = 1; // CSS px per logical px
+    this.cam = fitCamera(W, H);
+    this.dpr = 1;
     this.art = null;
     this.scenery = null;
     this.shadows = null;
@@ -43,19 +47,24 @@ export class Renderer {
     this.time = 0;
   }
 
-  resize(cssW, cssH, dpr) {
-    // Same size: keep the scenery and shadow buffers (repainting them is the costly part).
-    const key = `${cssW}x${cssH}@${dpr}`;
+  // Apply a camera from fitCamera() (src/view.js) at this device pixel ratio.
+  resize(cam, dpr) {
+    // Same view: keep the scenery and shadow buffers (repainting them is the costly part).
+    const key = `${cam.mode}:${cam.cssW}x${cam.cssH}:${cam.scale.toFixed(4)}@${dpr}`;
     if (key === this.sizeKey && this.scenery) return;
-    this.sizeKey = key;
-    this.canvas.style.width = `${cssW}px`;
-    this.canvas.style.height = `${cssH}px`;
-    this.canvas.width = Math.round(cssW * dpr);
-    this.canvas.height = Math.round(cssH * dpr);
-    const k = (cssW * dpr) / W;
+    const k = cam.scale * dpr;
     if (!k || !isFinite(k)) return;
+    this.sizeKey = key;
+    this.cam = cam;
+    this.dpr = dpr;
+    this.canvas.style.width = `${cam.cssW}px`;
+    this.canvas.style.height = `${cam.cssH}px`;
+    this.canvas.width = Math.round(cam.cssW * dpr);
+    this.canvas.height = Math.round(cam.cssH * dpr);
+    const scaleChanged = k !== this.k;
     this.k = k;
-    this.cssScale = cssW / W;
+    this.cssScale = cam.scale;
+    if (!scaleChanged && this.scenery) return; // only the framing moved
     // Hoof buffers are sized once: 2× logical, 3× on dense screens.
     this.scenery = paintScenery(k);
     this.shadows = {};
@@ -82,7 +91,8 @@ export class Renderer {
 
   begin(shake = 0) {
     const c = this.ctx;
-    c.setTransform(this.k, 0, 0, this.k, 0, 0);
+    const { k, cam } = this;
+    c.setTransform(k, 0, 0, k, -cam.x * k, -cam.y * k);
     if (shake > 0) c.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   }
 
@@ -111,15 +121,16 @@ export class Renderer {
 
   background() {
     const c = this.ctx;
+    const { cam } = this;
     c.fillStyle = '#16120f';
-    c.fillRect(-20, -20, W + 40, H + 40);
-    if (this.scenery) c.drawImage(this.scenery, 0, 0, W, H);
+    c.fillRect(cam.x - 20, cam.y - 20, cam.cssW / cam.scale + 40, cam.cssH / cam.scale + 40);
+    if (this.scenery) c.drawImage(this.scenery, -BLEED, 0, W + 2 * BLEED, H);
   }
 
   hoof(hoof, diagnosed, m) {
     const c = this.ctx;
     // Created on first draw: the first resize can fire before layout gives the canvas a size.
-    if (!this.art) this.art = new HoofArt(this.k >= 2.6 ? 3 : 2);
+    if (!this.art) this.art = new HoofArt(this.k >= 2.2 ? 3 : 2);
     this.art.sync(hoof);
     // Contact shadows give each claw weight against the chute.
     const shadows = this.shadows && this.shadowsFor(hoof.side);
@@ -303,6 +314,7 @@ export class Renderer {
   // Balance beam: tilts toward the taller claw. Each claw's readout sits on its own side.
   // Until the foot is clean the beam sits neutral and shows no figures: the muck hides the read.
   meter(m, side = 'LH', clean = true) {
+    if (this.cam.hudH) { this.stripMeter(m, side, clean); return; }
     const c = this.ctx;
     const T = CFG.sole.target;
     const [lc, rc] = clawSide(CLAW.OUTER, side) < 0 ? [CLAW.OUTER, CLAW.INNER] : [CLAW.INNER, CLAW.OUTER];
@@ -349,6 +361,69 @@ export class Renderer {
     c.restore();
   }
 
+  // Phone HUD: the same read as meter(), drawn in screen space as a strip across the top of
+  // the canvas (CSS px), so the camera can spend the scene's height on the hoof.
+  stripMeter(m, side, clean) {
+    const c = this.ctx;
+    const { cssW: cw, hudH: hh } = this.cam;
+    const T = CFG.sole.target, tol = CFG.sole.tolerance;
+    const [lc, rc] = clawSide(CLAW.OUTER, side) < 0 ? [CLAW.OUTER, CLAW.INNER] : [CLAW.INNER, CLAW.OUTER];
+    const name = (k) => (k === CLAW.OUTER ? 'OUTER' : 'INNER');
+    const left = m.claws[lc].wbMean, right = m.claws[rc].wbMean;
+    const diff = clean ? right - left : 0;
+    const level = clean && Math.abs(diff) <= 0.6;
+    const fs = CFG.view.minText;
+    c.save();
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    c.fillStyle = 'rgba(20,14,10,0.92)';
+    c.beginPath(); roundRect(c, 4, 2, cw - 8, hh - 4, 10); c.fill();
+
+    // Beam in the middle, between the two claw columns.
+    const half = Math.min(70, cw * 0.18);
+    c.save();
+    c.translate(cw / 2, 25);
+    c.fillStyle = '#6b5a45';
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(-6, 9); c.lineTo(6, 9); c.closePath(); c.fill();
+    c.rotate(Math.max(-0.3, Math.min(0.3, -diff * 0.06)));
+    c.fillStyle = !clean ? '#8a7a64' : level ? '#7bbf6a' : '#d8a64a';
+    c.fillRect(-half, -2.5, half * 2, 4);
+    c.beginPath(); c.arc(-half, -0.5, 4.5, 0, Math.PI * 2); c.arc(half, -0.5, 4.5, 0, Math.PI * 2); c.fill();
+    c.restore();
+    c.textAlign = 'center';
+    c.font = `bold ${fs}px system-ui, sans-serif`;
+    c.fillStyle = !clean ? 'rgba(241,231,208,0.6)' : level ? '#7bbf6a' : '#d8a64a';
+    c.fillText(!clean ? 'clean to read' : level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, cw / 2, 15);
+    c.font = `${fs}px system-ui, sans-serif`;
+    c.fillStyle = 'rgba(241,231,208,0.7)';
+    c.fillText(`target ${T} mm`, cw / 2, 42);
+
+    // Each claw: name and mm, a horizontal gauge against the target band, then toe / thin status.
+    const col = (k, v, x, align) => {
+      const gw = 58, gx = align === 'left' ? x : x - gw;
+      c.textAlign = align;
+      c.font = `bold ${fs}px system-ui, sans-serif`;
+      c.fillStyle = '#f1e7d0';
+      c.fillText(`${name(k)} ${clean ? v.toFixed(1) : '—'} mm`, x, 15);
+      const max = 15, tx = (mm) => gx + (Math.min(max, mm) / max) * gw;
+      c.fillStyle = 'rgba(255,255,255,0.1)';
+      c.fillRect(gx, 21, gw, 6);
+      c.fillStyle = 'rgba(123,191,106,0.5)';
+      c.fillRect(tx(T - tol), 21, tx(T + tol) - tx(T - tol), 6);
+      const thin = clean && v < T - tol;
+      if (clean) {
+        c.fillStyle = thin ? '#ff6b5b' : Math.abs(v - T) <= tol ? '#7bbf6a' : '#d8a64a';
+        c.fillRect(tx(v) - 1.5, 18, 3, 12);
+      }
+      const dead = m.claws[k].deadRemain;
+      c.font = `${fs}px system-ui, sans-serif`;
+      c.fillStyle = thin ? '#ff6b5b' : dead < 0.12 ? '#7bbf6a' : 'rgba(241,231,208,0.6)';
+      c.fillText(thin ? 'too thin' : dead < 0.12 ? 'toe ✓' : 'toe long', x, 42);
+    };
+    col(lc, left, 12, 'left');
+    col(rc, right, cw - 12, 'right');
+    c.restore();
+  }
+
   gauge(c, x, y, v, deadRemain) {
     const h = 46, max = 15;
     const ty = (mm) => y + h - (Math.min(max, mm) / max) * h;
@@ -386,7 +461,8 @@ export class Renderer {
     }
     // On touch the finger is on the handle: every tool points from its tip back to the finger.
     const g = ptr.touch ? touchAngle() : null;
-    const gx = Math.cos(touchAngle()) * CFG.touch.grip, gy = Math.sin(touchAngle()) * CFG.touch.grip;
+    const grip = CFG.touch.grip / this.cssScale;
+    const gx = Math.cos(touchAngle()) * grip, gy = Math.sin(touchAngle()) * grip;
     switch (tool) {
       case 'knife': drawKnife(c, ptr.x, ptr.y, g ?? f.ang); break;
       case 'grinder': drawGrinder(c, ptr.x, ptr.y, f.spin, ptr.down, r, g ?? undefined); break;
@@ -412,7 +488,9 @@ export class Renderer {
         const fs = this.font(11, true);
         const tw = c.measureText(txt).width + 10;
         const flip = ptr.touch && CFG.touch.leftHanded; // keep the gauge away from the finger
-        const bx = flip ? Math.max(4, ptr.x - r - 6 - tw) : Math.min(W - tw - 4, ptr.x + r + 6);
+        // Keep the pill on screen: the camera may show less (or more) than the scene's width.
+        const x0 = Math.max(0, this.cam.x) + 4, x1 = Math.min(W, this.cam.x + this.cam.cssW / this.cam.scale) - 4;
+        const bx = flip ? Math.max(x0, ptr.x - r - 6 - tw) : Math.min(x1 - tw, ptr.x + r + 6);
         const bh = fs + 5;
         const by = ptr.y - r - bh - 2;
         c.fillStyle = 'rgba(20,14,10,0.85)';

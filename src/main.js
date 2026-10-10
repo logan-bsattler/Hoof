@@ -8,6 +8,7 @@ import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, appl
 import { STEPS, evaluateSteps, trimFinished, stepTip } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
 import { Renderer } from './render.js';
+import { fitCamera, toScene } from './view.js';
 import { Particles } from './particles.js';
 import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
@@ -166,12 +167,10 @@ function selectTool(id) {
 function toLogical(e) {
   const r = canvas.getBoundingClientRect();
   const touch = e.pointerType === 'touch' && !CFG.touch.direct.includes(game.tool);
-  const { grip } = CFG.touch, angle = touchAngle();
-  return {
-    x: ((e.clientX - r.left) / r.width) * CFG.view.w - (touch ? grip * Math.cos(angle) : 0),
-    y: ((e.clientY - r.top) / r.height) * CFG.view.h - (touch ? grip * Math.sin(angle) : 0),
-    touch,
-  };
+  const cam = renderer.cam, angle = touchAngle();
+  const grip = touch ? CFG.touch.grip / cam.scale : 0; // CSS px → logical at this zoom
+  const p = toScene(cam, e.clientX - r.left, e.clientY - r.top);
+  return { x: p.x - grip * Math.cos(angle), y: p.y - grip * Math.sin(angle), touch };
 }
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -518,6 +517,10 @@ async function showFail() {
 
 // --------------------------------------------------------------------- loop
 
+// Phones zoom onto the hoof; the walk-off is composed for the whole scene, so it gets the full view.
+const walkoffShown = () => game.state === 'walkoff' || (game.state === 'results' && !!game.walkoff);
+const viewMode = () => (window.innerWidth <= CFG.view.phone.maxW && !walkoffShown() ? 'hoof' : 'full');
+
 // Window resize and the ResizeObserver can both fire in one frame: fit once per frame.
 let resizeQueued = false;
 function resize() {
@@ -526,9 +529,7 @@ function resize() {
   requestAnimationFrame(() => {
     resizeQueued = false;
     const wrap = document.getElementById('canvasWrap');
-    const { w, h } = CFG.view;
-    const s = Math.min(wrap.clientWidth / w, wrap.clientHeight / h);
-    renderer.resize(Math.floor(w * s), Math.floor(h * s), Math.min(2.5, window.devicePixelRatio || 1));
+    renderer.resize(fitCamera(wrap.clientWidth, wrap.clientHeight, viewMode()), Math.min(2.5, window.devicePixelRatio || 1));
   });
 }
 window.addEventListener('resize', resize);
@@ -619,6 +620,7 @@ function frame(now) {
 
   particles.update(dt);
   renderer.update(dt);
+  if (viewMode() !== renderer.cam.mode) resize();
   draw();
 
   if (game.state === 'walkoff') {
@@ -643,7 +645,7 @@ function guideStep() {
 function draw() {
   const ctx = renderer.ctx;
   renderer.begin(game.shake);
-  if (game.state === 'walkoff' || (game.state === 'results' && game.walkoff)) {
+  if (walkoffShown()) {
     game.walkoff.draw(ctx);
     return;
   }
@@ -662,8 +664,8 @@ function draw() {
   if (game.state === 'play') renderer.cursor(game.tool, game.ptr, hoof, game.guides, game.time);
 }
 
-// Dev aid: ?debug exposes the game state for inspection in the console.
-if (new URLSearchParams(location.search).has('debug')) window.hoofGame = game;
+// Dev aid: ?debug exposes the game state and renderer (its .cam maps logical ↔ screen) in the console.
+if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { hoofGame: game, hoofRenderer: renderer });
 
 resize();
 showIntro();

@@ -36,8 +36,9 @@ Work through the packages in the order below. **WP0 comes first** because it is 
 
 - `npm test` after every package.
 - Browser: `preview_start {name: "true-hoof"}` (port 5173, from `.claude/launch.json`). The pane is small, so `resize_window` to 1280×900 for desktop, use the mobile preset (375×812), and also try 375×667 for small phones.
-- Long gestures: dispatch pointer events on `#game` with `javascript_tool`. Map a logical point to the screen with
-  `r = canvas.getBoundingClientRect(); clientX = r.left + x / 400 * r.width; clientY = r.top + y / 720 * r.height`.
+- Long gestures: dispatch pointer events on `#game` with `javascript_tool`. Map a logical point to the screen through the camera (WP6; on phones the canvas no longer shows the whole 400×720 scene). With `?debug`, use
+  `r = canvas.getBoundingClientRect(); cam = hoofRenderer.cam; clientX = r.left + (x - cam.x) * cam.scale; clientY = r.top + (y - cam.y) * cam.scale`
+  (the same as `toScreen` in `src/view.js`). On desktop the camera is `{x: 0, y: 0, scale: r.width / 400}`, so the old `x / 400 * r.width` mapping still holds there.
   Use `pointerId: 1, pointerType: 'mouse', bubbles: true`, then `pointerdown` → several `pointermove` → `pointerup`.
 - For close-up art checks, open `dev/artlab.html` (`?stage=0..3`, `?focus=lesion|toe`, `?zoom=2`).
 - Ask Ben to playtest on his phone for feel (`npm start` and open the LAN URL, or `npm run android:apk`).
@@ -238,6 +239,62 @@ Proposal:
 - **Toasts overwrite each other.** There's a single toast element, so warnings replace step tips mid-read (`ui.js:96-102`). Add a small queue with priority (warn > good > info) and a minimum display time of about 1.2 s.
 - **Duplicate helpers.** `hoof.js:93-113` re-implements `mulberry32` and `smoothstep` from `noise.js`, and `render.js:362` `roundRect` duplicates `toolart.js:17` `rrect`. Import one copy of each.
 - **Optional first impression.** Replace the intro modal over a dimmed hoof with a proper title card (logo, the barn, ambient sound starting on the first tap).
+
+---
+
+## WP6: a bigger hoof on phones (medium; scoped 2026-10-10 at `4494435`)
+
+**Problem.** The canvas is a fixed 400×720 logical scene, letterboxed into `#canvasWrap` (`main.js:523-533`). Phone wraps are much wider than 0.556, so the fit is height-limited:
+
+| Viewport | Wrap (CSS px) | Canvas now | Hoof scale now | Empty side margin |
+|---|---|---|---|---|
+| 375×667 | 375×413 | 229×413 | 0.573 | 146 px |
+| 375×812 | 375×558 | 310×558 | 0.775 | 65 px |
+
+About a third of the scene's height is not hoof. The HUD takes y 8–112, the strap and chute take y 112–180, and the bottom 60 px are empty. The claws (with the overgrown toes, both feet) span x 48–352 and y 182–625. The claw labels sit at y 652, and the clean-step target covers y 180–630.
+
+**Change: a camera, plus a phone HUD drawn in screen space.** On narrow screens the canvas fills the wrap. The HUD becomes a fixed strip across the top, and the camera fits a content box of about x 38–362 and y 172–664 (324×492 logical) into the space that's left.
+
+| Viewport | Hoof scale with WP6 (48 px HUD strip) | Gain |
+|---|---|---|
+| 375×667 | min(375/324, 365/492) = 0.742 | +29% linear, +67% area |
+| 375×812 | min(375/324, 510/492) = 1.037 | +34% linear, +79% area |
+
+### 6.1 Camera (the seam everything else goes through)
+- Add a pure `fitCamera(wrapW, wrapH, mode)` in a new `src/view.js`. It returns `{ x, y, w, h, scale, hudH }` in logical px and is unit-tested. Mode `full` is today's whole scene, letterboxed. Mode `hoof` is the content box below a HUD strip. Put the content box, the strip height and the breakpoint in `CFG.view`.
+- `Renderer.begin()`: `setTransform(k)` then `translate(-cam.x, -cam.y + hudH/scale)`. `cssScale` becomes `cam.scale`, so the text floor in `font()` keeps working.
+- `toLogical()` (`main.js:166-175`) inverts the camera instead of `/ r.width * 400`. Add a round-trip test (logical → screen → logical).
+- The walk-off keeps mode `full`, because it's a cutscene composed for the whole 400×720. Switch modes on `state` and refit once, not per frame.
+
+### 6.2 Phone HUD strip
+- Draw `meter()` in screen space under its own transform, about 48 CSS px tall and full canvas width. Keep the beam and status text ("clean to read", "LEVEL", "1.2 mm off") and the two corner readouts (name and mm). Swap the 46 px vertical gauges for short horizontal bars, and show "toe long" and "too thin" as text in the corners. The desktop HUD stays as it is.
+- Keep the `wasCleaned()` gating from WP3.2: "— mm" until the foot is clean.
+
+### 6.3 Scenery bleed
+- With a full-width canvas, the camera shows logical x of about −53 to 453 at 375×667, but the scenery is painted only for 0–400 (`scenery.js:19-31`). Paint it with a horizontal bleed (around −80 to 480) and widen `background()`'s fill to match. The other option is a soft vignette into the dark wrap colour (D7).
+
+### 6.4 Knock-on fixes
+- **Touch grip.** `CFG.touch.grip` (68 logical px) would grow from 39 to 50 CSS px at 375×667 and to about 70 px at 375×812. Make the grip a CSS-px value (about 44) converted with `cam.scale`, so the tip-to-finger distance doesn't change with zoom.
+- **Hoof buffer sharpness.** `HoofArt` picks a 3× buffer only when `k >= 2.6` (`render.js:115`). At scale 1.04 on a 3× DPR phone, k ≈ 3.1, so even the 3× buffer is slightly upscaled. Lower the threshold, or allow 4× when k > 3, after checking the memory cost (the buffer is 336×480 × S² × 4 bytes, plus the overlay).
+- **Thickness readout.** The cursor pill clamps to 0–W (`render.js:415`). Clamp it to the camera's visible x range instead.
+- **Fill cost.** The phone canvas gains about 1.6× pixels at 375×667. Check the frame time on a mid-range Android in Ben's playtest.
+- **Docs.** Update the "How to verify" mapping in this plan, the README, and the DESIGN.md "View" row.
+
+### 6.5 Verify
+- `npm test`, including the new `view.js` tests. The playthrough bot works in logical coordinates and shouldn't change.
+- In the preview at 375×667, 375×812, 412×915 and 1280×900 (desktop must be unchanged), check that:
+  - the whole hoof, both labels and every tutorial target are visible
+  - tool taps land where the tip is drawn (mouse and emulated touch)
+  - the HUD strip shows "— mm" before cleaning
+  - the canvas doesn't change size between beats
+  - the walk-off is still letterboxed correctly
+
+### Decisions for Ben
+| # | Decision | Default |
+|---|---|---|
+| D6 | Where does the camera apply: phones only (≤ 860 px, like the rest of WP4) or everywhere it helps? | Phones only |
+| D7 | Side margins: extend the barn scenery, or a soft vignette into the dark background? | Extend the scenery |
+| D8 | Phone HUD: compact strip with horizontal gauges (+29%), or keep today's HUD scaled into a ~66 px strip (+23%, no redesign)? | Compact strip |
 
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.

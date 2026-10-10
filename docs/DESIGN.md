@@ -75,7 +75,7 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 | Hoof model | 84×120 cell grid over two claws; per-cell sole thickness, mud, roughness, loose horn, blood; zones for wall, white line, heel, dish, toe triangle, ulcer, dead toe |
 | Tools | 9: brush, testers, nippers, grinder, knife, rasp, block, spray bottle, pad + wrap |
 | Gestures | Scrub (brush/rasp), press-hold-pull strip (knife), press-hold-glide (grinder/spray), tip-first tap/drag bite (nippers; all-or-nothing per bite), tap (testers/block/pad + wrap) |
-| View | Sole facing the camera, heel bulbs at the top, toes pointing down (the trimmer's view in the chute) |
+| View | Sole facing the camera, heel bulbs at the top, toes pointing down (the trimmer's view in the chute). Desktop shows the whole 400×720 scene letterboxed. On phones (≤ 860 px) the camera zooms onto the hoof, the HUD becomes a compact strip across the top, and the barn scenery extends past the scene edges to fill the width. The walk-off always uses the whole scene. |
 | Guided run | Optional coached first trim: 13 beats, each with a tool, an on-hoof target outline, one instruction and a progress bar |
 | Treatment | Flush the opened ulcer with the spray, then pad and wrap it; fresh paring washes out the flush |
 | Reveal | Mud hides the bruise-coloured ulcer patch and the decoy marks (a dark stain, a reddish bruise) until scrubbed; decoys trim off with the surface horn |

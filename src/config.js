@@ -6,14 +6,21 @@ export const touchAngle = () => (CFG.touch.leftHanded ? Math.PI - CFG.touch.angl
 export const CFG = {
   // Logical play-field size (portrait). The canvas is scaled to fit the screen.
   // minText: smallest canvas text in CSS px, however far a small phone scales the field down.
-  view: { w: 400, h: 720, minText: 11 },
+  view: {
+    w: 400, h: 720, minText: 11,
+    // Phones (`maxW` CSS px wide or less) zoom onto the hoof (src/view.js): `content` is the
+    // logical box that must stay in view (claws, labels, tutorial targets), `hudH` the CSS px
+    // HUD strip above it, `bleed` how far the scenery is painted past each side of the scene.
+    phone: { maxW: 860, content: { x: 38, y: 172, w: 324, h: 492 }, hudH: 48, bleed: 80 },
+  },
 
   // Touch: the finger holds the tool's handle, so the working tip sits `grip` px up-left of
   // the touch point (along `angle`, radians, pointing tip → handle) and the cut stays visible.
+  // grip is in CSS px, so the tip sits the same distance from the finger at any zoom.
   // Mouse and pen work at the pointer as before.
   // leftHanded mirrors it (tip up-right, handle to the lower left); toggled by the Lefty chip.
   // Tools in `direct` (spray, testers) still work right under the finger: you aim them, not hold them.
-  touch: { grip: 68, angle: 1.05, leftHanded: false, direct: ['spray', 'probe'] },
+  touch: { grip: 46, angle: 1.05, leftHanded: false, direct: ['spray', 'probe'] },
 
   // Simulation grid laid over the hoof. Each cell tracks sole thickness, mud, etc.
   grid: { cell: 4, x0: 32, y0: 150, cols: 84, rows: 120 },

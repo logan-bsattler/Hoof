@@ -7,6 +7,7 @@ import { CFG } from './config.js';
 import { mulberry32 } from './noise.js';
 
 const { w: W, h: H } = CFG.view;
+const B = CFG.view.phone.bleed; // painted past each side, for the wider phone framing
 
 function canvas(w, h) {
   const c = document.createElement('canvas');
@@ -15,21 +16,22 @@ function canvas(w, h) {
   return c;
 }
 
-// Paint the static backdrop at scale k (device px per logical px).
+// Paint the static backdrop at scale k (device px per logical px). The result covers logical
+// x −B…W+B, so draw it at (−B, 0, W + 2B, H).
 export function paintScenery(k) {
-  const out = canvas(W * k, H * k);
+  const out = canvas((W + 2 * B) * k, H * k);
   const c = out.getContext('2d');
-  c.setTransform(k, 0, 0, k, 0, 0);
+  c.setTransform(k, 0, 0, k, B * k, 0);
 
   // Far layer, out of focus: barn floor and steel posts.
   const fk = Math.max(0.3, k * 0.28);
-  const far = canvas(W * fk, H * fk);
+  const far = canvas((W + 2 * B) * fk, H * fk);
   const f = far.getContext('2d');
-  f.setTransform(fk, 0, 0, fk, 0, 0);
+  f.setTransform(fk, 0, 0, fk, B * fk, 0);
   paintFar(f);
   c.imageSmoothingEnabled = true;
   c.imageSmoothingQuality = 'high';
-  c.drawImage(far, 0, 0, W, H);
+  c.drawImage(far, -B, 0, W + 2 * B, H);
 
   // Near layer, in focus: the chute hardware beside and above the foot.
   paintChute(c);
@@ -44,40 +46,49 @@ function paintFar(c) {
   bg.addColorStop(0.45, '#2a231c');
   bg.addColorStop(1, '#3b3127');
   c.fillStyle = bg;
-  c.fillRect(0, 0, W, H);
+  c.fillRect(-B, 0, W + 2 * B, H);
 
   // Daylight from the barn door, upper right.
   const sun = c.createRadialGradient(360, 260, 10, 360, 260, 300);
   sun.addColorStop(0, 'rgba(232,214,180,0.35)');
   sun.addColorStop(1, 'rgba(232,214,180,0)');
   c.fillStyle = sun;
-  c.fillRect(0, 0, W, H);
+  c.fillRect(-B, 0, W + 2 * B, H);
 
-  // Floor: manure-dark concrete with straw bedding.
-  for (let k = 0; k < 260; k++) {
-    const x = rand() * W, y = 380 + rand() * 360;
-    c.fillStyle = `rgba(${20 + rand() * 30 | 0},${16 + rand() * 20 | 0},${10 + rand() * 14 | 0},0.5)`;
-    c.beginPath(); c.ellipse(x, y, 4 + rand() * 14, 2 + rand() * 6, 0, 0, Math.PI * 2); c.fill();
-  }
-  c.lineCap = 'round';
-  for (let k = 0; k < 1400; k++) {
-    const x = rand() * W, y = 330 + rand() ** 0.7 * 400;
-    const len = 6 + rand() * 26, a = rand() * Math.PI;
-    const l = 0.55 + rand() * 0.6;
-    c.strokeStyle = `rgba(${210 * l | 0},${172 * l | 0},${92 * l | 0},${0.35 + rand() * 0.5})`;
-    c.lineWidth = 0.8 + rand() * 1.6;
-    c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len * 0.5); c.stroke();
-  }
+  // Floor: manure-dark concrete with straw bedding. The bleed strips get their own seeds,
+  // so the main scene's floor is the same as before they existed.
+  paintFloor(c, rand, 0, W);
+  paintFloor(c, mulberry32(513), -B, B);
+  paintFloor(c, mulberry32(514), W, B);
 
   // Steel posts of the chute on the right, and a far rail.
-  for (const [x, wd] of [[352, 20], [384, 16]]) {
+  for (const [x, wd] of [[352, 20], [384, 16], [452, 14]]) {
     const g = c.createLinearGradient(x - wd / 2, 0, x + wd / 2, 0);
     g.addColorStop(0, '#15161a'); g.addColorStop(0.35, '#4a4d55'); g.addColorStop(1, '#101114');
     c.fillStyle = g;
     c.fillRect(x - wd / 2, 0, wd, 520);
   }
   c.fillStyle = 'rgba(20,20,24,0.8)';
-  c.fillRect(0, 300, W, 8);
+  c.fillRect(-B, 300, W + 2 * B, 8);
+}
+
+// Muck and straw over the floor strip x0…x0+w (counts scale with the width).
+function paintFloor(c, rand, x0, w) {
+  const n = w / W;
+  for (let k = 0; k < 260 * n; k++) {
+    const x = x0 + rand() * w, y = 380 + rand() * 360;
+    c.fillStyle = `rgba(${20 + rand() * 30 | 0},${16 + rand() * 20 | 0},${10 + rand() * 14 | 0},0.5)`;
+    c.beginPath(); c.ellipse(x, y, 4 + rand() * 14, 2 + rand() * 6, 0, 0, Math.PI * 2); c.fill();
+  }
+  c.lineCap = 'round';
+  for (let k = 0; k < 1400 * n; k++) {
+    const x = x0 + rand() * w, y = 330 + rand() ** 0.7 * 400;
+    const len = 6 + rand() * 26, a = rand() * Math.PI;
+    const l = 0.55 + rand() * 0.6;
+    c.strokeStyle = `rgba(${210 * l | 0},${172 * l | 0},${92 * l | 0},${0.35 + rand() * 0.5})`;
+    c.lineWidth = 0.8 + rand() * 1.6;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len * 0.5); c.stroke();
+  }
 }
 
 function steel(c, x0, y0, x1, y1, light = '#5d6068', dark = '#1a1b1f') {
@@ -109,7 +120,7 @@ function paintChute(c) {
   // Dark steel frame plate down the left side.
   c.fillStyle = steel(c, 0, 0, 70, 0, '#3b3d43', '#141518');
   c.beginPath();
-  c.moveTo(0, 96); c.lineTo(58, 96); c.lineTo(66, 150); c.lineTo(52, 430); c.lineTo(0, 440);
+  c.moveTo(-B, 96); c.lineTo(58, 96); c.lineTo(66, 150); c.lineTo(52, 430); c.lineTo(-B, 440);
   c.closePath();
   c.fill();
   c.strokeStyle = 'rgba(0,0,0,0.6)';
@@ -124,7 +135,7 @@ function paintChute(c) {
 
   // Hydraulic cylinder across the top: barrel plus a chrome rod.
   c.fillStyle = steel(c, 0, 118, 0, 150, '#555860', '#121316');
-  c.fillRect(-4, 118, 70, 32);
+  c.fillRect(-B, 118, 66 + B, 32);
   c.fillStyle = steel(c, 0, 125, 0, 143, '#f4f6f8', '#5a5e66');
   c.fillRect(64, 125, 108, 18);
   c.fillStyle = 'rgba(255,255,255,0.65)';
@@ -145,10 +156,10 @@ function paintChute(c) {
   c.strokeStyle = '#0b0b0c';
   c.lineWidth = 9;
   c.lineCap = 'round';
-  c.beginPath(); c.moveTo(-10, 380); c.bezierCurveTo(40, 470, 10, 560, 90, 640); c.stroke();
+  c.beginPath(); c.moveTo(-B, 330); c.quadraticCurveTo(-40, 345, -10, 380); c.bezierCurveTo(40, 470, 10, 560, 90, 640); c.stroke();
   c.strokeStyle = 'rgba(255,255,255,0.12)';
   c.lineWidth = 2;
-  c.beginPath(); c.moveTo(-8, 377); c.bezierCurveTo(42, 466, 12, 556, 92, 636); c.stroke();
+  c.beginPath(); c.moveTo(-B, 327); c.quadraticCurveTo(-38, 342, -8, 377); c.bezierCurveTo(42, 466, 12, 556, 92, 636); c.stroke();
 }
 
 // The lower leg above the heel bulbs, receding toward the chute.
