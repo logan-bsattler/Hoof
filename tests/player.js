@@ -1,7 +1,7 @@
 // A DOM-free "careful hand": drives the real tools over a hoof the way a steady player would.
 // Used by the playthrough test (can the tools reach Textbook without blood?) and by the art lab.
 
-import { CLAW, Z } from '../src/hoof.js';
+import { Z, clawBox } from '../src/hoof.js';
 import { CFG } from '../src/config.js';
 import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
 
@@ -71,7 +71,9 @@ export function makePlayer(hoof, opts = {}) {
     },
     // Sweeping grinder passes over one claw, rows top to bottom, like 0:35-1:15.
     grind(claw, y0 = 270, y1 = 580, passes = 3) {
-      const [xa, xb] = claw === CLAW.INNER ? [222, 340] : [60, 178];
+      // Across the claw, axial wall to abaxial wall, inset from both.
+      const b = clawBox(claw, hoof.side);
+      const [xa, xb] = [b.x + 15, b.x + b.w - 15];
       for (let q = 0; q < passes; q++) {
         const off = q * 5;
         for (let y = y0 + off; y < y1; y += 14) {

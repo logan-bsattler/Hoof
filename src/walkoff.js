@@ -14,9 +14,11 @@ const STAMP = {
 };
 
 export class Walkoff {
-  constructor(result, sound, { wrapped = false } = {}) {
+  constructor(result, sound, { wrapped = false, side = 'LH' } = {}) {
     this.result = result;
     this.wrapped = wrapped;
+    // She walks to the right, so her left legs are the far ones: LEGS[0] left hind, LEGS[1] right hind.
+    this.limpLeg = side === 'RH' ? 1 : 0;
     this.gait = result.gait;
     this.sound = sound;
     this.t = 0;
@@ -66,7 +68,7 @@ export class Walkoff {
     c.fillRect(8, 300, 72, 10);
 
     const x = -60 + this.t * this.speed;
-    drawCow(c, x, this.t * (this.speed / 18), this.gait, this.wrapped);
+    drawCow(c, x, this.t * (this.speed / 18), this.gait, this.wrapped, this.limpLeg);
 
     if (this.stamped) {
       const s = STAMP[this.gait];
@@ -97,14 +99,13 @@ export class Walkoff {
 
 // Leg layout relative to body centre. `off` is the gait phase offset.
 const LEGS = [
-  { dx: -58, off: 0, back: true, far: true },        // left hind (affected)
-  { dx: -44, off: Math.PI, back: true, far: false },
+  { dx: -58, off: 0, back: true, far: true },        // left hind
+  { dx: -44, off: Math.PI, back: true, far: false }, // right hind
   { dx: 50, off: Math.PI / 2, back: false, far: true },
   { dx: 62, off: (3 * Math.PI) / 2, back: false, far: false },
 ];
 
-function drawCow(c, x, phase, gait, wrapped) {
-  const limpLeg = 0;
+function drawCow(c, x, phase, gait, wrapped, limpLeg = 0) {
   const bobAmp = gait === 'lame' ? 7 : gait === 'tender' ? 3 : 1;
   // Body dips when the sore leg takes weight.
   const bob = gait === 'sound'

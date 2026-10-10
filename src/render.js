@@ -2,7 +2,7 @@
 // hoof material (hoofart.js), strap, block and dressings, guides, HUD and the tool in hand.
 
 import { CFG, touchAngle } from './config.js';
-import { Z, CLAW, GEOM, clawPolygon, toeLine } from './hoof.js';
+import { Z, CLAW, GEOM, clawPolygon, toeLine, clawBox, clawSide, clawSpan, dishRect, onClaw } from './hoof.js';
 import { toolRadius } from './tools.js';
 import { HoofArt } from './hoofart.js';
 import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
@@ -39,10 +39,18 @@ export class Renderer {
     // Hoof buffers are sized once: 2× logical, 3× on dense screens.
     this.scenery = paintScenery(k);
     this.shadows = {};
-    for (const c of CLAWS) {
-      this.shadows[c] = shadowSprite(clawPolygon(c), k);
-      this.shadows[c + 2] = shadowSprite(clawPolygon(c, true), k);
+  }
+
+  // Contact shadow sprites for one foot layout, made on first use at this scale.
+  shadowsFor(side) {
+    if (!this.shadows[side]) {
+      const sh = this.shadows[side] = {};
+      for (const c of CLAWS) {
+        sh[c] = shadowSprite(clawPolygon(c, false, side), this.k);
+        sh[c + 2] = shadowSprite(clawPolygon(c, true, side), this.k);
+      }
     }
+    return this.shadows[side];
   }
 
   begin(shake = 0) {
@@ -82,11 +90,12 @@ export class Renderer {
     if (!this.art) this.art = new HoofArt(this.k >= 2.6 ? 3 : 2);
     this.art.sync(hoof);
     // Contact shadows give each claw weight against the chute.
+    const shadows = this.shadows && this.shadowsFor(hoof.side);
     for (const claw of CLAWS) {
       const dead = m ? m.claws[claw].deadRemain : 1;
-      if (!this.shadows) break;
-      this.shadow(this.shadows[claw], 0.65);
-      if (dead > 0.02) this.shadow(this.shadows[claw + 2], 0.65 * dead);
+      if (!shadows) break;
+      this.shadow(shadows[claw], 0.65);
+      if (dead > 0.02) this.shadow(shadows[claw + 2], 0.65 * dead);
     }
     this.art.draw(c);
     drawStrap(c);
@@ -154,16 +163,18 @@ export class Renderer {
     c.restore();
   }
 
-  guides() {
+  guides(hoof) {
     const c = this.ctx;
+    const side = hoof.side;
     c.save();
     c.font = '10px system-ui, sans-serif';
     c.textAlign = 'center';
     for (const claw of CLAWS) {
-      const mirror = claw === CLAW.OUTER ? (x) => W - x : (x) => x;
+      const s = clawSide(claw, side), box = clawBox(claw, side);
+      const ax = onClaw(claw, side); // an x on the right-hand claw, moved onto this claw
 
       // Trim line at the front of the living toe.
-      const tl = toeLine(claw);
+      const tl = toeLine(claw, side);
       c.setLineDash([5, 4]);
       c.strokeStyle = 'rgba(232,190,100,0.95)';
       c.lineWidth = 1.5;
@@ -174,26 +185,38 @@ export class Renderer {
       // Dish channel along the axial wall.
       c.strokeStyle = 'rgba(120,190,210,0.9)';
       c.beginPath();
-      roundRect(c, Math.min(mirror(212), mirror(254)), GEOM.dishY0, 42, GEOM.dishY1 - GEOM.dishY0, 14);
+      const dr = dishRect(claw, side);
+      roundRect(c, dr.x, dr.y, dr.w, dr.h, 14);
       c.stroke();
 
-      // Toe triangle: no-cut.
+      // Toe triangle: no-cut. The Z.TRI band, clipped to the claw: a light wash plus its two
+      // open edges (the claw's own outline closes it).
+      const triX = GEOM.midX + s * (8 + GEOM.triW);
+      c.save();
+      path(c, clawPolygon(claw, false, side));
+      c.clip();
+      c.fillStyle = 'rgba(255,107,91,0.1)';
+      c.fillRect(Math.min(GEOM.midX, triX), GEOM.triY, Math.abs(triX - GEOM.midX), H - GEOM.triY);
       c.setLineDash([2, 3]);
       c.strokeStyle = 'rgba(255,107,91,0.9)';
-      path(c, [[209, 480], [242, 480], [242, 558], [222, 581], [211, 540]].map(([x, y]) => [mirror(x), y]));
+      c.beginPath();
+      c.moveTo(GEOM.midX, GEOM.triY); c.lineTo(triX, GEOM.triY); c.lineTo(triX, H);
       c.stroke();
+      c.restore();
 
-      // Heel line.
+      // Heel line, across the claw.
+      const heel = clawSpan(claw, GEOM.heelY, side);
+      c.setLineDash([2, 3]);
       c.strokeStyle = 'rgba(255,255,255,0.45)';
       c.beginPath();
-      c.moveTo(mirror(214), GEOM.heelY); c.lineTo(mirror(345), GEOM.heelY);
+      c.moveTo(heel[0] + 4, GEOM.heelY); c.lineTo(heel[1] - 4, GEOM.heelY);
       c.stroke();
       c.setLineDash([]);
 
-      label(c, 'trim line', mirror(272), 606, 'rgba(232,190,100,0.95)');
-      label(c, 'dish', mirror(233), GEOM.dishY0 - 4, 'rgba(120,190,210,0.95)');
-      label(c, 'no-cut', mirror(228), 520, 'rgba(255,107,91,0.95)');
-      label(c, 'heel: leave it', mirror(290), GEOM.heelY + 13, 'rgba(255,255,255,0.8)');
+      label(c, 'trim line', box.cx, box.y + box.h + 21, 'rgba(232,190,100,0.95)');
+      label(c, 'dish', dr.x + dr.w / 2, GEOM.dishY0 - 4, 'rgba(120,190,210,0.95)');
+      label(c, 'no-cut', ax(228), 520, 'rgba(255,107,91,0.95)');
+      label(c, 'heel: leave it', (heel[0] + heel[1]) / 2 + s * 10, GEOM.heelY + 13, 'rgba(255,255,255,0.8)');
     }
     c.restore();
   }
@@ -201,8 +224,8 @@ export class Renderer {
   block(hoof, ghostClaw = 0) {
     const c = this.ctx;
     const press = Math.min(1, (this.time - this.placed.block) / 0.25);
-    if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block), 1, press);
-    if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw), 0.4, 1);
+    if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block, false, hoof.side), 1, press);
+    if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw, false, hoof.side), 0.4, 1);
   }
 
   // Pad and pink wrap over the treated claw (plus a ghost pad while aiming).
@@ -210,33 +233,35 @@ export class Renderer {
     const c = this.ctx;
     const L = hoof.caseDef.lesion;
     if (hoof.wrap >= 1) {
-      const pts = clawPolygon(hoof.wrapClaw);
+      const pts = clawPolygon(hoof.wrapClaw, false, hoof.side);
       drawPad(c, L, pts, Math.min(1, (this.time - this.placed.pad) / 0.2));
       if (hoof.wrap >= 2) drawWrap(c, pts, 1, Math.min(1, (this.time - this.placed.wrap) / 0.6));
     } else if (ghostClaw === L.claw) {
-      drawPad(c, L, clawPolygon(L.claw), 0.35);
+      drawPad(c, L, clawPolygon(L.claw, false, hoof.side), 0.35);
     }
   }
 
   placedNow(what) { this.placed[what] = this.time; }
 
-  labels() {
+  labels(hoof) {
     const c = this.ctx;
     c.save();
     c.font = 'bold 12px system-ui, sans-serif';
     c.textAlign = 'center';
-    label(c, 'OUTER claw', 115, 652, 'rgba(241,231,208,0.9)');
-    label(c, 'INNER claw', 285, 652, 'rgba(241,231,208,0.9)');
+    for (const claw of CLAWS) {
+      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, clawBox(claw, hoof.side).cx, 652, 'rgba(241,231,208,0.9)');
+    }
     c.restore();
   }
 
-  // Balance beam: tilts toward the taller claw.
-  meter(m) {
+  // Balance beam: tilts toward the taller claw. Each claw's readout sits on its own side.
+  meter(m, side = 'LH') {
     const c = this.ctx;
     const T = CFG.sole.target;
-    const outer = m.claws[CLAW.OUTER].wbMean;
-    const inner = m.claws[CLAW.INNER].wbMean;
-    const diff = inner - outer;
+    const [lc, rc] = clawSide(CLAW.OUTER, side) < 0 ? [CLAW.OUTER, CLAW.INNER] : [CLAW.INNER, CLAW.OUTER];
+    const name = (k) => (k === CLAW.OUTER ? 'OUTER' : 'INNER');
+    const left = m.claws[lc].wbMean, right = m.claws[rc].wbMean;
+    const diff = right - left;
     const level = Math.abs(diff) <= 0.6;
     c.save();
     c.fillStyle = 'rgba(20,14,10,0.7)';
@@ -256,9 +281,9 @@ export class Renderer {
     c.font = 'bold 11px system-ui, sans-serif';
     c.fillStyle = '#f1e7d0';
     c.textAlign = 'left';
-    c.fillText(`OUTER ${outer.toFixed(1)} mm`, 22, 28);
+    c.fillText(`${name(lc)} ${left.toFixed(1)} mm`, 22, 28);
     c.textAlign = 'right';
-    c.fillText(`INNER ${inner.toFixed(1)} mm`, W - 22, 28);
+    c.fillText(`${name(rc)} ${right.toFixed(1)} mm`, W - 22, 28);
     c.textAlign = 'center';
     c.fillStyle = level ? '#7bbf6a' : '#d8a64a';
     c.fillText(level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, 200, 28);
@@ -266,8 +291,8 @@ export class Renderer {
     c.fillStyle = 'rgba(241,231,208,0.6)';
     c.fillText(`target sole ≈ ${T} mm`, 200, 42);
     // Per-claw height gauges against the target band.
-    this.gauge(c, 30, 48, outer, m.claws[CLAW.OUTER].deadRemain);
-    this.gauge(c, W - 46, 48, inner, m.claws[CLAW.INNER].deadRemain);
+    this.gauge(c, 30, 48, left, m.claws[lc].deadRemain);
+    this.gauge(c, W - 46, 48, right, m.claws[rc].deadRemain);
     c.restore();
   }
 

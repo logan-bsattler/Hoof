@@ -21,7 +21,10 @@ export const CLAW_NAME = { 1: 'outer', 2: 'inner' };
 // Loose-horn groups.
 export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2 };
 
-const MID_X = 200; // centre line between the claws
+const MID_X = 200;
+
+// How deep (mm) a decoy mark goes into the horn before trimming takes it off.
+export const DECOY_DEPTH = { stain: 1, bruise: 2.5 }; // centre line between the claws
 
 // Zone boundaries in view coords. The foot is presented the way a trimmer sees it in the
 // chute: sole facing the camera, heel bulbs at the top (toward the leg), toes pointing down.
@@ -34,7 +37,7 @@ export const GEOM = {
   overgrowY: 480,          // overgrown toe horn extends below this line
 };
 
-// Inner (medial) claw outline in view coords; the outer claw is its mirror.
+// Inner (medial) claw outline in view coords, drawn on the viewer's right; the other side is its mirror.
 // Heel bulb at the top, toe at the bottom, axial wall facing the centre line.
 const INNER_PTS = [
   [222, 585], [210, 540], [207, 460], [207, 360], [210, 280],
@@ -42,7 +45,18 @@ const INNER_PTS = [
   [350, 300], [352, 370], [342, 450], [320, 515], [290, 560], [255, 582],
 ];
 
-export function clawPolygon(claw, overgrown = false) {
+// Which side of the screen a claw sits on: +1 right, -1 left. On a left hind foot (sole up,
+// toes down) the outer claw is on the viewer's left; a right hind foot is the mirror image.
+export function clawSide(claw, side = 'LH') {
+  return (claw === CLAW.INNER) === (side !== 'RH') ? 1 : -1;
+}
+
+// Map an x drawn for the right-hand claw onto `claw`'s actual side.
+export function onClaw(claw, side = 'LH') {
+  return clawSide(claw, side) > 0 ? (x) => x : (x) => CFG.view.w - x;
+}
+
+export function clawPolygon(claw, overgrown = false, side = 'LH') {
   let pts = INNER_PTS.map(([x, y]) => [x, y]);
   if (overgrown) {
     // Stretch the toe forward (down) and curl it slightly toward the axial side.
@@ -52,15 +66,50 @@ export function clawPolygon(claw, overgrown = false) {
       return [x - 6 * t * t, y + 40 * t];
     });
   }
-  if (claw === CLAW.OUTER) pts = pts.map(([x, y]) => [CFG.view.w - x, y]);
-  return pts;
+  const mx = onClaw(claw, side);
+  return pts.map(([x, y]) => [mx(x), y]);
 }
 
 // The front edge of the living toe: the "trim to here" line.
-export function toeLine(claw) {
-  const pts = INNER_PTS.filter(([, y]) => y > 510);
-  pts.sort((a, b) => a[0] - b[0]);
-  return claw === CLAW.OUTER ? pts.map(([x, y]) => [CFG.view.w - x, y]) : pts;
+export function toeLine(claw, side = 'LH') {
+  const mx = onClaw(claw, side);
+  return INNER_PTS.filter(([, y]) => y > 510).map(([x, y]) => [mx(x), y]).sort((a, b) => a[0] - b[0]);
+}
+
+// Bounding box of a claw's living outline.
+export function clawBox(claw, side = 'LH') {
+  const pts = clawPolygon(claw, false, side);
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x = Math.min(...xs), y = Math.min(...ys), w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+}
+
+// Where a horizontal line at y crosses a claw outline: [left x, right x], or null.
+export function clawSpan(claw, y, side = 'LH') {
+  const pts = clawPolygon(claw, false, side);
+  const xs = [];
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y)) xs.push(xi + ((y - yi) * (xj - xi)) / (yj - yi));
+  }
+  return xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
+}
+
+// The step-3 dish channel along a claw's axial wall, as a rect: the Z.DISH band, inset.
+export function dishRect(claw, side = 'LH') {
+  const s = clawSide(claw, side);
+  const a = MID_X + s * 12, b = MID_X + s * (8 + GEOM.dishW);
+  return { x: Math.min(a, b), y: GEOM.dishY0, w: Math.abs(b - a), h: GEOM.dishY1 - GEOM.dishY0 };
+}
+
+// The claw without the lesion: it carries the block.
+export function soundClaw(caseDef) {
+  return caseDef.lesion.claw === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
+}
+
+// "outer (left)": a claw's name and where it sits on screen, for coaching copy.
+export function clawWhere(claw, side = 'LH') {
+  return `${CLAW_NAME[claw]} (${clawSide(claw, side) > 0 ? 'right' : 'left'})`;
 }
 
 export function axialDist(x) {
@@ -89,6 +138,12 @@ function distToPoly(x, y, pts) {
   return best;
 }
 
+// True when (x, y) sits inside a claw's living outline, at least `margin` px in from its edge.
+export function insideClaw(claw, x, y, side = 'LH', margin = 0) {
+  const pts = clawPolygon(claw, false, side);
+  return pointInPoly(x, y, pts) && distToPoly(x, y, pts) >= margin;
+}
+
 // Deterministic PRNG so hoofs (and tests) are reproducible.
 function mulberry32(seed) {
   return () => {
@@ -113,8 +168,9 @@ const smoothstep = (e0, e1, v) => {
 };
 
 export class Hoof {
-  constructor(caseDef, seed = 214) {
+  constructor(caseDef, seed = caseDef.seed ?? 214) {
     this.caseDef = caseDef;
+    this.side = caseDef.side ?? 'LH';
     this.g = CFG.grid;
     const n = this.g.cols * this.g.rows;
     this.n = n;
@@ -170,7 +226,7 @@ export class Hoof {
     const { target: T, heel } = CFG.sole;
     const cd = this.caseDef;
     const polys = [CLAW.OUTER, CLAW.INNER].map((c) => ({
-      c, live: clawPolygon(c), over: clawPolygon(c, true),
+      c, live: clawPolygon(c, false, this.side), over: clawPolygon(c, true, this.side),
     }));
 
     for (let i = 0; i < this.n; i++) {
@@ -253,16 +309,29 @@ export class Hoof {
     return CFG.sole.target;
   }
 
-  // What the hoof testers report at cell i.
+  // The tester-readable mark (ulcer or decoy) covering cell i, if any.
+  findingAt(i) {
+    const x = this.cellX(i), y = this.cellY(i);
+    return (this.caseDef.findings ?? []).find((f) =>
+      f.claw === this.claw[i] && Math.hypot(x - f.x, y - f.y) <= f.r * (f.kind === 'ulcer' ? 1.75 : 1.3)) ?? null;
+  }
+
+  // What the hoof testers report at cell i. `finding` is the mark it read, if any.
   probe(i, diagnosed) {
     if (i < 0) return { kind: 'none', text: 'Tap the hoof with the testers.' };
     const z = this.zone[i];
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
     if (z & Z.DEAD) return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
     if (this.looseInit[i] === LOOSE.ULCER) {
+      const finding = this.caseDef.findings?.find((f) => f.kind === 'ulcer') ?? null;
       return diagnosed
-        ? { kind: 'lesion', text: 'The ulcer. Open it up and keep weight off it.' }
-        : { kind: 'lesion', text: 'It springs under the testers. Something soft under there.' };
+        ? { kind: 'lesion', finding, text: 'The ulcer. Open it up and keep weight off it.' }
+        : { kind: 'lesion', finding, text: 'It springs under the testers. Something soft under there.' };
+    }
+    // Decoys sit in the surface horn: once it's trimmed away there is nothing left to read.
+    const f = this.findingAt(i);
+    if (f && f.kind !== 'ulcer' && this.init[i] - this.thick[i] < DECOY_DEPTH[f.kind]) {
+      return { kind: f.kind, finding: f, text: f.probeText };
     }
     if (this.looseInit[i] === LOOSE.HEEL && this.loose[i]) {
       return { kind: 'loose', text: 'Loose, undermined heel horn. Flick it off with the knife.' };

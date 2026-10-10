@@ -1,8 +1,9 @@
 // The case checklist: clean → diagnose → five-step trim → finish.
-// Each step is a predicate over hoof metrics + the session log.
+// Each step is a predicate over hoof metrics + the session log. A tip is a string, or a
+// function of the case for copy that names a claw (read it through stepTip).
 
 import { CFG } from './config.js';
-import { CLAW, LOOSE } from './hoof.js';
+import { CLAW, CLAW_NAME, LOOSE, soundClaw } from './hoof.js';
 
 const { target: T, dishTarget: D, tolerance: TOL } = CFG.sole;
 
@@ -18,7 +19,7 @@ export const STEPS = [
   },
   {
     id: 'diagnose', label: 'Read it: test anything suspicious', tool: 'probe',
-    tip: 'See that dark patch on the outer claw? Tap it with the hoof testers before you commit.',
+    tip: 'Clean it, then test anything that looks wrong with the hoof testers. Commit your read when you’re sure.',
     done: (m, s) => !!s.diagnosis,
   },
   {
@@ -40,11 +41,11 @@ export const STEPS = [
   {
     id: 'step4', label: '4 · Open the ulcer, block the sound claw', tool: 'knife',
     tip: 'Pare the loose horn off the ulcer with the knife: open it, don’t carve it. Then glue the block on the SOUND claw.',
-    done: (m, s, hoof) => m.looseRemain[LOOSE.ULCER] < 0.1 && hoof.block === CLAW.INNER,
+    done: (m, s, hoof) => m.looseRemain[LOOSE.ULCER] < 0.1 && hoof.block === soundClaw(hoof.caseDef),
   },
   {
     id: 'step5', label: '5 · Remove loose heel horn', tool: 'knife',
-    tip: 'There’s a curl of loose horn at the inner heel. Flick it off with the knife and leave the heel itself alone.',
+    tip: (cd) => `There’s a curl of loose horn at the ${CLAW_NAME[cd.looseHorn.claw]} heel. Flick it off with the knife and leave the heel itself alone.`,
     done: (m) => m.looseRemain[LOOSE.HEEL] < 0.1,
   },
   {
@@ -58,6 +59,10 @@ export const STEPS = [
     done: (m, s, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin,
   },
 ];
+
+export function stepTip(step, caseDef) {
+  return typeof step.tip === 'function' ? step.tip(caseDef) : step.tip;
+}
 
 // The wrap goes on last: every step before 'treat' must be done.
 export function trimFinished(status) {

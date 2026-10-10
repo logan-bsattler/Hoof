@@ -2,7 +2,6 @@
 // Each tool is drawn with its working point at (x, y) and its body offset away from
 // the cut, so the horn under it stays readable. Generic, unbranded designs.
 
-import { CLAW } from './hoof.js';
 import { mulberry32 } from './noise.js';
 
 const TAU = Math.PI * 2;
@@ -313,15 +312,24 @@ function polyPath(c, pts) {
   c.closePath();
 }
 
-function blockFrame(claw) {
-  const side = claw === CLAW.OUTER ? -1 : 1;
-  return { cx: 200 + side * 79, cy: 432, rx: 78, ry: 182, side };
+function bbox(pts) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+// The block covers the weight-bearing sole: heel line to past the toe, a touch wider than the
+// claw so the claw outline trims its edge. `side` turns the tread bars the right way round.
+function blockFrame(clawPts) {
+  const b = bbox(clawPts);
+  const cx = b.x + b.w / 2;
+  return { cx, cy: b.y + b.h * 0.62, rx: b.w * 0.54, ry: b.h * 0.45, side: cx < 200 ? -1 : 1 };
 }
 
 // Black rubber block, tread out: a raised rim, circular lugs and diagonal bars,
 // with glue squeezing out at the edge. `press` 0..1 animates it being pressed on.
 export function drawBlock(c, claw, clawPts, alpha = 1, press = 1) {
-  const f = blockFrame(claw);
+  const f = blockFrame(clawPts);
   const s = 1.06 - 0.06 * press;
   c.save();
   c.globalAlpha = alpha;
@@ -403,9 +411,14 @@ export function drawPad(c, lesion, clawPts, alpha = 1) {
   c.globalAlpha = alpha;
   polyPath(c, clawPts);
   c.clip();
-  const cx = lesion.x - 6, cy = lesion.y + 58;
+  // Sized to the claw and centred a little below the lesion, nudged away from the axial wall,
+  // and kept inside the claw's length.
+  const b = bbox(clawPts);
+  const rx = b.w * 0.455, ry = b.h * 0.29;
+  const cx = lesion.x + (b.x + b.w / 2 - lesion.x) * 0.12;
+  const cy = Math.max(b.y + ry * 0.6, Math.min(b.y + b.h - ry * 0.6, lesion.y + ry * 0.5));
   dropShadow(c, 8, 2, 5, 0.45);
-  superellipse(c, cx, cy, 66, 118, 2.3);
+  superellipse(c, cx, cy, rx, ry, 2.3);
   c.fillStyle = '#f7f5f0';
   c.fill();
   c.shadowColor = 'transparent';
@@ -414,19 +427,19 @@ export function drawPad(c, lesion, clawPts, alpha = 1) {
   g.addColorStop(0, 'rgba(90,186,160,0.55)');
   g.addColorStop(1, 'rgba(90,186,160,0)');
   c.fillStyle = g;
-  c.fillRect(cx - 70, cy - 120, 140, 240);
+  c.fillRect(cx - rx - 4, cy - ry - 2, rx * 2 + 8, ry * 2 + 4);
   const rand = mulberry32(8);
   c.strokeStyle = 'rgba(170,165,150,0.25)';
   c.lineWidth = 0.4;
   for (let k = 0; k < 260; k++) {
-    const x = cx + (rand() - 0.5) * 130, y = cy + (rand() - 0.5) * 236, a = rand() * TAU;
+    const x = cx + (rand() - 0.5) * rx * 2, y = cy + (rand() - 0.5) * ry * 2, a = rand() * TAU;
     c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 3, y + Math.sin(a) * 3); c.stroke();
   }
-  const sh = c.createLinearGradient(cx - 66, cy - 118, cx + 66, cy + 118);
+  const sh = c.createLinearGradient(cx - rx, cy - ry, cx + rx, cy + ry);
   sh.addColorStop(0, 'rgba(255,255,255,0.25)');
   sh.addColorStop(1, 'rgba(60,50,40,0.25)');
   c.fillStyle = sh;
-  c.fillRect(cx - 70, cy - 120, 140, 240);
+  c.fillRect(cx - rx - 4, cy - ry - 2, rx * 2 + 8, ry * 2 + 4);
   c.restore();
 }
 

@@ -11,7 +11,7 @@
 // All art is procedural: nothing here is traced from reference footage.
 
 import { CFG } from './config.js';
-import { Z, CLAW, LOOSE, GEOM, clawPolygon } from './hoof.js';
+import { Z, CLAW, LOOSE, GEOM, DECOY_DEPTH, clawPolygon } from './hoof.js';
 import { mulberry32, valueNoise, fbm, smoothstep } from './noise.js';
 
 export const MARK = { NONE: 0, GRINDER: 1, KNIFE: 2, RASP: 3 };
@@ -102,8 +102,8 @@ export class HoofArt {
 
     // Rounded outlines: the model's polygons are coarse, and their corners would facet the rim.
     const polys = {
-      1: smoothPoly(clawPolygon(CLAW.OUTER)), 2: smoothPoly(clawPolygon(CLAW.INNER)),
-      3: smoothPoly(clawPolygon(CLAW.OUTER, true)), 4: smoothPoly(clawPolygon(CLAW.INNER, true)),
+      1: smoothPoly(clawPolygon(CLAW.OUTER, false, hoof.side)), 2: smoothPoly(clawPolygon(CLAW.INNER, false, hoof.side)),
+      3: smoothPoly(clawPolygon(CLAW.OUTER, true, hoof.side)), 4: smoothPoly(clawPolygon(CLAW.INNER, true, hoof.side)),
     };
     this.polys = polys;
     const cls = new Uint8Array(n);
@@ -260,13 +260,15 @@ export class HoofArt {
     this.arcX = new Int16Array(n);
     this.arcY = new Int16Array(n);
     this.built = true;
+    this.builtSide = hoof.side;
   }
 
   // ------------------------------------------------------------- per frame
 
   // Bring the buffers in line with the simulation; recompose what changed.
   sync(hoof) {
-    if (!this.built) this.build(hoof);
+    // The outline buffers depend on which way round the foot is.
+    if (!this.built || this.builtSide !== hoof.side) this.build(hoof);
     if (hoof !== this.hoof) {
       this.hoof = hoof;
       this.snap = {
@@ -429,6 +431,7 @@ export class HoofArt {
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const lesionC = L.claw, heelC = LH.claw;
     const heelY = GEOM.heelY;
+    const decoys = (hoof.caseDef.findings ?? []).filter((f) => f.kind !== 'ulcer');
 
     let i0 = 0, i1 = 0, i2 = 0, i3 = 0, w0 = 0, w1 = 0, w2 = 0, w3 = 0;
     const sm = (a) => a[i0] * w0 + a[i1] * w1 + a[i2] * w2 + a[i3] * w3;
@@ -541,6 +544,7 @@ export class HoofArt {
           sheen = 1 - 0.6 * r;
           const onLesion = c === lesionC;
           const dL = onLesion ? Math.hypot(lx - L.x, ly - L.y) : 1e9;
+          let decoyDark = 0;
 
           // 1. Ivory sole, coloured by thickness.
           const rk = Math.max(0, Math.min(RAMP_N - 1, Math.round((t / RAMP_MAX) * (RAMP_N - 1)))) * 3;
@@ -594,6 +598,21 @@ export class HoofArt {
             const fall = (1 - dL / (L.r * 4.2)) * (ly > L.y - L.r * 0.5 ? 1 : 0.45);
             const br = smoothstep(0.5, 0.78, nStreak[p] / 255) * fall * 0.8;
             R += (222 - R) * br; G += (112 - G) * br; B += (124 - B) * br;
+          }
+
+          // Decoys: a reddish bruise in the horn, or a dark stain like the ulcer's, without the
+          // hole. Both are surface marks that trimming takes off (DECOY_DEPTH).
+          for (const f of decoys) {
+            if (f.claw !== c) continue;
+            const dd = Math.hypot(lx - f.x, ly - f.y);
+            if (dd > f.r * 2) continue;
+            const keep = smoothstep(DECOY_DEPTH[f.kind], DECOY_DEPTH[f.kind] * 0.4, removed);
+            if (f.kind === 'bruise') {
+              const k = smoothstep(f.r * 2, f.r * 0.5, dd + (ncv - 0.5) * 8) * (0.35 + 0.4 * smoothstep(0.4, 0.75, nStreak[p] / 255)) * keep;
+              R += (196 - R) * k; G += (96 - G) * k; B += (92 - B) * k;
+            } else {
+              decoyDark = Math.max(decoyDark, smoothstep(f.r * 1.9, f.r * 0.4, dd + (ncv - 0.5) * 6) * 0.55 * keep);
+            }
           }
 
           // Lesion cap: a small dark hole in the horn over the ulcer.
@@ -658,6 +677,7 @@ export class HoofArt {
                 sr *= 1 - k; sg *= 1 - k; sb *= 1 - k;
                 if (Math.abs(ncv - 0.5) < 0.02 && ngr > 0.35) { sr *= 0.7; sg *= 0.7; sb *= 0.7; }
               }
+              if (decoyDark > 0) { sr *= 1 - decoyDark; sg *= 1 - decoyDark; sb *= 1 - decoyDark; }
               R += (sr - R) * st; G += (sg - G) * st; B += (sb - B) * st;
             }
           }

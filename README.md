@@ -86,8 +86,12 @@ updates arrive whenever the server is reachable). If you add a file under `src/`
 
 ## How to play (MVP: Case B, "Pressure Point")
 
-One full hoof case: a Holstein's left hind foot with a hidden sole ulcer. The foot is shown the
+One hoof case: a Holstein's hind foot with a hidden sole ulcer. The foot is shown the
 way a trimmer sees it in the chute: sole facing you, heel bulbs at the top, toes pointing down.
+The first cow is the hand-built #214 (left hind, ulcer on the outer claw). **Trim another** deals a
+fresh cow: left or right hind (a right hind shows its outer claw on your right), different overgrowth,
+ulcer size and position, sometimes on the inner claw, plus one or two harmless marks (a stain, a
+bruise) that look like trouble. Your best grade on the case is remembered on the device.
 
 New players should pick **Guided first trim** on the opening card. It coaches the same case in
 13 small beats: each one picks the tool, outlines where to work, gives one instruction and shows
@@ -96,7 +100,7 @@ a progress bar. **Lift the foot** plays it unguided.
 | Step | What you do | Tool |
 |---|---|---|
 | Clean | Scrub the mud off. The dark patch only shows on a clean foot | 🖌️ Wire brush |
-| Read | Tap the dark patch, then commit to a diagnosis | 🧪 Hoof testers |
+| Read | Test anything suspicious; only the ulcer springs. Then press **Commit read** and name it | 🧪 Hoof testers |
 | 1 | Inner claw first: nip the overgrown toe from the tip back to the dashed line, level the sole to ~7 mm | ✂️ Nippers, ⚙️ Grinder |
 | 2 | Match the outer claw until the balance beam reads LEVEL | ⚙️ Grinder |
 | 3 | Carve the dish along each claw's inner edge (dashed channel), staying out of the toe triangle | 🔪 Knife |
@@ -137,7 +141,7 @@ index.html, styles.css   page shell, HUD, responsive layout (portrait/phone frie
 src/main.js              state machine (intro → play → walk-off/fail → results), input, frame loop
 src/config.js            all tunables: thickness targets, tool rates, score weights, grades
 src/hoof.js              hoof model: cell grid over two claws (thickness, mud, roughness, zones)
-src/case.js              hand-built case data (Case B: sole ulcer)
+src/case.js              Case B (sole ulcer): the hand-built cow and makeCaseB(seed) for dealt cows
 src/tools.js             tool definitions and their effect on the model (pure, testable)
 src/steps.js             clean → diagnose → five steps → finish → treat checklist predicates
 src/tutorial.js          guided first trim: coached beats with targets and progress (pure, testable)

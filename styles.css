@@ -208,6 +208,9 @@ button.primary {
   width: 100%;
 }
 button.primary.small { width: auto; padding: 6px 12px; font-size: 12px; }
+button.primary[hidden] { display: none; }
+#btnRead { margin-bottom: 8px; }
+.modal ul.found { margin: 8px 0 12px; padding-left: 18px; }
 
 /* ---- modal ---- */
 .modal {

@@ -2,7 +2,7 @@
 // Speed is deliberately absent. Pure function of metrics + session log.
 
 import { CFG } from './config.js';
-import { CLAW, LOOSE } from './hoof.js';
+import { CLAW, LOOSE, soundClaw } from './hoof.js';
 
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 // 100 at `good` or better, 0 at `bad`, linear between.
@@ -10,7 +10,7 @@ const ramp = (v, good, bad) => clamp(100 * (bad - v) / (bad - good));
 
 export function newSession() {
   return {
-    diagnosis: null, diagnosisCorrect: false,
+    diagnosis: null, diagnosisCorrect: false, probes: [],
     firstCutClaw: null, dirtyCuts: 0, grinderLesion: false,
     blockAttempts: [], blockBeforeDx: false,
     dishBeforeLevel: false, stepDoneAt: {}, blood: false, nicks: 0,
@@ -31,7 +31,7 @@ export function judgeBlood(session, cells) {
 export function scoreCase(m, session, hoof, caseDef) {
   const T = CFG.sole.target, D = CFG.sole.dishTarget;
   const inner = m.claws[CLAW.INNER], outer = m.claws[CLAW.OUTER];
-  const sound = caseDef.lesion.claw === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
+  const sound = soundClaw(caseDef);
   const notes = [];
 
   if (session.blood) {
@@ -55,8 +55,10 @@ export function scoreCase(m, session, hoof, caseDef) {
 
   // Correctness: right read, right order, right claw.
   let correctness = 100;
-  if (!session.diagnosis) { correctness -= 25; notes.push('You never tested the dark patch. Read before you cut.'); }
-  else if (!session.diagnosisCorrect) { correctness -= 15; notes.push('Misread the lesion. A spot that springs at the sole/heel junction is a sole ulcer.'); }
+  // Committing a read without testing the lesion itself counts as no read at all.
+  if (!session.diagnosis || !session.probes.includes('ulcer')) {
+    correctness -= 25; notes.push('You never tested the sore spot itself. Read before you cut.');
+  } else if (!session.diagnosisCorrect) { correctness -= 15; notes.push(caseDef.misreadNote); }
   if (session.blockAttempts.includes(caseDef.lesion.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
   if (hoof.block !== sound) { correctness -= 25; notes.push('No block on the sound claw, so the ulcer is still carrying weight.'); }
   if (m.looseRemain[LOOSE.ULCER] > 0.1) { correctness -= 20; notes.push('Loose horn left over the ulcer: it needs opening up to heal.'); }

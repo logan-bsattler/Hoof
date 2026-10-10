@@ -3,9 +3,9 @@
 
 import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
-import { CASE_B } from './case.js';
+import { CASE_B, makeCaseB } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
-import { STEPS, evaluateSteps, trimFinished } from './steps.js';
+import { STEPS, evaluateSteps, trimFinished, stepTip } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
 import { Renderer } from './render.js';
 import { Particles } from './particles.js';
@@ -14,7 +14,8 @@ import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
 
-const caseDef = CASE_B;
+// The first run is the hand-built Case B; "Trim another" deals a fresh cow.
+let caseDef = CASE_B;
 const canvas = document.getElementById('game');
 const renderer = new Renderer(canvas);
 const particles = new Particles();
@@ -48,6 +49,7 @@ const game = {
 const ui = new UI({
   onTool: (id) => selectTool(id),
   onRelease: () => requestRelease(),
+  onRead: () => { if (game.state === 'play' && !game.session.diagnosis) diagnose(); },
   onToggleGuides: () => { game.guides = !game.guides; ui.setToggle('btnGuides', game.guides); },
   onToggleSound: () => { game.sound = !game.sound; Sound.setEnabled(game.sound); ui.setToggle('btnSound', game.sound); },
   onToggleLefty: () => setLefty(!CFG.touch.leftHanded),
@@ -61,6 +63,19 @@ function setLefty(on) {
 }
 try { setLefty(localStorage.getItem('truehoof.lefty') === '1'); } catch { /* storage blocked */ }
 
+// Best result per case, remembered on this device.
+const bestKey = () => `truehoof.best.${caseDef.id}`;
+function loadBest() {
+  try { return JSON.parse(localStorage.getItem(bestKey())) ?? null; } catch { return null; }
+}
+// Records a finished result; true when it beats the stored best.
+function saveBest(r) {
+  const best = loadBest();
+  if (r.failed || (best && best.total >= r.total)) return false;
+  try { localStorage.setItem(bestKey(), JSON.stringify({ grade: r.grade, total: r.total })); } catch { /* storage blocked */ }
+  return true;
+}
+
 // ---------------------------------------------------------------- lifecycle
 
 function newCase() {
@@ -73,8 +88,11 @@ function newCase() {
   game.walkoff = null;
   game.result = null;
   game.weepT = 0;
+  game.found = [];      // marks the testers have read this case, in order
   particles.list = [];
-  ui.setSteps(game.steps);
+  ui.setSteps(game.steps, caseDef);
+  ui.setReadable(false);
+  document.getElementById('caseTitle').textContent = `Case ${caseDef.id} · ${caseDef.title} · ${caseDef.subtitle}`;
   selectTool('brush');
   document.body.classList.remove('steps-open');
 }
@@ -82,11 +100,13 @@ function newCase() {
 async function showIntro() {
   game.state = 'intro';
   newCase();
+  const best = loadBest();
   const mode = await ui.modal(
     `<div class="eyebrow">Case ${caseDef.id} · Trimmer tier</div>
      <h1>${caseDef.title}</h1>
      <p class="sub">${caseDef.subtitle}</p>
      <p>${caseDef.intro}</p>
+     ${best ? `<p class="sub">Your best on this case: <b>${best.grade}</b> · ${best.total}</p>` : ''}
      <ul class="howto">
        <li><b>Clean</b> to reveal what’s hiding under the muck.</li>
        <li><b>Read</b> it with the hoof testers before you commit.</li>
@@ -102,7 +122,7 @@ async function showIntro() {
   game.tutorial = mode === 'guided' ? new Tutorial(caseDef) : null;
   document.body.classList.toggle('tutorial', !!game.tutorial);
   if (game.tutorial) updateCoach();
-  else { ui.setCoach(null); ui.toast(STEPS[0].tip, 'info', 4500); }
+  else { ui.setCoach(null); ui.toast(stepTip(STEPS[0], caseDef), 'info', 4500); }
 }
 
 // Guided run: move to the next beat when the current one is done.
@@ -254,6 +274,11 @@ function tap(x, y) {
   if (game.tool === 'probe') {
     renderer.fx.squeezeT = 1;
     const r = hoof.probe(i, !!game.session.diagnosis);
+    if (r.finding && !game.found.includes(r.finding)) {
+      game.found.push(r.finding);
+      game.session.probes.push(r.finding.kind);
+    }
+    if (!game.session.diagnosis) ui.setReadable(game.found.length > 0);
     if (r.kind === 'lesion' && !game.session.diagnosis) {
       Sound.spring();
       buzz([10, 40, 20]);
@@ -262,7 +287,8 @@ function tap(x, y) {
       renderer.weep(L.x, L.y, 1);
       Sound.bubbles();
       ui.toast(r.text, 'info');
-      diagnose();
+      // The guided run commits the read straight away; otherwise the player decides when.
+      if (game.tutorial) diagnose();
     } else {
       Sound.tock();
       buzz(5);
@@ -303,12 +329,16 @@ function dress(claw) {
   }
 }
 
+// Commit the read: what the testers found, in neutral words, then the call.
 async function diagnose() {
   game.state = 'modal';
+  ui.setReadable(false);
+  const found = game.found.map((f) => `<li>${f.look[0].toUpperCase()}${f.look.slice(1)} on the ${CLAW_NAME[f.claw]} claw: ${f.feel}.</li>`);
   const pick = await ui.modal(
     `<div class="eyebrow">Commit the read</div>
-     <h2>It springs under the testers.</h2>
-     <p>A soft spot at the sole/heel junction of the outer claw. What are you looking at?</p>`,
+     <h2>What the testers found</h2>
+     <ul class="found">${found.join('') || '<li>Nothing tested yet.</li>'}</ul>
+     <p>${caseDef.diagnosisPrompt}</p>`,
     caseDef.diagnosisOptions.map((o) => ({ id: o.id, label: o.label })),
   );
   const opt = caseDef.diagnosisOptions.find((o) => o.id === pick);
@@ -316,7 +346,7 @@ async function diagnose() {
   game.session.diagnosisCorrect = pick === caseDef.diagnosis;
   await ui.modal(
     `<div class="eyebrow">${game.session.diagnosisCorrect ? 'Good read' : 'Not quite'}</div>
-     <p>${opt.feedback}</p><p class="plan">${caseDef.plan}</p>`,
+     <p>${opt.feedback}</p>${game.session.diagnosisCorrect || game.tutorial ? `<p class="plan">${caseDef.plan}</p>` : ''}`,
     [{ id: 'ok', label: 'Get to work', primary: true }],
   );
   if (game.session.diagnosisCorrect) Sound.step();
@@ -434,13 +464,14 @@ async function requestRelease() {
   }
   game.metrics = game.hoof.metrics();
   game.result = scoreCase(game.metrics, game.session, game.hoof, caseDef);
-  game.walkoff = new Walkoff(game.result, Sound, { wrapped: game.hoof.wrap >= 2 });
+  game.walkoff = new Walkoff(game.result, Sound, { wrapped: game.hoof.wrap >= 2, side: game.hoof.side });
   game.state = 'walkoff';
 }
 
 async function showResults() {
   game.state = 'results';
   const r = game.result;
+  const newBest = saveBest(r);
   const bars = [['Balance', 'balance', 35], ['Correctness', 'correctness', 30], ['Restraint', 'restraint', 20], ['Finish', 'finish', 15]]
     .map(([label, key, w]) => {
       const v = Math.round(r.parts[key]);
@@ -449,11 +480,12 @@ async function showResults() {
   await ui.modal(
     `<div class="eyebrow">Trimmer’s ticket · Case ${caseDef.id}</div>
      <h1 class="grade ${r.medal}">${r.grade}</h1>
-     <p class="sub">Score ${r.total} / 100 · walked off <b>${r.gait}</b></p>
+     <p class="sub">Score ${r.total} / 100 · walked off <b>${r.gait}</b>${newBest ? ' · <b>New best</b>' : ''}</p>
      ${bars}
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,
     [{ id: 'again', label: 'Trim another', primary: true }],
   );
+  caseDef = makeCaseB((Math.random() * 1e9) >>> 0);
   showIntro();
 }
 
@@ -537,7 +569,7 @@ function frame(now) {
         Sound.step();
         particles.spawn('spark', game.ptr.x, game.ptr.y, '#7bbf6a', 8);
         const c = game.steps.current;
-        if (c >= 0) ui.toast(STEPS[c].tip, 'good', 4500);
+        if (c >= 0) ui.toast(stepTip(STEPS[c], caseDef), 'good', 4500);
         else ui.toast('Every step done. Release her and watch her walk.', 'good', 4500);
       }
       // The pressure-release beat: first time the ulcer is opened.
@@ -551,7 +583,7 @@ function frame(now) {
         game.weepT = 4;
         ui.toast('Pressure released. You can almost hear her sigh.', 'good', 3200);
       }
-      ui.setSteps(game.steps);
+      ui.setSteps(game.steps, caseDef);
     }
   } else {
     Sound.scrub('brush', 0);
@@ -589,9 +621,9 @@ function draw() {
   renderer.dressing(hoof, game.tool === 'wrap' ? aim : 0);
   if (game.guides) renderer.guides(hoof);
   if (game.tutorial?.beat && game.state === 'play') renderer.coach(game.tutorial.beat.target, game.tutorial.progress, game.time);
-  renderer.labels();
+  renderer.labels(hoof);
   particles.draw(ctx);
-  renderer.meter(game.metrics);
+  renderer.meter(game.metrics, hoof.side);
   if (game.state === 'play') renderer.cursor(game.tool, game.ptr, hoof, game.guides, game.time);
 }
 

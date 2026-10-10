@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, CLAW, LOOSE, GEOM } from '../src/hoof.js';
-import { CASE_B } from '../src/case.js';
+import { Hoof, CLAW, LOOSE, GEOM, clawBox, dishRect, soundClaw } from '../src/hoof.js';
+import { CASE_B, makeCaseB } from '../src/case.js';
 import { applyGrind, applyWrap } from '../src/tools.js';
 import { evaluateSteps, trimFinished } from '../src/steps.js';
 import { newSession, scoreCase } from '../src/scoring.js';
@@ -15,8 +15,9 @@ import { makePlayer } from './player.js';
 
 const DT = 1 / 60;
 
-test('a careful player reaches Textbook with the real tools, without drawing blood', () => {
-  const hoof = new Hoof(CASE_B);
+function playthrough(cd) {
+  const hoof = new Hoof(cd);
+  const side = hoof.side;
   const s = newSession();
   let bloodAt = null;
   // Session bookkeeping, as main.js handle() does it.
@@ -45,8 +46,9 @@ test('a careful player reaches Textbook with the real tools, without drawing blo
   until('clean', () => p.brushAll());
 
   // Read: test the dark patch, then commit the read (main.js diagnose()).
-  const L = CASE_B.lesion;
+  const L = cd.lesion;
   assert.equal(hoof.probe(hoof.cellAt(L.x, L.y), false).kind, 'lesion');
+  s.probes.push('ulcer');
   s.diagnosis = 'ulcer';
   s.diagnosisCorrect = true;
   assert.ok(done('diagnose'));
@@ -58,11 +60,19 @@ test('a careful player reaches Textbook with the real tools, without drawing blo
   until('step2', () => p.grind(CLAW.OUTER, 270, 580, 1));
 
   // Step 3: knife the dish channel along each axial wall, clear of the ulcer.
-  const dishX = (c) => (c === CLAW.INNER ? [212, 222, 232, 242] : [188, 178, 168, 158]);
+  const dishX = (c) => { const d = dishRect(c, side); return [0, 10, 20, 30].map((k) => d.x + 4 + k); };
   until('step3', () => {
     for (const c of [CLAW.INNER, CLAW.OUTER]) {
-      const top = c === L.claw ? L.y + L.r * 1.75 + CFG.tools.knife.radius : GEOM.dishY0;
-      for (const x of dishX(c)) p.drag('knife', [[x, top], [x, GEOM.dishY1]], 120);
+      // Around the ulcer core, not through it: split each column where the blade would reach
+      // the core. Grazing the loose cap only starts opening it, which step 4 does anyway.
+      const R = L.r + CFG.tools.knife.radius + 2;
+      for (const x of dishX(c)) {
+        const dx = Math.abs(x - L.x);
+        if (c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
+        const h = Math.sqrt(R * R - dx * dx);
+        if (L.y - h > GEOM.dishY0 + 4) p.drag('knife', [[x, GEOM.dishY0], [x, L.y - h]], 120);
+        p.drag('knife', [[x, L.y + h], [x, GEOM.dishY1]], 120);
+      }
     }
   });
 
@@ -75,19 +85,21 @@ test('a careful player reaches Textbook with the real tools, without drawing blo
     }
   }
   assert.ok(hoof.metrics().looseRemain[LOOSE.ULCER] < 0.1, 'ulcer opened');
-  hoof.block = CLAW.INNER;
-  s.blockAttempts.push(CLAW.INNER);
+  hoof.block = soundClaw(cd);
+  s.blockAttempts.push(hoof.block);
   until('step4', () => {});
 
   // Step 5: flick the loose heel horn off.
-  const H = CASE_B.looseHorn;
+  const H = cd.looseHorn;
   until('step5', () => {
     for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
   });
 
-  // Finish: rasp the sound-side passes the block leaves open.
+  // Finish: rasp the claw the block leaves open.
+  const open = clawBox(L.claw, side);
   until('finish', () => {
-    for (let y = 190; y < 600; y += 16) p.drag('rasp', [[40, y], [190, y + 4], [40, y + 8]], 400);
+    const [a, b] = [open.x - 8, open.x + open.w - 3];
+    for (let y = 190; y < 600; y += 16) p.drag('rasp', [[a, y], [b, y + 4], [a, y + 8]], 400);
   }, 20);
 
   // Treat: flush the opened ulcer, then pad and wrap it.
@@ -105,12 +117,24 @@ test('a careful player reaches Textbook with the real tools, without drawing blo
   const { current } = evaluateSteps(m, s, hoof, ++now);
   assert.equal(current, -1, 'every step done');
   assert.equal(m.blood, 0);
-  const r = scoreCase(m, s, hoof, CASE_B);
+  const r = scoreCase(m, s, hoof, cd);
   const parts = Object.entries(r.parts).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(', ');
-  console.log(`playthrough: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
+  console.log(`playthrough ${cd.subtitle}, ulcer ${L.claw === CLAW.OUTER ? 'outer' : 'inner'}: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
     `outer ${m.claws[CLAW.OUTER].wbMean.toFixed(2)} mm · ${r.notes.join(' | ')}`);
   assert.equal(r.grade, 'Textbook', `${r.total}: ${r.notes.join(' | ')}`);
   assert.equal(r.gait, 'sound');
+}
+
+test('a careful player reaches Textbook with the real tools, without drawing blood', () => playthrough(CASE_B));
+
+test('the careful player also wins on mirrored feet and inner-claw ulcers', () => {
+  // The first dealt cows covering each foot × sore claw combination.
+  const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
+  for (let seed = 1; want.size && seed < 500; seed++) {
+    const cd = makeCaseB(seed);
+    if (want.delete(cd.side + cd.lesion.claw)) playthrough(cd);
+  }
+  assert.equal(want.size, 0, 'every layout dealt');
 });
 
 test('a careless player holding the grinder still on one sole spot draws blood within ~6 s', () => {

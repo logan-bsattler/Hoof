@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, Z, CLAW, LOOSE, GEOM } from '../src/hoof.js';
-import { CASE_B } from '../src/case.js';
+import { Hoof, Z, CLAW, LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
+import { CASE_B, makeCaseB } from '../src/case.js';
 import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase, judgeBlood } from '../src/scoring.js';
@@ -23,9 +23,9 @@ function idealTrim(hoof) {
     hoof.rough[i] = 0;
   }
   for (let i = 0; i < hoof.n; i++) if (hoof.looseInit[i] === LOOSE.ULCER) hoof.tint[i] = 1;
-  hoof.block = CLAW.INNER;
+  hoof.block = soundClaw(hoof.caseDef);
   hoof.wrap = 2;
-  hoof.wrapClaw = CLAW.OUTER;
+  hoof.wrapClaw = hoof.caseDef.lesion.claw;
 }
 
 // Centre of the first cell matching a predicate.
@@ -34,8 +34,11 @@ function findCell(hoof, pred) {
   throw new Error('no matching cell');
 }
 
-function idealSession() {
-  return { ...newSession(), diagnosis: 'ulcer', diagnosisCorrect: true, firstCutClaw: CLAW.INNER, blockAttempts: [CLAW.INNER] };
+function idealSession(cd = CASE_B) {
+  return {
+    ...newSession(), diagnosis: 'ulcer', diagnosisCorrect: true, probes: ['ulcer'],
+    firstCutClaw: CLAW.INNER, blockAttempts: [soundClaw(cd)],
+  };
 }
 
 test('hoof builds two claws with overgrown toes, an ulcer, and loose heel horn', () => {
@@ -301,4 +304,75 @@ test('a nicked but otherwise ideal trim still scores, capped at Sound with a Res
   assert.ok(r.notes.some((n) => n.includes('nicked')));
   judgeBlood(s, 1);
   assert.equal(scoreCase(h.metrics(), s, h, CASE_B).failed, true, 'two nicks fail');
+});
+
+// Case B with the ulcer moved to the inner claw: the block, wrap and heel horn all swap claws.
+const CASE_B_INNER = {
+  ...CASE_B,
+  lesion: { ...CASE_B.lesion, claw: CLAW.INNER, x: 2 * GEOM.midX - CASE_B.lesion.x },
+  looseHorn: { ...CASE_B.looseHorn, claw: CLAW.OUTER, x: 2 * GEOM.midX - CASE_B.looseHorn.x },
+  findings: [],
+};
+
+async function idealRun(cd) {
+  const { Tutorial } = await import('../src/tutorial.js');
+  const h = new Hoof(cd);
+  idealTrim(h);
+  const m = h.metrics();
+  const { status } = evaluateSteps(m, idealSession(cd), h, 1);
+  const t = new Tutorial(cd);
+  t.update(m, idealSession(cd), h);
+  return { h, status, r: scoreCase(m, idealSession(cd), h, cd), t };
+}
+
+test('an ulcer on the inner claw: every step completes on the outer-claw block, Textbook', async () => {
+  const { status, r, t } = await idealRun(CASE_B_INNER);
+  for (const s of status) assert.ok(s.done, s.id);
+  assert.equal(r.grade, 'Textbook', r.notes.join(' | '));
+  assert.equal(r.gait, 'sound');
+  assert.equal(t.finished, true);
+});
+
+test('decoys read firm under the testers; the ulcer springs', () => {
+  const h = new Hoof(CASE_B);
+  for (let i = 0; i < h.n; i++) h.mud[i] = 0;
+  for (const f of CASE_B.findings) {
+    const r = h.probe(h.cellAt(f.x, f.y), false);
+    assert.equal(r.kind, f.kind === 'ulcer' ? 'lesion' : f.kind, f.kind);
+    assert.equal(r.finding, f);
+  }
+  const stain = CASE_B.findings.find((f) => f.kind === 'stain');
+  assert.match(h.probe(h.cellAt(stain.x, stain.y), false).text, /firm/i);
+  // Trimmed away, a stain is just horn.
+  h.thick[h.cellAt(stain.x, stain.y)] -= 1.5;
+  assert.equal(h.probe(h.cellAt(stain.x, stain.y), false).kind, 'firm');
+});
+
+test('committing a read without testing the ulcer scores as an unread lesion', () => {
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  const s = { ...idealSession(), probes: ['stain'] };
+  const r = scoreCase(h.metrics(), s, h, CASE_B);
+  assert.equal(r.parts.correctness, 75);
+  assert.ok(r.notes.some((n) => n.includes('never tested')));
+});
+
+test('50 dealt cows all build, keep the lesion in its claw, and trim to Textbook', async () => {
+  const sides = new Set(), sore = new Set();
+  for (let seed = 1; seed <= 50; seed++) {
+    const cd = makeCaseB(seed);
+    sides.add(cd.side); sore.add(cd.lesion.claw);
+    const L = cd.lesion;
+    assert.ok(insideClaw(L.claw, L.x, L.y, cd.side, 4), `seed ${seed}: lesion outside its claw`);
+    assert.ok(insideClaw(cd.looseHorn.claw, cd.looseHorn.x, cd.looseHorn.y, cd.side, 4), `seed ${seed}: heel horn`);
+    assert.ok(cd.excess[CLAW.OUTER] > cd.excess[CLAW.INNER], `seed ${seed}: outer overgrows most`);
+    assert.ok(cd.findings.length >= 2, `seed ${seed}: at least one decoy`);
+    const { h, status, r, t } = await idealRun(cd);
+    assert.ok(h.metrics().looseN[LOOSE.ULCER] > 10, `seed ${seed}: ulcer cells`);
+    for (const s of status) assert.ok(s.done, `seed ${seed}: ${s.id}`);
+    assert.equal(r.grade, 'Textbook', `seed ${seed}: ${r.total} ${r.notes.join(' | ')}`);
+    assert.equal(t.finished, true, `seed ${seed}: tutorial`);
+  }
+  assert.equal(sides.size, 2, 'both hind feet dealt');
+  assert.equal(sore.size, 2, 'both claws ulcerate');
 });

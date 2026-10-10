@@ -78,8 +78,9 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 | View | Sole facing the camera, heel bulbs at the top, toes pointing down (the trimmer's view in the chute) |
 | Guided run | Optional coached first trim: 13 beats, each with a tool, an on-hoof target outline, one instruction and a progress bar |
 | Treatment | Flush the opened ulcer with the spray, then pad and wrap it; fresh paring washes out the flush |
-| Reveal | Mud hides the bruise-coloured ulcer patch until scrubbed |
-| Diagnosis | Testers spring on the lesion, then you pick from 4 diagnoses; wrong picks are explained |
+| Reveal | Mud hides the bruise-coloured ulcer patch and the decoy marks (a dark stain, a reddish bruise) until scrubbed; decoys trim off with the surface horn |
+| Diagnosis | Testers spring on the ulcer and read firm on decoys. Commit read (available after the first finding) lists what was tested, then you pick from 4 diagnoses; wrong picks are explained, and the plan is shown after a misread only in the guided run. Committing without testing the ulcer scores as an unread lesion |
+| Cases | Case B hand-built (#214, left hind) plus `makeCaseB(seed)`: left or right hind (mirrored layout), per-claw overgrowth, ulcer position/size/claw, heel-horn position, decoys. Best grade per case kept in localStorage |
 | Steps | Live checklist (clean, read, five steps, finish, treat) with per-step tips and a suggested tool |
 | Feedback | Thickness colour ramp, mm gauge, balance beam, toe-length gauges, resistance easing in over the last 1.5 mm above target, grinder pitch/whine and haptics that tighten as the sole thins, thin-sole warnings |
 | Blood | Living cells cut to 0 mm. First stroke that bloods ≤ 3 cells is a nick: flinch, moo, one drop, the tool comes off, grade capped at Sound, Restraint −40. A second nick or a deeper cut: case failed |

@@ -1,12 +1,12 @@
 // DOM-side UI: tool dock, steps checklist, toasts, and modal cards.
 
 import { TOOLS, TOOL_ORDER } from './tools.js';
-import { STEPS, DONE_TIP } from './steps.js';
+import { STEPS, DONE_TIP, stepTip } from './steps.js';
 
 const $ = (id) => document.getElementById(id);
 
 export class UI {
-  constructor({ onTool, onRelease, onToggleGuides, onToggleSound, onToggleLefty }) {
+  constructor({ onTool, onRelease, onRead, onToggleGuides, onToggleSound, onToggleLefty }) {
     this.toolButtons = {};
     const dock = $('tools');
     for (const id of TOOL_ORDER) {
@@ -30,6 +30,8 @@ export class UI {
     });
 
     $('btnRelease').addEventListener('click', onRelease);
+    $('btnRead').addEventListener('click', onRead);
+    $('btnReadBar').addEventListener('click', onRead);
     $('btnReleaseBar').addEventListener('click', onRelease);
     $('btnGuides').addEventListener('click', onToggleGuides);
     $('btnSound').addEventListener('click', onToggleSound);
@@ -46,18 +48,25 @@ export class UI {
     $('toolInfo').innerHTML = `<strong>${TOOLS[id].name}</strong> · ${TOOLS[id].hint}`;
   }
 
+  // "Commit read" shows once the testers have found something and until the read is made.
+  setReadable(on) {
+    $('btnRead').hidden = !on;
+    $('btnReadBar').hidden = !on;
+    $('btnReleaseBar').hidden = on;
+  }
+
   setToggle(id, on) {
     $(id).classList.toggle('on', on);
     $(id).setAttribute('aria-pressed', on);
   }
 
-  setSteps({ status, current }) {
+  setSteps({ status, current }, caseDef) {
     status.forEach((s, k) => {
       const li = this.stepItems[k];
       li.classList.toggle('done', s.done);
       li.classList.toggle('current', k === current);
     });
-    const tip = current < 0 ? DONE_TIP : STEPS[current].tip;
+    const tip = current < 0 ? DONE_TIP : stepTip(STEPS[current], caseDef);
     const label = current < 0 ? 'All steps done' : STEPS[current].label;
     $('stepTip').textContent = tip;
     if (!this.coaching) {
