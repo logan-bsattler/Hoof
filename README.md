@@ -183,5 +183,5 @@ A vanilla JS + HTML5 Canvas web prototype, with no build step:
 ## Roadmap (from the design doc)
 
 More cases (overgrowth tutorial, embedded screw, white line, DD, crack), the case select and
-apprentice→pro progression, a real cow sprite, a
-recorded ASMR audio pass, a narrator, and a signed Play Store / iOS build.
+apprentice→pro progression, a real cow sprite,
+a fuller ASMR audio mix, a narrator, and a signed Play Store / iOS build.

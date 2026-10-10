@@ -85,7 +85,7 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 | Feedback | Thickness colour ramp, mm gauge, balance beam, toe-length gauges, resistance easing in over the last 1.5 mm above target, grinder pitch/whine and haptics that tighten as the sole thins, thin-sole warnings |
 | Blood | Living cells cut to 0 mm. First stroke that bloods ≤ 3 cells is a nick: flinch, moo, one drop, the tool comes off, grade capped at Sound, Restraint −40. A second nick or a deeper cut: case failed |
 | Scoring | Weighted 4-part score + teaching notes; gait (sound/tender/lame) drives the walk-off: a weight-test beat, a 4-beat walk and an AHDB mobility score (0–3) |
-| Juice | Curled shavings, mud clods, grinder dust, flakes, release puff, screen shake, procedural WebAudio SFX, vibration on supported devices |
+| Juice | Curled shavings, mud clods, grinder dust, flakes, release puff, screen shake, CC0 recorded SFX with procedural grinder/rasp loops (and procedural fallback), vibration on supported devices |
 
 ### Deliberate simplifications
 
@@ -99,5 +99,5 @@ It was chosen because it exercises every system: reveal, diagnosis, all five ste
 1. Case A (overgrowth only, apprentice tools) and Case C (embedded screw); per-tool practice drills.
 2. Case select + farm visit (3–5 cases) + herd mobility score.
 3. Art: real cow sprite (the layered horn renderer is done; see docs/ART-DIRECTION.md).
-4. Recorded ASMR audio + optional narrator.
+4. Optional narrator; a fuller ASMR mix tuned by playtest (the CC0 recording pass is done, see audio/CREDITS.md).
 5. Capacitor wrap for iOS/Android; haptics via native plugin.
