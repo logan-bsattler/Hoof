@@ -105,6 +105,9 @@ a progress bar. **Lift the foot** plays it unguided.
 | Treat | Flush the opened ulcer, then pad and wrap it. **Release the cow** and watch her walk | 🧴 Spray bottle, 🩹 Pad + wrap |
 
 **Controls:** mouse or touch. Tap a tool (or press keys `1`–`9`).
+- **On a touchscreen your finger holds the handle:** the tool's working tip sits about a
+  centimetre up-left of your fingertip, so the horn you're cutting stays visible. Tune it with
+  `CFG.touch` in `src/config.js` (`grip` distance, `angle`). Mouse and pen work right at the pointer.
 - **Brush and rasp:** scrub back and forth.
 - **Hoof knife:** press, hold and pull. It bites once pulled and takes off a strip of horn.
 - **Grinder and spray bottle:** press, hold and glide.

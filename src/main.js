@@ -41,7 +41,7 @@ const game = {
   result: null,
   lastWarn: {},
   tutorial: null,       // a Tutorial during the guided first run, else null
-  ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null },
+  ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false },
 };
 
 const ui = new UI({
@@ -124,11 +124,16 @@ function selectTool(id) {
 
 // -------------------------------------------------------------------- input
 
+// Pointer → logical working point. A finger holds the handle, so for touch the working
+// point is the tool tip, offset up-left of the finger (CFG.touch); the sprite is drawn back to it.
 function toLogical(e) {
   const r = canvas.getBoundingClientRect();
+  const touch = e.pointerType === 'touch';
+  const { grip, angle } = CFG.touch;
   return {
-    x: ((e.clientX - r.left) / r.width) * CFG.view.w,
-    y: ((e.clientY - r.top) / r.height) * CFG.view.h,
+    x: ((e.clientX - r.left) / r.width) * CFG.view.w - (touch ? grip * Math.cos(angle) : 0),
+    y: ((e.clientY - r.top) / r.height) * CFG.view.h - (touch ? grip * Math.sin(angle) : 0),
+    touch,
   };
 }
 
@@ -176,7 +181,7 @@ canvas.addEventListener('pointermove', (e) => {
       }
     }
   }
-  ptr.x = p.x; ptr.y = p.y;
+  ptr.x = p.x; ptr.y = p.y; ptr.touch = p.touch;
 });
 
 function endPointer(e) {

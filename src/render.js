@@ -305,15 +305,19 @@ export class Renderer {
       c.arc(ptr.x, ptr.y, r, 0, Math.PI * 2);
       c.stroke();
     }
+    // On touch the finger is on the handle: every tool points from its tip back to the finger.
+    const g = ptr.touch ? CFG.touch.angle : null;
+    const gx = Math.cos(CFG.touch.angle) * CFG.touch.grip, gy = Math.sin(CFG.touch.angle) * CFG.touch.grip;
     switch (tool) {
-      case 'knife': drawKnife(c, ptr.x, ptr.y, f.ang); break;
-      case 'grinder': drawGrinder(c, ptr.x, ptr.y, f.spin, ptr.down, r); break;
-      case 'brush': drawBrush(c, ptr.x, ptr.y, 0.5 + Math.sin(f.ang) * 0.2); break;
-      case 'nippers': drawNippers(c, ptr.x, ptr.y, 1 - f.biteT); break;
-      case 'rasp': drawRasp(c, ptr.x, ptr.y, f.ang); break;
-      case 'probe': drawTesters(c, ptr.x, ptr.y, f.squeezeT); break;
-      case 'spray': drawSpray(c, ptr.x, ptr.y, ptr.down, time); break;
-      case 'wrap': drawWrapRoll(c, ptr.x, ptr.y); break;
+      case 'knife': drawKnife(c, ptr.x, ptr.y, g ?? f.ang); break;
+      case 'grinder': drawGrinder(c, ptr.x, ptr.y, f.spin, ptr.down, r, g ?? undefined); break;
+      case 'brush': drawBrush(c, ptr.x, ptr.y, g ?? 0.5 + Math.sin(f.ang) * 0.2); break;
+      case 'nippers': drawNippers(c, ptr.x, ptr.y, 1 - f.biteT, g ?? undefined); break;
+      case 'rasp': drawRasp(c, ptr.x, ptr.y, g ?? f.ang); break;
+      case 'probe': drawTesters(c, ptr.x, ptr.y, f.squeezeT, g ?? undefined); break;
+      case 'spray': g === null ? drawSpray(c, ptr.x, ptr.y, ptr.down, time)
+        : drawSpray(c, ptr.x, ptr.y, ptr.down, time, ptr.x + gx * 1.15, ptr.y + gy * 1.15); break;
+      case 'wrap': g === null ? drawWrapRoll(c, ptr.x, ptr.y) : drawWrapRoll(c, ptr.x, ptr.y, gx - 11, gy); break;
       default: break;
     }
 

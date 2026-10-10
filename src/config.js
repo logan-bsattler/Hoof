@@ -4,6 +4,11 @@ export const CFG = {
   // Logical play-field size (portrait). The canvas is scaled to fit the screen.
   view: { w: 400, h: 720 },
 
+  // Touch: the finger holds the tool's handle, so the working tip sits `grip` px up-left of
+  // the touch point (along `angle`, radians, pointing tip → handle) and the cut stays visible.
+  // Mouse and pen work at the pointer as before.
+  touch: { grip: 68, angle: 1.05 },
+
   // Simulation grid laid over the hoof. Each cell tracks sole thickness, mud, etc.
   grid: { cell: 4, x0: 32, y0: 150, cols: 84, rows: 120 },
 

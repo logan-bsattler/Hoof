@@ -68,14 +68,14 @@ export function drawKnife(c, x, y, ang) {
 }
 
 // Angle grinder with a carbide disc centred on (x, y). When spinning the disc blurs
-// to a translucent smear so the cut stays visible.
-export function drawGrinder(c, x, y, spin, on, r) {
+// to a translucent smear so the cut stays visible. `rot` points from the disc along the body.
+export function drawGrinder(c, x, y, spin, on, r, rot = 0.72) {
   const R = r * 1.25;
   c.save();
   c.translate(x, y);
   // Body: gearhead and motor housing reaching off to the lower right.
   c.save();
-  c.rotate(0.72);
+  c.rotate(rot);
   dropShadow(c, 12, 6, 8, 0.5);
   c.fillStyle = lin(c, 0, -14, 0, 14, [[0, '#2b2c30'], [0.4, '#6c6f76'], [1, '#1d1e21']]);
   rrect(c, R * 0.55, -13, 34, 26, 7);
@@ -96,7 +96,7 @@ export function drawGrinder(c, x, y, spin, on, r) {
   // Guard over the far half of the disc.
   c.strokeStyle = lin(c, -R, 0, R, 0, STEEL);
   c.lineWidth = 4;
-  c.beginPath(); c.arc(0, 0, R + 2, -0.85, 2.3); c.stroke();
+  c.beginPath(); c.arc(0, 0, R + 2, rot - 1.57, rot + 1.58); c.stroke();
 
   // Disc.
   if (on) {
@@ -150,11 +150,11 @@ export function drawBrush(c, x, y, ang) {
   c.restore();
 }
 
-// Nippers: two jaws meeting at (x, y), handles off to the lower right.
-export function drawNippers(c, x, y, open) {
+// Nippers: two jaws meeting at (x, y), handles off along `rot` (lower right by default).
+export function drawNippers(c, x, y, open, rot = 0.8) {
   c.save();
   c.translate(x, y);
-  c.rotate(0.8);
+  c.rotate(rot);
   c.scale(1.4, 1.4);
   c.translate(-22, 0); // jaws centred on the bite
   dropShadow(c, 8, 4, 6, 0.45);
@@ -204,11 +204,11 @@ export function drawRasp(c, x, y, ang) {
   c.restore();
 }
 
-// Hoof testers: a big pincer, one jaw tip on the spot being tested.
-export function drawTesters(c, x, y, squeeze) {
+// Hoof testers: a big pincer, one jaw tip on the spot being tested, handles along `rot`.
+export function drawTesters(c, x, y, squeeze, rot = 0.9) {
   c.save();
   c.translate(x, y);
-  c.rotate(0.9);
+  c.rotate(rot);
   dropShadow(c, 8, 4, 6, 0.45);
   c.strokeStyle = lin(c, 0, -30, 0, 30, STEEL);
   c.lineWidth = 4;
@@ -236,9 +236,8 @@ export function drawTesters(c, x, y, squeeze) {
   c.restore();
 }
 
-// Spray bottle aimed at (x, y) from the lower left; a mist cone while spraying.
-export function drawSpray(c, x, y, on, t) {
-  const bx = x - 62, by = y + 54;
+// Spray bottle aimed at (x, y), held at (bx, by) (lower left by default); a mist cone while spraying.
+export function drawSpray(c, x, y, on, t, bx = x - 62, by = y + 54) {
   const ang = Math.atan2(y - by, x - bx);
   if (on) {
     c.save();
@@ -276,10 +275,10 @@ export function drawSpray(c, x, y, on, t) {
   c.restore();
 }
 
-// A roll of pink cohesive bandage, shown as the pad + wrap cursor.
-export function drawWrapRoll(c, x, y) {
+// A roll of pink cohesive bandage, shown as the pad + wrap cursor, offset (ox, oy) from the aim point.
+export function drawWrapRoll(c, x, y, ox = 18, oy = 18) {
   c.save();
-  c.translate(x + 18, y + 18);
+  c.translate(x + ox, y + oy);
   dropShadow(c, 8, 4, 6, 0.4);
   c.fillStyle = '#f5f1ea';
   rrect(c, -22, -6, 26, 22, 3);
