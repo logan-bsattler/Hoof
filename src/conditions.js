@@ -133,6 +133,10 @@ export const CONDITIONS = {
             id: 'whiteline', label: 'White-line abscess',
             feedback: 'No dark track along the wall and nothing gave under the testers. She’s sound.',
           },
+          {
+            id: 'dd', label: 'Digital dermatitis',
+            feedback: 'The heel cleft is clean skin: no raw red patch between the bulbs. She’s sound.',
+          },
         ],
         misreadNote: 'Misread a sound foot. Marks that stay firm under the testers are nothing to open.',
         plan: 'Plan: functional trim (steps 1–3), rasp, then flick off the loose heel horn. Nothing to open: leave the marks alone.',
@@ -188,6 +192,10 @@ export const CONDITIONS = {
             id: 'foreign', label: 'Foreign body',
             feedback: "No puncture, no screw, no stone. It's a sole ulcer.",
           },
+          {
+            id: 'dd', label: 'Digital dermatitis',
+            feedback: "DD is a raw patch on the skin of the heel cleft. This springs in the horn of the sole: it's a sole ulcer.",
+          },
         ],
         misreadNote: 'Misread the lesion. A spot that springs at the sole/heel junction is a sole ulcer.',
         plan: `Plan: functional trim (steps 1–3), open the ulcer and block the sound ${sound} claw, then flush, pad and wrap it.`,
@@ -241,6 +249,10 @@ export const CONDITIONS = {
           {
             id: 'foreign', label: 'Foreign body',
             feedback: 'Nothing driven in. Grit got in through a split white line: a white-line abscess.',
+          },
+          {
+            id: 'dd', label: 'Digital dermatitis',
+            feedback: 'DD sits on the skin between the heel bulbs. This tracks along the wall: a white-line abscess.',
           },
         ],
         // First-appearance hint, in the intro's how-to list.
