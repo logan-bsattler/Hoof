@@ -90,8 +90,12 @@
   <script type="module" src="src/main.js"></script>
   <script>
     // Offline + installable PWA. Skipped inside the Capacitor app, which already ships the files.
+    // Also skipped on localhost (add ?sw to test it there): a slow or stopped dev server
+    // makes the worker serve cached code, so edits seem not to land. Phones use the LAN URL.
     if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
-      addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+      const dev = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && !new URLSearchParams(location.search).has('sw');
+      if (dev) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+      else addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     }
   </script>
 </body>
