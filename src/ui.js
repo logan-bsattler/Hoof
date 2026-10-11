@@ -1,7 +1,7 @@
 // DOM-side UI: tool dock, steps checklist, toasts, and modal cards.
 
 import { TOOLS, TOOL_ORDER } from './tools.js';
-import { STEPS, DONE_TIP, stepTip } from './steps.js';
+import { DONE_TIP, stepTip, stepsFor } from './steps.js';
 import { drawToolIcon } from './toolart.js';
 
 const $ = (id) => document.getElementById(id);
@@ -39,13 +39,7 @@ export class UI {
     // The icon's CSS size changes with the layout breakpoint.
     addEventListener('resize', () => this.drawIcons());
 
-    const list = $('stepsList');
-    this.stepItems = STEPS.map((s) => {
-      const li = document.createElement('li');
-      li.textContent = s.label;
-      list.appendChild(li);
-      return li;
-    });
+    this.stepItems = [];
 
     $('btnRelease').addEventListener('click', onRelease);
     $('btnRead').addEventListener('click', onRead);
@@ -96,19 +90,29 @@ export class UI {
   }
 
   setSteps({ status, current }, caseDef) {
+    const steps = stepsFor(caseDef);
+    // Rebuild the checklist when the case brings a different step list.
+    if (this.stepsOf !== steps.map((s) => s.id).join()) {
+      this.stepsOf = steps.map((s) => s.id).join();
+      $('stepsList').replaceChildren(...(this.stepItems = steps.map((s) => {
+        const li = document.createElement('li');
+        li.textContent = s.label;
+        return li;
+      })));
+    }
     status.forEach((s, k) => {
       const li = this.stepItems[k];
       li.classList.toggle('done', s.done);
       li.classList.toggle('current', k === current);
     });
-    const tip = current < 0 ? DONE_TIP : stepTip(STEPS[current], caseDef);
-    const label = current < 0 ? 'All steps done' : STEPS[current].label;
+    const tip = current < 0 ? DONE_TIP : stepTip(steps[current], caseDef);
+    const label = current < 0 ? 'All steps done' : steps[current].label;
     $('stepTip').textContent = tip;
     if (!this.coaching) {
       $('stepBarLabel').textContent = label;
       $('stepBarTip').textContent = tip;
     }
-    const hintTool = current < 0 ? null : STEPS[current].tool;
+    const hintTool = current < 0 ? null : steps[current].tool;
     for (const [k, b] of Object.entries(this.toolButtons)) b.classList.toggle('suggested', k === hintTool);
   }
 

@@ -431,7 +431,7 @@ export class HoofArt {
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const lesionC = L.claw, heelC = LH.claw;
     const heelY = GEOM.heelY;
-    const decoys = (hoof.caseDef.findings ?? []).filter((f) => f.kind !== 'ulcer');
+    const decoys = (hoof.caseDef.findings ?? []).filter((f) => f.kind !== L.type);
 
     let i0 = 0, i1 = 0, i2 = 0, i3 = 0, w0 = 0, w1 = 0, w2 = 0, w3 = 0;
     const sm = (a) => a[i0] * w0 + a[i1] * w1 + a[i2] * w2 + a[i3] * w3;

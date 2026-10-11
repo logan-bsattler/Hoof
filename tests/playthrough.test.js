@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
 import { Hoof, CLAW, LOOSE, GEOM, clawBox, dishRect, soundClaw } from '../src/hoof.js';
-import { CASE_B, makeCaseB } from '../src/case.js';
+import { CASE_B, makeCase } from '../src/case.js';
+import { CONDITIONS } from '../src/conditions.js';
 import { applyGrind, applyWrap } from '../src/tools.js';
 import { evaluateSteps, trimFinished } from '../src/steps.js';
 import { newSession, scoreCase } from '../src/scoring.js';
@@ -129,11 +130,15 @@ function playthrough(cd) {
 
 test('a careful player reaches Textbook with the real tools, without drawing blood', () => playthrough(CASE_B));
 
+for (const id of Object.keys(CONDITIONS)) {
+  test(`${id}: the careful player reaches Textbook on a dealt cow`, () => playthrough(makeCase(id, 1)));
+}
+
 test('the careful player also wins on mirrored feet and inner-claw ulcers', () => {
   // The first dealt cows covering each foot × sore claw combination.
   const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
   for (let seed = 1; want.size && seed < 500; seed++) {
-    const cd = makeCaseB(seed);
+    const cd = makeCase('ulcer', seed);
     if (want.delete(cd.side + cd.lesion.claw)) playthrough(cd);
   }
   assert.equal(want.size, 0, 'every layout dealt');

@@ -61,6 +61,11 @@ export const STEPS = [
   },
 ];
 
+// The steps this case needs, in the condition's order. Cases without a list run them all.
+export function stepsFor(caseDef) {
+  return caseDef?.steps ? caseDef.steps.map((id) => STEPS.find((s) => s.id === id)) : STEPS;
+}
+
 export function stepTip(step, caseDef) {
   return typeof step.tip === 'function' ? step.tip(caseDef) : step.tip;
 }
@@ -74,7 +79,7 @@ export const DONE_TIP = 'That’s a good foot. Release her and watch her walk.';
 
 // Returns per-step status; records first completion time in the session.
 export function evaluateSteps(m, session, hoof, now) {
-  const status = STEPS.map((st) => ({ id: st.id, done: !!st.done(m, session, hoof) }));
+  const status = stepsFor(hoof.caseDef).map((st) => ({ id: st.id, done: !!st.done(m, session, hoof) }));
   for (const s of status) {
     if (s.done && session.stepDoneAt[s.id] == null) session.stepDoneAt[s.id] = now;
   }

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { CFG } from '../src/config.js';
 import { fitCamera, toScene, toScreen } from '../src/view.js';
 import { CLAW, clawPolygon } from '../src/hoof.js';
-import { CASE_B, makeCaseB } from '../src/case.js';
+import { CASE_B, makeCase } from '../src/case.js';
 import { tutorialBeats } from '../src/tutorial.js';
 
 const { w: W, h: H, phone } = CFG.view;
@@ -62,7 +62,7 @@ test('the phone content box holds both claws, the labels and every tutorial targ
   }
   assert.ok(inBox(CB.x, 652 - 12, CB.x, 652 + 4), 'claw labels (y 652)');
   for (let seed = 0; seed < 40; seed++) {
-    const cd = seed === 0 ? CASE_B : makeCaseB(seed);
+    const cd = seed === 0 ? CASE_B : makeCase('ulcer', seed);
     for (const b of tutorialBeats(cd)) {
       const t = b.target;
       if (!t) continue;

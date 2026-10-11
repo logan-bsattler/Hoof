@@ -315,6 +315,8 @@ Case B is still the template: `buildCase()`/`makeCaseB()` in `src/case.js`, the 
 - `makeCase(conditionId, seed, mods)` replaces `makeCaseB`; Case B becomes `makeCase('ulcer', 214)`, with an identical hoof (pin it with a test).
 - The tests sweep every condition × 50 seeds, all of which must build, and run one bot playthrough per condition, which must reach Textbook with no blood.
 
+**Status (2026-10-10): done, apart from the grid.** `src/conditions.js` holds `CONDITIONS` (only `ulcer` for now) with these fields: `caseId`, `title`, `steps` (step ids), `requires` ({open, block, treat}, which scoring gates on), `diagnosis`, `place(rand, side)` and `copy()`. `makeCase` always draws the side, so a `side` mod doesn't reshuffle the cow. `CASE_B` is `makeCase('ulcer', 214, {hand-placed mods})`, and a snapshot showed it and 7 seeded cows came out identical to before. `stepsFor(caseDef)` in steps.js feeds evaluateSteps, ui.js (the checklist is rebuilt when the step list changes) and main.js. Probe, decoy art and scoring read `caseDef.lesion.type` in place of `'ulcer'`. Still ulcer-specific, to generalize per condition in 7.2: `LOOSE.ULCER` carving in hoof.js, the step4/treat predicates, tutorial beats, and the `tests/player.js` bot path.
+
 ### 7.2 New conditions, in depth (two or three)
 In priority order. Each one needs its own probe text, art in HoofArt, a bot path in `tests/player.js`, and a tutorial-lite hint for its first appearance.
 1. **Routine trim (nothing wrong).** The restraint test. Decoys only: the right read is "sound", and the job is the five-step trim with nothing opened. Opening a decoy costs Restraint. Cheapest to build, and it makes every other diagnosis meaningful.
@@ -361,6 +363,8 @@ Show the current tier on the route map ("Guides: off from here").
 - Test: save, reload, same state; also a corrupted save, which should fall back to a fresh start without throwing.
 
 ### Decisions for Ben
+Ben took all five defaults on 2026-10-10.
+
 | # | Decision | Default |
 |---|---|---|
 | D9 | Which deep conditions, in what order: routine trim, white-line abscess, digital dermatitis? | All three, in that order |

@@ -313,7 +313,7 @@ export class Hoof {
   findingAt(i) {
     const x = this.cellX(i), y = this.cellY(i);
     return (this.caseDef.findings ?? []).find((f) =>
-      f.claw === this.claw[i] && Math.hypot(x - f.x, y - f.y) <= f.r * (f.kind === 'ulcer' ? 1.75 : 1.3)) ?? null;
+      f.claw === this.claw[i] && Math.hypot(x - f.x, y - f.y) <= f.r * (f.kind === this.caseDef.lesion?.type ? 1.75 : 1.3)) ?? null;
   }
 
   // What the hoof testers report at cell i. `finding` is the mark it read, if any.
@@ -323,7 +323,7 @@ export class Hoof {
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
     if (z & Z.DEAD) return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
     if (this.looseInit[i] === LOOSE.ULCER) {
-      const finding = this.caseDef.findings?.find((f) => f.kind === 'ulcer') ?? null;
+      const finding = this.caseDef.findings?.find((f) => f.kind === this.caseDef.lesion.type) ?? null;
       return diagnosed
         ? { kind: 'lesion', finding, text: 'The ulcer. Open it up and keep weight off it.' }
         : { kind: 'lesion', finding, text: 'It springs under the testers. Something soft under there.' };

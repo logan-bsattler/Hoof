@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
 import { Hoof, Z, CLAW, LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
-import { CASE_B, makeCaseB } from '../src/case.js';
+import { CASE_B, makeCase } from '../src/case.js';
+import { CONDITIONS } from '../src/conditions.js';
+import { stepsFor } from '../src/steps.js';
 import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase, judgeBlood } from '../src/scoring.js';
@@ -357,10 +359,31 @@ test('committing a read without testing the ulcer scores as an unread lesion', (
   assert.ok(r.notes.some((n) => n.includes('never tested')));
 });
 
-test('50 dealt cows all build, keep the lesion in its claw, and trim to Textbook', async () => {
+test('Case B is the hand-placed ulcer, unchanged by the condition registry', () => {
+  assert.equal(CASE_B.id, 'B');
+  assert.equal(CASE_B.condition, 'ulcer');
+  assert.equal(CASE_B.side, 'LH');
+  assert.deepEqual(CASE_B.excess, { [CLAW.OUTER]: 4.6, [CLAW.INNER]: 2.4 });
+  assert.deepEqual(CASE_B.lesion, { type: 'ulcer', claw: CLAW.OUTER, x: 172, y: 288, r: 12 });
+  assert.deepEqual(CASE_B.looseHorn, { claw: CLAW.INNER, x: 292, y: 228, r: 11 });
+  assert.deepEqual(CASE_B.findings.map((f) => [f.kind, f.x, f.y, f.r]), [['ulcer', 172, 288, 12], ['stain', 262, 300, 13], ['bruise', 122, 430, 11]]);
+  assert.deepEqual(stepsFor(CASE_B).map((s) => s.id),
+    ['clean', 'diagnose', 'step1', 'step2', 'step3', 'finish', 'step4', 'step5', 'treat']);
+});
+
+test('makeCase: a side mod changes only the side, and unknown conditions throw', () => {
+  const a = makeCase('ulcer', 77), b = makeCase('ulcer', 77, { side: a.side === 'LH' ? 'RH' : 'LH' });
+  assert.notEqual(a.side, b.side);
+  assert.deepEqual(a.excess, b.excess);
+  assert.throws(() => makeCase('nope', 1), /Unknown condition/);
+});
+
+for (const id of Object.keys(CONDITIONS)) test(`${id}: 50 dealt cows all build, keep the lesion in its claw, and trim to Textbook`, async () => {
   const sides = new Set(), sore = new Set();
   for (let seed = 1; seed <= 50; seed++) {
-    const cd = makeCaseB(seed);
+    const cd = makeCase(id, seed);
+    assert.equal(cd.condition, id);
+    assert.ok(stepsFor(cd).every(Boolean), `seed ${seed}: every step id exists`);
     sides.add(cd.side); sore.add(cd.lesion.claw);
     const L = cd.lesion;
     assert.ok(insideClaw(L.claw, L.x, L.y, cd.side, 4), `seed ${seed}: lesion outside its claw`);

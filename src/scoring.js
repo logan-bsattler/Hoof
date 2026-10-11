@@ -56,15 +56,16 @@ export function scoreCase(m, session, hoof, caseDef) {
   // Correctness: right read, right order, right claw.
   let correctness = 100;
   // Committing a read without testing the lesion itself counts as no read at all.
-  if (!session.diagnosis || !session.probes.includes('ulcer')) {
+  if (!session.diagnosis || !session.probes.includes(caseDef.lesion.type)) {
     correctness -= 25; notes.push('You never tested the sore spot itself. Read before you cut.');
   } else if (!session.diagnosisCorrect) { correctness -= 15; notes.push(caseDef.misreadNote); }
+  const need = caseDef.requires ?? { open: true, block: true, treat: true };
   if (session.blockAttempts.includes(caseDef.lesion.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
-  if (hoof.block !== sound) { correctness -= 25; notes.push('No block on the sound claw, so the ulcer is still carrying weight.'); }
-  if (m.looseRemain[LOOSE.ULCER] > 0.1) { correctness -= 20; notes.push('Loose horn left over the ulcer: it needs opening up to heal.'); }
+  if (need.block && hoof.block !== sound) { correctness -= 25; notes.push('No block on the sound claw, so the ulcer is still carrying weight.'); }
+  if (need.open && m.looseRemain[LOOSE.ULCER] > 0.1) { correctness -= 20; notes.push('Loose horn left over the ulcer: it needs opening up to heal.'); }
   if (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
   if (session.firstCutClaw === CLAW.OUTER) { correctness -= 10; notes.push('Started on the outer claw. On a hind foot, trim the inner claw first and match the outer to it.'); }
-  if (hoof.wrap < 2 || m.lesionTint < CFG.treat.tintMin) { correctness -= 10; notes.push('The ulcer went out untreated. Flush it with the spray, then pad and wrap it.'); }
+  if (need.treat && (hoof.wrap < 2 || m.lesionTint < CFG.treat.tintMin)) { correctness -= 10; notes.push('The ulcer went out untreated. Flush it with the spray, then pad and wrap it.'); }
   if (session.grinderLesion) { correctness -= 10; notes.push('Grinder over the lesion. Use the knife near the ulcer.'); }
   if (session.dirtyCuts > 0) { correctness -= 10; notes.push('You cut into a dirty foot. Clean first, then cut.'); }
   if (session.dishBeforeLevel) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }

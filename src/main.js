@@ -3,9 +3,9 @@
 
 import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
-import { CASE_B, makeCaseB } from './case.js';
+import { CASE_B, makeCase } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
-import { STEPS, evaluateSteps, trimFinished, stepTip } from './steps.js';
+import { stepsFor, evaluateSteps, trimFinished, stepTip } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
@@ -131,7 +131,7 @@ async function showIntro() {
   game.tutorial = mode === 'guided' ? new Tutorial(caseDef) : null;
   document.body.classList.toggle('tutorial', !!game.tutorial);
   if (game.tutorial) updateCoach();
-  else { ui.setCoach(null); ui.toast(stepTip(STEPS[0], caseDef), 'info', 4500); }
+  else { ui.setCoach(null); ui.toast(stepTip(stepsFor(caseDef)[0], caseDef), 'info', 4500); }
 }
 
 // Guided run: move to the next beat when the current one is done.
@@ -500,7 +500,7 @@ async function showResults() {
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,
     [{ id: 'again', label: 'Trim another', primary: true }],
   );
-  caseDef = makeCaseB((Math.random() * 1e9) >>> 0);
+  caseDef = makeCase('ulcer', (Math.random() * 1e9) >>> 0);
   showIntro();
 }
 
@@ -595,7 +595,7 @@ function frame(now) {
         Sound.step();
         particles.spawn('spark', game.ptr.x, game.ptr.y, '#7bbf6a', 8);
         const c = game.steps.current;
-        if (c >= 0) ui.toast(stepTip(STEPS[c], caseDef), 'good', 4500);
+        if (c >= 0) ui.toast(stepTip(stepsFor(caseDef)[c], caseDef), 'good', 4500);
         else ui.toast('Every step done. Release her and watch her walk.', 'good', 4500);
       }
       // The pressure-release beat: first time the ulcer is opened.
