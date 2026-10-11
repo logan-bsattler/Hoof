@@ -282,10 +282,15 @@ export class HoofArt {
       this.ulcerF = new Float32Array(hoof.n);
       // Likewise the white-line track's under-run horn: the groove can only open along it.
       this.tractF = new Float32Array(hoof.n);
+      // The heel cleft's skin, and the DD patch on it.
+      this.cleftF = new Float32Array(hoof.n);
+      this.ddF = new Float32Array(hoof.n);
       for (let i = 0; i < hoof.n; i++) {
         this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i];
         this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
         this.tractF[i] = hoof.looseInit[i] === LOOSE.TRACT ? 1 : 0;
+        this.cleftF[i] = hoof.zone[i] & Z.CLEFT ? 1 : 0;
+        this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
       }
       this.markT.fill(0);
       this.octx.save();
@@ -432,6 +437,7 @@ export class HoofArt {
     const { thick, init, mud, rough, tint } = hoof;
     const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
+    const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
     const lesionC = L?.claw ?? CLAW.NONE, heelC = LH.claw;
     // The ulcer art keys off dL (distance to the ulcer) and Lr; with no ulcer, dL stays huge.
     const ulcerC = L?.type === 'ulcer' ? L.claw : CLAW.NONE, Lr = ulcerC ? L.r : 0;
@@ -763,6 +769,31 @@ export class HoofArt {
               cr += (168 - cr) * core; cg += (110 - cg) * core; cb += (106 - cb) * core;
               R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
               wetness = Math.max(wetness, open * (0.4 + 0.6 * bottom));
+            }
+          }
+
+          // Heel cleft: soft, greyish-pink skin where the bulbs fold in toward each other.
+          const cf = smoothstep(0.25, 0.75, fieldAt(cleftF, lx + (nIsle[p] / 255 - 0.5) * 4, ly + (nStain[p] / 255 - 0.5) * 4));
+          if (cf > 0) {
+            const k = cf * 0.55;
+            R += (172 + 16 * ngr - R) * k; G += (134 + 12 * ngr - G) * k; B += (120 + 10 * ngr - B) * k;
+            // Digital dermatitis: a raw, strawberry-red patch, pitted with pale dots, inside a rim
+            // of thickened greyish-white skin. The spray stains it teal.
+            if (DDL && c === DDL.claw) {
+              const u = Math.hypot((lx - DDL.x) / (DDL.r * 0.75), (ly - DDL.y) / (DDL.r * 1.05)) + (ncv - 0.5) * 0.25;
+              const on = smoothstep(0.3, 0.6, fieldAt(ddF, lx, ly)) * cf;
+              const raw = smoothstep(0.92, 0.78, u) * on;
+              const rim = smoothstep(0.7, 0.9, u) * smoothstep(1.2, 0.98, u) * on;
+              if (raw + rim > 0) {
+                let cr = 196 - 30 * ncv, cg = 44 + 16 * ncv, cb = 50 + 12 * ncv;
+                const dot = smoothstep(0.72, 0.86, ngr) * 0.7;
+                cr += (238 - cr) * dot; cg += (162 - cg) * dot; cb += (150 - cb) * dot;
+                const tn = sm(tint) * 0.7;
+                cr += (62 - cr) * tn; cg += (158 - cg) * tn; cb += (146 - cb) * tn;
+                R += (cr - R) * raw; G += (cg - G) * raw; B += (cb - B) * raw;
+                R += (232 - R) * rim * 0.8; G += (226 - G) * rim * 0.8; B += (212 - B) * rim * 0.8;
+                wetness = Math.max(wetness, raw * 0.9);
+              }
             }
           }
 

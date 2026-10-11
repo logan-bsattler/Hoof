@@ -35,7 +35,7 @@ export const STEPS = [
   },
   {
     id: 'step3', label: '3 · Dish out both claws', tool: 'knife',
-    tip: (cd) => `With the knife, carve the dish along the inner edge of each claw (dashed channel) so weight comes off ${cd.lesion ? 'the ulcer site' : 'the sole/heel junction, where ulcers start'}. Stay out of the toe triangle.`,
+    tip: (cd) => `With the knife, carve the dish along the inner edge of each claw (dashed channel) so weight comes off ${cd.lesion?.type === 'ulcer' ? 'the ulcer site' : 'the sole/heel junction, where ulcers start'}. Stay out of the toe triangle.`,
     done: (m) => m.claws[CLAW.INNER].dishMean <= D + TOL && m.claws[CLAW.OUTER].dishMean <= D + TOL,
   },
   // The rasp trues up the sole before the block goes on and covers one claw.
@@ -65,7 +65,16 @@ export const STEPS = [
     tip: 'Flush the opened ulcer with the spray bottle, then tap it with the pad + wrap: white pad first, then the pink wrap.',
     done: (m, s, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin,
   },
+  // Digital dermatitis: no blade, just treatment of the skin in the cleft.
+  {
+    id: 'dress', label: 'Treat: spray and wrap the cleft', tool: 'spray',
+    tip: 'Keep the knife out of the cleft. Spray the raw patch until it’s soaked, then tap it with the pad + wrap: white pad first, then the pink wrap.',
+    done: (m, s, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin,
+  },
 ];
+
+// The treatment steps: the wrap goes on last, after everything else.
+const TREAT = new Set(['treat', 'dress']);
 
 // The steps this case needs, in the condition's order. Cases without a list run them all.
 export function stepsFor(caseDef) {
@@ -76,9 +85,9 @@ export function stepTip(step, caseDef) {
   return typeof step.tip === 'function' ? step.tip(caseDef) : step.tip;
 }
 
-// The wrap goes on last: every step before 'treat' must be done.
+// The wrap goes on last: every step but the treatment must be done.
 export function trimFinished(status) {
-  return status.every((s) => s.id === 'treat' || s.done);
+  return status.every((s) => TREAT.has(s.id) || s.done);
 }
 
 export const DONE_TIP = 'That’s a good foot. Release her and watch her walk.';

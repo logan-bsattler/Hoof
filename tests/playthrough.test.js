@@ -27,6 +27,7 @@ function playthrough(cd) {
       if (ev.claws.size && s.firstCutClaw == null) s.firstCutClaw = [...ev.claws][0];
       if (ev.dirtyCut) s.dirtyCuts++;
       if (ev.grinderLesion) s.grinderLesion = true;
+      if (ev.cleftCut) s.cleftCuts++;
       if (ev.blood && !bloodAt) bloodAt = `${tool} at ${x.toFixed(0)},${y.toFixed(0)}`;
     },
   });
@@ -76,8 +77,10 @@ function playthrough(cd) {
       // the core. Grazing the loose cap only starts opening it, which step 4 does anyway.
       const R = (L?.r ?? 0) + CFG.tools.knife.radius + 2;
       for (const x of dishX(c)) {
-        const dx = L ? Math.abs(x - L.x) : Infinity;
-        if (!L || c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
+        // DD sits up in the cleft, clear of the dish: nothing to steer round.
+        const sole = L && L.type !== 'dd';
+        const dx = sole ? Math.abs(x - L.x) : Infinity;
+        if (!sole || c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
         const h = Math.sqrt(R * R - dx * dx);
         if (L.y - h > GEOM.dishY0 + 4) p.drag('knife', [[x, GEOM.dishY0], [x, L.y - h]], 120);
         p.drag('knife', [[x, L.y + h], [x, GEOM.dishY1]], 120);
@@ -124,8 +127,8 @@ function playthrough(cd) {
   });
 
   if (cd.requires.treat) {
-    // Treat: flush the opened ulcer, then pad and wrap it.
-    until('treat', () => {
+    // Treat: flush the opened ulcer (or spray the DD patch), then pad and wrap it.
+    until(L.type === 'dd' ? 'dress' : 'treat', () => {
       p.drag('spray', [[L.x - 10, L.y], [L.x + 10, L.y], [L.x - 10, L.y]], 20);
       if (hoof.metrics().lesionTint >= CFG.treat.tintMin) {
         for (let k = 0; k < 2; k++) {
@@ -169,6 +172,15 @@ test('the careful player follows the white line on both feet and both claws', ()
   const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
   for (let seed = 1; want.size && seed < 500; seed++) {
     const cd = makeCase('whiteline', seed);
+    if (want.delete(cd.side + cd.lesion.claw)) playthrough(cd);
+  }
+  assert.equal(want.size, 0, 'every layout dealt');
+});
+
+test('the careful player treats DD on both feet and both claws without a blade in the cleft', () => {
+  const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
+  for (let seed = 1; want.size && seed < 500; seed++) {
+    const cd = makeCase('dd', seed);
     if (want.delete(cd.side + cd.lesion.claw)) playthrough(cd);
   }
   assert.equal(want.size, 0, 'every layout dealt');

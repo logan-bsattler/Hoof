@@ -15,6 +15,8 @@ export const Z = {
   DISH: 32,    // where the step-3 dish should be modelled
   TRI: 64,     // toe triangle — protected weight-bearing horn
   ULCER: 128,  // lesion core: corium sits just under the surface
+  CLEFT: 256,  // skin of the heel cleft between the bulbs: no tool cuts here
+  DD: 512,     // digital dermatitis: the raw lesion on the cleft skin
 };
 
 export const CLAW = { NONE: 0, OUTER: 1, INNER: 2 };
@@ -47,6 +49,8 @@ export const GEOM = {
   triY: 480, triW: 34,     // below this line, near the axial wall: toe triangle
   toeRamp: [450, 580],     // overgrowth thickens toward the toe
   overgrowY: 480,          // overgrown toe horn extends below this line
+  // The heel cleft: a strip of skin `cleftW` px wide along each claw's axial heel, between these lines.
+  cleftY0: 204, cleftY1: 238, cleftW: 12,
 };
 
 // Inner (medial) claw outline in view coords, drawn on the viewer's right; the other side is its mirror.
@@ -193,7 +197,7 @@ export class Hoof {
     const n = this.g.cols * this.g.rows;
     this.n = n;
     this.claw = new Uint8Array(n);
-    this.zone = new Uint8Array(n);
+    this.zone = new Uint16Array(n);
     this.thick = new Float32Array(n);
     this.init = new Float32Array(n);
     this.mud = new Float32Array(n);
@@ -271,6 +275,9 @@ export class Hoof {
       const c = this.claw[i];
       if (!c) continue;
 
+      // How far in from the claw's axial edge this cell sits (for the heel cleft).
+      const span = clawSpan(c, y, this.side);
+      const fromAxial = span ? (clawSide(c, this.side) > 0 ? x - span[0] : span[1] - x) : Infinity;
       const excess = cd.excess[c];
       this.mud[i] = Math.min(1, 0.78 + 0.22 * nz + this.rand() * 0.12);
 
@@ -283,6 +290,7 @@ export class Hoof {
         else if (this.edge[i] < 8.5) this.zone[i] |= Z.WL;
 
         if (y < GEOM.heelY) this.zone[i] |= Z.HEEL;
+        if (y >= GEOM.cleftY0 && y <= GEOM.cleftY1 && fromAxial < GEOM.cleftW) this.zone[i] |= Z.CLEFT;
         else if (y >= GEOM.dishY0 && y <= GEOM.dishY1 && ax < GEOM.dishW && !(this.zone[i] & Z.WALL)) this.zone[i] |= Z.DISH;
         if (y > GEOM.triY && ax < GEOM.triW) this.zone[i] |= Z.TRI;
 
@@ -309,6 +317,10 @@ export class Hoof {
     // Lesion: a core of exposed corium hidden under a cap of loose horn.
     const L = cd.lesion;
     if (L?.type === 'whiteline') this.buildTract(L);
+    else if (L?.type === 'dd') this.stampExact(L.x, L.y, L.r, (i) => {
+      // Digital dermatitis is skin, not loose horn: the raw patch sits on the cleft.
+      if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.DD;
+    });
     else if (L) this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
       if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw) return;
       this.zone[i] &= ~Z.DISH;
@@ -379,6 +391,11 @@ export class Hoof {
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
     if (z & Z.DEAD) return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
     const L = this.caseDef.lesion;
+    if (z & Z.DD) {
+      const finding = this.caseDef.findings?.find((f) => f.kind === 'dd') ?? null;
+      return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
+    }
+    if (z & Z.CLEFT) return { kind: 'cleft', text: 'Heel cleft: skin, not horn. Keep the blades out of it.' };
     if (L && this.looseInit[i] === LESION_LOOSE[L.type]) {
       const finding = this.caseDef.findings?.find((f) => f.kind === L.type) ?? null;
       if (this.drained) return { kind: 'firm', text: 'Drained. The pressure’s off: keep weight off this claw.' };
@@ -430,7 +447,7 @@ export class Hoof {
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
-      looseN: { 1: 0, 2: 0, 3: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0 }, tintSum: 0,
+      looseN: { 1: 0, 2: 0, 3: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0 }, tintSum: 0, ddN: 0, ddTint: 0,
       thinCells: 0, overWB: 0, wbN: 0, overDish: 0, dishN: 0,
       triCut: 0, triN: 0, heelRemoved: 0, heelN: 0, blood: 0,
     };
@@ -458,6 +475,9 @@ export class Hoof {
         if (this.loose[i]) m.looseLeft[lg]++;
         if (lg === LOOSE.ULCER) m.tintSum += this.tint[i];
       }
+      if (z & Z.DD) { m.ddN++; m.ddTint += this.tint[i]; }
+      // The cleft is skin: it is neither trimmed nor graded as horn.
+      if (z & Z.CLEFT) continue;
 
       // The ulcer core and the pared-out white-line groove are meant to sit low.
       if ((z & Z.ULCER) || lg === LOOSE.TRACT) continue;
@@ -503,8 +523,8 @@ export class Hoof {
       2: m.looseN[2] ? m.looseLeft[2] / m.looseN[2] : 0,
       3: m.looseN[3] ? m.looseLeft[3] / m.looseN[3] : 0,
     };
-    // How well the opened ulcer has been flushed with the spray (0..1).
-    m.lesionTint = m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER] : 0;
+    // How well the opened ulcer (or the DD patch) has been flushed with the spray (0..1).
+    m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER] : 0;
     m.levelDiff = claws[CLAW.INNER].wbMean - claws[CLAW.OUTER].wbMean;
     m.heelRemovedMean = m.heelN ? m.heelRemoved / m.heelN : 0;
     return m;

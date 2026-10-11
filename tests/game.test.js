@@ -25,11 +25,12 @@ function idealTrim(hoof) {
     hoof.rough[i] = 0;
   }
   for (let i = 0; i < hoof.n; i++) {
-    if (hoof.looseInit[i] === LOOSE.ULCER) hoof.tint[i] = 1;
+    if (hoof.looseInit[i] === LOOSE.ULCER || (hoof.zone[i] & Z.DD)) hoof.tint[i] = 1;
     // The white-line track pared out as a groove below the sole, deepest at the pocket.
     if (hoof.looseInit[i] === LOOSE.TRACT) hoof.thick[i] = hoof.zoneTarget(i) - (hoof.tract[i] === TRACT.POCKET ? 2.5 : 1.5);
   }
-  hoof.block = soundClaw(hoof.caseDef);
+  // DD needs no block; a case without a requires list (the hand-built ones) is an ulcer.
+  if (hoof.caseDef.requires?.block ?? true) hoof.block = soundClaw(hoof.caseDef);
   if (!hoof.caseDef.lesion) return; // a sound foot gets no block and no wrap
   hoof.drained = hoof.caseDef.lesion.type === 'whiteline';
   if (!hoof.caseDef.requires.treat) return; // a drained abscess stays open to the air
@@ -401,7 +402,8 @@ for (const id of Object.keys(CONDITIONS)) test(`${id}: 50 dealt cows all build, 
     assert.ok(cd.findings.length >= (L ? 2 : 1), `seed ${seed}: at least one decoy`);
     for (const f of cd.findings) assert.ok(insideClaw(f.claw, f.x, f.y, cd.side, 4), `seed ${seed}: ${f.kind} outside its claw`);
     const { h, status, r, t } = await idealRun(cd);
-    if (L) assert.ok(h.metrics().looseN[LESION_LOOSE[L.type]] > 10, `seed ${seed}: lesion cells`);
+    if (L?.type === 'dd') assert.ok(h.metrics().ddN >= 8, `seed ${seed}: DD cells ${h.metrics().ddN}`);
+    else if (L) assert.ok(h.metrics().looseN[LESION_LOOSE[L.type]] > 10, `seed ${seed}: lesion cells`);
     else assert.equal(h.metrics().looseN[LOOSE.ULCER] + h.metrics().looseN[LOOSE.TRACT], 0, `seed ${seed}: no lesion cells on a sound foot`);
     if (L?.path) {
       for (const [x, y] of [...L.path, [L.pocket.x, L.pocket.y]]) assert.ok(insideClaw(L.claw, x, y, cd.side, 4), `seed ${seed}: track outside its claw`);
@@ -548,4 +550,71 @@ test('whiteline: no pad or wrap; it heals open', () => {
   idealTrim(h);
   assert.deepEqual(applyWrap(h, cd.lesion.claw, h.metrics(), true), { ok: false, reason: 'untreated' });
   assert.equal(h.wrap, 0);
+});
+
+test('dd: the patch sits in the heel cleft, reads very sore, and is no-go for every blade', () => {
+  const cd = makeCase('dd', 1);
+  const h = new Hoof(cd);
+  const L = cd.lesion;
+  const i = h.cellAt(L.x, L.y);
+  assert.ok(h.zone[i] & Z.CLEFT && h.zone[i] & Z.DD, 'centre cell is DD on the cleft');
+  assert.ok(h.zone[i] & Z.HEEL, 'the cleft sits in the heel');
+  h.mud.fill(0);
+  assert.equal(h.probe(i, false).kind, 'lesion');
+  assert.match(h.probe(i, false).text, /cleft/);
+  // Blades take nothing off the cleft, but every one of them registers.
+  const before = Float32Array.from(h.thick);
+  assert.ok(knifeAlong(h, [[L.x, L.y - 6], [L.x, L.y + 6]]).some((e) => e.cleftCut), 'knife');
+  assert.ok(applyGrind(h, L.x, L.y, 1 / 60).cleftCut, 'grinder');
+  // The nippers only reach the heel once the long toe is off (a deep bite takes nothing).
+  for (let j = 0; j < h.n; j++) if (h.zone[j] & Z.DEAD) h.thick[j] = 0;
+  assert.ok(applyBite(h, L.x, L.y).cleftCut, 'nippers');
+  assert.equal(h.thick[i], before[i], 'no skin removed');
+  assert.ok(h.blood[i], 'the raw patch bleeds at a touch');
+  assert.equal(applyStroke(h, 'rasp', L.x, L.y, 4).cleftCut, false, 'the rasp just rides over it');
+  // Not graded as horn: the cleft is skipped by the weight test.
+  assert.equal(h.contactMap()[i], 0);
+});
+
+test('dd: the spray soaks the patch, the wrap needs it, and no block is wanted', () => {
+  const cd = makeCase('dd', 1);
+  const L = cd.lesion;
+  const h = new Hoof(cd);
+  idealTrim(h);
+  h.wrap = 0; h.wrapClaw = CLAW.NONE; h.tint.fill(0);
+  assert.equal(h.block, CLAW.NONE, 'no block on a DD foot');
+  assert.deepEqual(applyWrap(h, L.claw, h.metrics(), true), { ok: false, reason: 'unflushed' });
+  for (let k = 0; k < 60; k++) applySpray(h, L.x, L.y, 1 / 60);
+  assert.ok(h.metrics().lesionTint >= CFG.treat.tintMin, `tint ${h.metrics().lesionTint}`);
+  assert.equal(applyWrap(h, soundClaw(cd), h.metrics(), true).reason, 'sound', 'the wrap goes on the sore claw');
+  assert.equal(applyWrap(h, L.claw, h.metrics(), true).stage, 1);
+  assert.equal(applyWrap(h, L.claw, h.metrics(), true).stage, 2);
+  const r = scoreCase(h.metrics(), idealSession(cd), h, cd);
+  assert.equal(r.grade, 'Textbook', r.notes.join(' | '));
+  assert.equal(r.gait, 'sound');
+
+  const blocked = new Hoof(cd);
+  idealTrim(blocked);
+  blocked.block = soundClaw(cd);
+  const rb = scoreCase(blocked.metrics(), idealSession(cd), blocked, cd);
+  assert.ok(rb.parts.correctness <= r.parts.correctness - 20, 'needless block');
+  assert.notEqual(rb.gait, 'sound');
+
+  const bare = new Hoof(cd);
+  idealTrim(bare);
+  bare.wrap = 0;
+  const rt = scoreCase(bare.metrics(), idealSession(cd), bare, cd);
+  assert.ok(rt.notes.some((n) => /DD lesion went out untreated/.test(n)), rt.notes.join(' | '));
+  assert.notEqual(rt.gait, 'sound');
+});
+
+test('dd: a blade in the cleft costs Correctness and Restraint', () => {
+  const cd = makeCase('dd', 1);
+  const h = new Hoof(cd);
+  idealTrim(h);
+  const base = scoreCase(h.metrics(), idealSession(cd), h, cd);
+  const r = scoreCase(h.metrics(), { ...idealSession(cd), cleftCuts: 3 }, h, cd);
+  assert.ok(r.parts.correctness <= base.parts.correctness - 15);
+  assert.ok(r.parts.restraint <= base.parts.restraint - 20);
+  assert.ok(r.notes.some((n) => /treated, not cut/.test(n)), r.notes.join(' | '));
 });

@@ -13,7 +13,7 @@ export function newSession() {
     diagnosis: null, diagnosisCorrect: false, probes: [],
     firstCutClaw: null, dirtyCuts: 0, grinderLesion: false,
     blockAttempts: [], blockBeforeDx: false,
-    dishBeforeLevel: false, stepDoneAt: {}, blood: false, nicks: 0,
+    dishBeforeLevel: false, stepDoneAt: {}, blood: false, nicks: 0, cleftCuts: 0,
   };
 }
 
@@ -60,9 +60,13 @@ function soleDugBesideTrack(hoof, L) {
 // Is the lesion opened up the way its condition needs?
 export function lesionOpened(m, hoof) {
   const L = hoof.caseDef.lesion;
-  if (!L) return true;
+  // Digital dermatitis is skin: there is nothing to open.
+  if (!L || L.type === 'dd') return true;
   return L.type === 'whiteline' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
+
+// Flushed, padded and wrapped.
+const treated = (m, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin;
 
 export function scoreCase(m, session, hoof, caseDef) {
   const T = CFG.sole.target, D = CFG.sole.dishTarget;
@@ -98,6 +102,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   } else if (!session.diagnosisCorrect) { correctness -= 15; notes.push(caseDef.misreadNote); }
   const need = caseDef.requires ?? { open: true, block: true, treat: true };
   if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
+  else if (L && !need.block && hoof.block) { correctness -= 20; notes.push('No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.'); }
   if (L && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
   if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${L.type === 'whiteline' ? 'abscess' : 'ulcer'} is still carrying weight.`); }
   if (need.open && !lesionOpened(m, hoof)) {
@@ -106,7 +111,15 @@ export function scoreCase(m, session, hoof, caseDef) {
   }
   if (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
   if (session.firstCutClaw === CLAW.OUTER) { correctness -= 10; notes.push('Started on the outer claw. On a hind foot, trim the inner claw first and match the outer to it.'); }
-  if (need.treat && (hoof.wrap < 2 || m.lesionTint < CFG.treat.tintMin)) { correctness -= 10; notes.push('The ulcer went out untreated. Flush it with the spray, then pad and wrap it.'); }
+  if (need.treat && !treated(m, hoof)) {
+    correctness -= 10;
+    notes.push(L.type === 'dd' ? 'The DD lesion went out untreated. Spray it, then pad and wrap it.' : 'The ulcer went out untreated. Flush it with the spray, then pad and wrap it.');
+  }
+  // A blade in the heel cleft: skin, not horn, and on a DD foot the raw patch itself.
+  if (session.cleftCuts) {
+    correctness -= 15;
+    notes.push(L?.type === 'dd' ? 'You put a blade into the heel cleft. DD is treated, not cut: clean, spray, wrap.' : 'You cut into the skin of the heel cleft. Keep the blades on horn.');
+  }
   if (need.open && session.grinderLesion) { correctness -= 10; notes.push('Grinder over the lesion. Use the knife near the ulcer.'); }
   if (session.dirtyCuts > 0) { correctness -= 10; notes.push('You cut into a dirty foot. Clean first, then cut.'); }
   if (session.dishBeforeLevel) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }
@@ -132,7 +145,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   const dug = decoysDug(hoof, caseDef);
   // Hunting for the abscess through the sole instead of following the track.
   const hunted = soleDugBesideTrack(hoof, L) > 6;
-  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0));
+  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
   if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
   if (hunted) notes.push('You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
@@ -159,7 +172,9 @@ export function scoreCase(m, session, hoof, caseDef) {
   // How she walks off: balance plus whether the ulcer is relieved.
   // A block on the sore claw loads the ulcer even harder: she'll limp.
   // A sound foot has nothing to relieve; a needless block rocks her onto one claw.
+  // DD needs no block: treating it is the relief, and a block only tips her.
   const relief = !L ? (hoof.block ? 40 : 100)
+    : !need.block ? (!hoof.block && treated(m, hoof) ? 100 : 40)
     : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
   const gaitScore = 0.5 * balance + 0.5 * relief;
   const blockedSore = !!L && hoof.block === L.claw;

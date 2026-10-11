@@ -17,6 +17,11 @@ export const FINDING = {
     probeText: 'She flinches all along this dark line. Something’s tracking under the wall.',
     diagnosedText: 'The white-line track. Pare along it from the wall until it drains.',
   },
+  dd: {
+    look: 'raw red patch in the heel cleft', feel: 'very sore to the touch',
+    probeText: 'She snatches the foot away. Raw, strawberry-red skin in the cleft, sore to the lightest touch.',
+    diagnosedText: 'Digital dermatitis. No blade near it: clean it, spray it, wrap it.',
+  },
   stain: {
     look: 'dark patch', feel: 'firm',
     probeText: 'Dark is just staining. Firm underneath.',
@@ -75,13 +80,23 @@ function placeTract(rand, side, claw) {
   return { claw, x: path[0][0], y: path[0][1], r: 8, w: 4.5, len, path, pocket };
 }
 
+// Digital dermatitis on `claw`'s side of the heel cleft, between the bulbs: a round raw patch
+// on the skin just above the bulbs, its centre a little in from the axial edge.
+function placeCleft(rand, side, claw) {
+  const between = (a, b) => a + rand() * (b - a);
+  const s = clawSide(claw, side);
+  const y = between(GEOM.cleftY0 + 12, GEOM.cleftY1 - 8);
+  const [l, r] = clawSpan(claw, y, side);
+  return { claw, x: (s > 0 ? l : r) + s * between(6, 8), y, r: between(10, 12) };
+}
+
 export const CONDITIONS = {
   // Case A "Due for a Trim": nothing wrong. Decoys only, and the right read is "sound".
   // The restraint test: the job is the trim, with nothing opened.
   routine: {
     caseId: 'A',
     title: 'Due for a Trim',
-    weight: 0.3, // share of dealt cows until the route (WP7.4) picks conditions per farm
+    weight: 0.25, // share of dealt cows until the route (WP7.4) picks conditions per farm
     steps: [...TRIM, 'step5'],
     requires: { open: false, block: false, treat: false },
     diagnosis: 'sound',
@@ -130,7 +145,7 @@ export const CONDITIONS = {
     caseId: 'B',
     title: 'Pressure Point',
     noun: 'ulcer',
-    weight: 0.4,
+    weight: 0.3,
     steps: [...TRIM, 'step4', 'step5', 'treat'],
     // What scoring checks beyond the shared trim.
     requires: { open: true, block: true, treat: true },
@@ -185,7 +200,7 @@ export const CONDITIONS = {
     caseId: 'C',
     title: 'Under the Wall',
     noun: 'abscess',
-    weight: 0.3,
+    weight: 0.25,
     steps: [...TRIM, 'drain', 'step5'],
     requires: { open: true, block: true, treat: false },
     diagnosis: 'whiteline',
@@ -232,6 +247,58 @@ export const CONDITIONS = {
         howto: '<li><b>Follow</b> the dark line in from the wall with the knife: it leads to the pus.</li>',
         misreadNote: 'Misread the lesion. A dark line along the wall that she flinches at is a white-line abscess.',
         plan: `Plan: functional trim (steps 1–3), rasp, then pare along the dark line from the wall until it drains, and block the sound ${sound} claw.`,
+      };
+    },
+  },
+
+  // Case D "Strawberry Heel": digital dermatitis. A skin infection, not a horn lesion: the trick
+  // is to keep every blade out of the cleft and treat it instead.
+  dd: {
+    caseId: 'D',
+    title: 'Strawberry Heel',
+    noun: 'lesion',
+    weight: 0.2,
+    steps: [...TRIM, 'step5', 'dress'],
+    requires: { open: false, block: false, treat: true },
+    diagnosis: 'dd',
+
+    place(rand, side) {
+      const sore = rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
+      const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
+      const lesion = placeCleft(rand, side, sore);
+      const looseHorn = placeHeelHorn(rand, at, rand() < 0.5 ? CLAW.OUTER : CLAW.INNER);
+      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn]);
+      return { lesion, looseHorn, decoys };
+    },
+
+    copy({ cow, leg }) {
+      return {
+        intro:
+          `#${cow} is walking on her toes on the ${leg} hind and the farmer says she kicks in the parlour. ` +
+          'Lift the foot: look between the heel bulbs as well as at the sole.',
+        diagnosisPrompt: 'She won’t let you near the back of this foot. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'dd', label: 'Digital dermatitis',
+            feedback: 'Right. A raw, strawberry-red patch on the skin of the heel cleft: digital dermatitis.',
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer sits in the horn of the sole. This is on the skin between the bulbs: digital dermatitis.',
+          },
+          {
+            id: 'footrot', label: 'Foot rot',
+            feedback: 'Foot rot swells the whole foot and smells. This is a raw patch on the skin above the bulbs: digital dermatitis.',
+          },
+          {
+            id: 'bruise', label: 'Sole bruise',
+            feedback: 'A bruise sits in the horn and stays firm. This is raw skin that she can’t bear touched: digital dermatitis.',
+          },
+        ],
+        // First-appearance hint, in the intro's how-to list.
+        howto: '<li><b>No knife in the cleft:</b> clean it, spray it, wrap it.</li>',
+        misreadNote: 'Misread the lesion. A raw red patch on the skin between the heel bulbs is digital dermatitis.',
+        plan: 'Plan: functional trim (steps 1–3), rasp, flick off the loose heel horn, then spray the lesion and pad and wrap it. No blade in the cleft, and no block.',
       };
     },
   },

@@ -300,6 +300,10 @@ function tap(x, y) {
       if (L.type === 'ulcer') {
         renderer.weep(L.x, L.y, 1);
         Sound.bubbles();
+      } else if (L.type === 'dd') {
+        // Raw skin: a sharp flinch, the foot snatched against the strap.
+        game.shake = 5;
+        Sound.moo(true);
       } else {
         game.shake = 2;
       }
@@ -321,10 +325,10 @@ function tap(x, y) {
 
 const WRAP_MSG = {
   miss: 'Tap the treated claw to pad and wrap it.',
-  sound: 'That’s the sound claw: it has the block. The pad and wrap go over the ulcer.',
+  sound: () => caseDef.lesion?.type === 'dd' ? 'The pad and wrap go over the lesion, on the other claw.' : 'That’s the sound claw: it has the block. The pad and wrap go over the ulcer.',
   untreated: 'No wrap for this one. Pared out and drained, it heals best open to the air.',
   closed: 'Open the ulcer first. Pare the loose horn off it with the knife.',
-  unflushed: 'Flush the opened ulcer with the spray bottle before you cover it.',
+  unflushed: () => caseDef.lesion?.type === 'dd' ? 'Spray the raw patch in the cleft until it’s soaked before you cover it.' : 'Flush the opened ulcer with the spray bottle before you cover it.',
   nothing: 'She’s sound: nothing to pad or wrap.',
   early: 'Finish the trim first. The wrap goes on last, just before she’s released.',
   done: 'She’s wrapped. Release her.',
@@ -333,7 +337,8 @@ const WRAP_MSG = {
 function dress(claw) {
   const r = applyWrap(game.hoof, claw, game.hoof.metrics(), trimFinished(game.steps.status));
   if (!r.ok) {
-    ui.toast(WRAP_MSG[r.reason], r.reason === 'done' ? 'good' : 'info', 3400);
+    const msg = WRAP_MSG[r.reason];
+    ui.toast(typeof msg === 'function' ? msg() : msg, r.reason === 'done' ? 'good' : 'info', 3400);
     return;
   }
   buzz(15);
@@ -384,6 +389,8 @@ function placeBlock(claw) {
   game.shake = 4;
   if (!caseDef.lesion) {
     ui.toast('She’s sound. A block only goes on to rest a sore claw.', 'warn', 4000);
+  } else if (!caseDef.requires?.block) {
+    ui.toast('No block for this one: the trouble is in the skin of the cleft, not under a claw.', 'warn', 4000);
   } else if (claw === caseDef.lesion.claw) {
     ui.toast(`That’s the sore claw! The block goes on the SOUND claw so the ${caseDef.noun} can rest.`, 'warn', 4000);
   } else {
@@ -455,6 +462,15 @@ function handle(ev, x, y) {
   else if (ev.thin) warnOnce('thin', 'Sole’s getting thin here. Ease off.');
   if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.');
   if (ev.offTrack) warnOnce('offTrack', 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
+  if (ev.cleftCut) {
+    s.cleftCuts++;
+    // She flinches once per warning, not on every stamp of the blade.
+    const fresh = (game.lastWarn.cleft ?? -99) + 4 <= game.time;
+    if (fresh && caseDef.lesion?.type === 'dd') { game.shake = 4; Sound.moo(true); }
+    warnOnce('cleft', caseDef.lesion?.type === 'dd'
+      ? 'No blade in the cleft! That’s raw skin: spray it and wrap it, don’t cut it.'
+      : 'That’s the heel cleft: skin, not horn. Keep the blades out of it.');
+  }
   if (ev.blockedSkip) warnOnce('blocked', 'Can’t trim under the block.', 'info', 6);
 
   if (ev.blood) {
@@ -598,7 +614,8 @@ function frame(now) {
         particles.spawn('mist', ptr.x - 8, ptr.y + 8, '#bff0e2', 3, [70, -60]);
         if (ev.sprayLesion > 0 && !game.session.flushed) {
           game.session.flushed = true;
-          ui.toast('Flushing the pocket. Flush again after each round of paring.', 'good', 3200);
+          ui.toast(caseDef.lesion?.type === 'dd' ? 'Spraying the raw patch. Soak all of it.'
+            : 'Flushing the pocket. Flush again after each round of paring.', 'good', 3200);
         }
         handle(ev, ptr.x, ptr.y);
       }

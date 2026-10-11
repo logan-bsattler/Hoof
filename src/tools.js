@@ -61,6 +61,8 @@ function newEvents() {
     // White-line abscess: drain fires once, when the pared track reaches the pocket of pus.
     // offTrack: the knife dug at the pocket's sole without following the track there.
     drain: false, offTrack: false,
+    // A blade (knife, grinder, nippers) bit into the skin of the heel cleft.
+    cleftCut: false,
   };
 }
 
@@ -111,6 +113,17 @@ function blocked(hoof, i, ev) {
   return false;
 }
 
+// The heel cleft is skin: blades take nothing off it, but they hurt, and the raw DD patch
+// bleeds at a touch. True when cell i is cleft (the caller skips it); only the tool's core counts.
+function inCleft(hoof, i, f, ev) {
+  if (!(hoof.zone[i] & Z.CLEFT)) return false;
+  if (f > 0.5) {
+    ev.cleftCut = true;
+    if (hoof.zone[i] & Z.DD) hoof.blood[i] = 1;
+  }
+  return true;
+}
+
 function clearLoose(hoof, i, ev) {
   if (!hoof.loose[i]) return false;
   ev.loose[hoof.loose[i]]++;
@@ -151,7 +164,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
     });
   } else if (tool === 'knife') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
-      if (blocked(hoof, i, ev)) return;
+      if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
       // Fresh cuts expose untreated tissue: the flush has to be repeated.
       hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * dist * f);
@@ -164,7 +177,8 @@ export function applyStroke(hoof, tool, x, y, dist) {
     });
   } else if (tool === 'rasp') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
-      if (blocked(hoof, i, ev)) return;
+      // The rasp has no edge to bite skin: it just rides over the cleft.
+      if (blocked(hoof, i, ev) || (hoof.zone[i] & Z.CLEFT)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.01 * dist * f);
       // The rasp lifts no loose horn, but trues the sole over the white-line track.
       if (hoof.loose[i] && hoof.looseInit[i] !== LOOSE.TRACT) return;
@@ -183,7 +197,7 @@ export function applyGrind(hoof, x, y, dt) {
   const cfg = CFG.tools.grinder;
   ev.danger = 0;
   hoof.stamp(x, y, cfg.radius, (i, f) => {
-    if (blocked(hoof, i, ev)) return;
+    if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
     if (f > 0.5 && (hoof.zone[i] & Z.LIVE) && hoof.thick[i] > 0) {
       ev.danger = Math.max(ev.danger, 1 - smoothstep(CFG.sole.thin, hoof.zoneTarget(i), hoof.thick[i]));
     }
@@ -237,6 +251,7 @@ export function applyBite(hoof, x, y) {
     if (blocked(hoof, i, ev)) return;
     // Only the middle of the jaws bites living horn; the edges just graze it.
     if (f < 1 - cfg.liveCore ** 2) return;
+    if (inCleft(hoof, i, 1, ev)) return;
     if (hoof.looseInit[i] !== LOOSE.TRACT) clearLoose(hoof, i, ev);
     ev.nipLive = true;
     cut(hoof, i, cfg.liveBite, ev, 1);
@@ -253,7 +268,8 @@ export function applySpray(hoof, x, y, dt) {
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (blocked(hoof, i, ev)) return;
     hoof.mud[i] = Math.max(0, hoof.mud[i] - cfg.rinse * dt * f);
-    const opened = hoof.looseInit[i] === LOOSE.ULCER && !hoof.loose[i];
+    // Opened ulcer tissue, or the raw DD patch on the cleft skin, soaks it up.
+    const opened = (hoof.looseInit[i] === LOOSE.ULCER && !hoof.loose[i]) || !!(hoof.zone[i] & Z.DD);
     const a = Math.min(1 - hoof.tint[i], (opened ? cfg.rate : cfg.hornRate) * dt * f);
     hoof.tint[i] += a;
     ev.sprayed += a;
@@ -272,7 +288,7 @@ export function applyWrap(hoof, claw, m, ready) {
   if (!claw) return { ok: false, reason: 'miss' };
   if (claw !== L.claw) return { ok: false, reason: 'sound' };
   if (hoof.wrap >= 2) return { ok: false, reason: 'done' };
-  if (m.looseRemain[LOOSE.ULCER] > 0.1) return { ok: false, reason: 'closed' };
+  if (L.type === 'ulcer' && m.looseRemain[LOOSE.ULCER] > 0.1) return { ok: false, reason: 'closed' };
   if (m.lesionTint < CFG.treat.tintMin) return { ok: false, reason: 'unflushed' };
   if (!ready) return { ok: false, reason: 'early' };
   hoof.wrapClaw = claw;
