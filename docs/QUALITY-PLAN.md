@@ -296,6 +296,84 @@ About a third of the scene's height is not hoof. The HUD takes y 8–112, the st
 | D7 | Side margins: extend the barn scenery, or a soft vignette into the dark background? | Extend the scenery |
 | D8 | Phone HUD: compact strip with horizontal gauges (+29%), or keep today's HUD scaled into a ~66 px strip (+23%, no redesign)? | Compact strip |
 
+## WP7: the trimmer's route, with more conditions and progression (large; scoped 2026-10-10 at `30479cf`)
+
+Today every case is the same sole ulcer on a dealt cow, played one at a time with nothing carried over. WP7 frames the game as a working hoof trimmer's round: you drive from farm to farm, trim each herd's cows, and build a reputation that opens up bigger and harder farms. (In-game copy says "trimmer", never "farrier": farriers shoe horses.)
+
+Ben's calls (2026-10-10):
+- **Structure:** the route. A farm visit is the level unit.
+- **Fail state:** none. Reputation only goes up. A poor trim earns little; it never takes anything away.
+- **Conditions:** both. Two or three new conditions done in depth, plus light variations on every case.
+
+Build order: 7.1 → 7.2 (one condition at a time, each with its bot playthrough) → 7.3 → 7.4 → 7.5 → 7.6 → 7.7. The game should be shippable after each step: until 7.4 lands, "New cow" just deals from the wider case pool.
+
+### 7.1 Condition framework (required before any new condition)
+Case B is still the template: `buildCase()`/`makeCaseB()` in `src/case.js`, the ulcer-specific step 4 (block) and treat (spray + wrap) in `src/steps.js`, and the beats in `src/tutorial.js`.
+- Add a condition registry (`src/conditions.js`). Each entry has the lesion kind and how to build it on the grid, its findings and probe text, which steps apply (trim always; block, treat, pare-out and wrap per condition), the correct diagnosis, the treatment plan text, and any scoring changes.
+- `steps.js` builds the step list from the condition, and the five-step trim stays shared.
+- Scoring reads "what was required" from the condition, not from literals.
+- `makeCase(conditionId, seed, mods)` replaces `makeCaseB`; Case B becomes `makeCase('ulcer', 214)`, with an identical hoof (pin it with a test).
+- The tests sweep every condition × 50 seeds, all of which must build, and run one bot playthrough per condition, which must reach Textbook with no blood.
+
+### 7.2 New conditions, in depth (two or three)
+In priority order. Each one needs its own probe text, art in HoofArt, a bot path in `tests/player.js`, and a tutorial-lite hint for its first appearance.
+1. **Routine trim (nothing wrong).** The restraint test. Decoys only: the right read is "sound", and the job is the five-step trim with nothing opened. Opening a decoy costs Restraint. Cheapest to build, and it makes every other diagnosis meaningful.
+2. **White-line abscess.** A dark track in the white line near the toe or abaxial wall. The testers flinch along the line. Pare along the track until it drains (a new "drain" event in tools.js), relieve the claw and block the sound one. The mistake to punish is digging into the sole instead of following the line.
+3. **Digital dermatitis (strawberry heel).** A raw lesion between the heel bulbs, outside the sole grid's trim zones. No knife: clean, spray, then wrap. Cutting there is the mistake. Needs a small heel-cleft area added to the grid and art.
+
+Later candidates, not in WP7: a thin-soled cow (over-trim trap), a corkscrew claw, and a toe ulcer.
+
+### 7.3 Light variations (every case)
+Data only, through `mods` in `makeCase`, chosen per farm (7.4):
+- excess growth per claw, and front versus hind foot (RH is already supported)
+- mud level, which changes how long cleaning takes
+- the number and kind of decoys
+- lesion size and position within its allowed band
+- cow temperament: flinch threshold and movement while you work (the existing flinch, tuned per cow)
+
+Each modifier keeps the bot at Textbook across the seed sweep.
+
+### 7.4 The route and farms
+- **Farm profile:** name, herd size (3–6 cows per visit), housing (pasture, freestall, straw yard, wet yard) which sets the condition weights and mud, a temperament range, and a one-line farmer intro. Start with 6–8 hand-written farms.
+- **A visit** is that farm's cows in sequence, ending with a day summary: each cow's grade, mobility, and the reputation earned.
+- **The route map** is a simple screen between visits: farms as stops along a road, locked ones greyed out with their reputation threshold shown. The title card's "tap to start" leads here once a save exists.
+- **Reputation only goes up.** Each cow earns points by grade (Textbook > Sound > ...). A lame walk-off earns nothing and flags that cow for the return visit. Thresholds unlock farms and, through them, new conditions and modifiers.
+- The first farm is the current tutorial: a small, calm herd, with guides on.
+
+### 7.5 Return visits
+- Revisiting a farm deals some of the same cows back by ear tag, a few months later. Each one shows the outcome of last time: healed, or still sore if the trim was poor.
+- A cow flagged lame becomes a recheck case: the same foot, a slightly worse lesion, and a chance to earn the points back. That's the "only up" way to make a bad trim matter.
+- Store per cow: farm, tag, seed, condition, last grade, and healed or not.
+
+### 7.6 Difficulty ramp
+Turn the help down with reputation, not with menus:
+- guides on → guides only after a mistake → off
+- a wider tolerance band early, today's band later
+- more decoys and calmer cows early, livelier cows later
+
+Show the current tier on the route map ("Guides: off from here").
+
+### 7.7 Saving progress
+- Save to `localStorage` under one versioned key: reputation, unlocked farms, cow history, best grade per farm, and tier.
+- Wrap every read and write in try/catch. If storage is blocked or cleared, the game still starts at farm 1.
+- Add a "Start the round over" option behind a confirm.
+- On Android (Capacitor) localStorage persists; check that the APK keeps the save across restarts.
+- Test: save, reload, same state; also a corrupted save, which should fall back to a fresh start without throwing.
+
+### Decisions for Ben
+| # | Decision | Default |
+|---|---|---|
+| D9 | Which deep conditions, in what order: routine trim, white-line abscess, digital dermatitis? | All three, in that order |
+| D10 | Route shape: one fixed road of farms, or a small branching map where you choose the next stop? | Fixed road first; branching later if it feels thin |
+| D11 | Earnings and kit upgrades (better grinder, a tilt chute, the van): in WP7, later, or never (keep it calm)? | Later; reputation only for now |
+| D12 | Cows per visit: fixed per farm, or random within the farm's range? | Fixed per farm, so the visit length is predictable |
+| D13 | Farm names and farmers: invented, or named after real places or people you know (with their OK)? | Invented |
+
+### How to verify
+- `npm test`: the condition × seed sweep, one bot playthrough per condition at Textbook, and the save/load tests.
+- In the preview: play farm 1 through to the route map; reload and confirm progress is kept; and a return visit shows the healed or recheck state.
+- Ben's phone playtest of a full visit: the pacing of 3–6 cows, and whether the day summary feels rewarding.
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
