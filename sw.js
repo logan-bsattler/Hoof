@@ -1,13 +1,13 @@
 // Service worker: precaches the app shell so TRUE HOOF installs and plays offline.
 // Network-first, so a reachable server always wins and dev edits show up on reload;
 // the cache is the fallback when offline or slow. Bump VERSION when the asset list changes.
-const VERSION = 'true-hoof-v14';
+const VERSION = 'true-hoof-v15';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png', 'icons/favicon-32.png',
   'src/audio.js', 'src/case.js', 'src/conditions.js', 'src/config.js', 'src/hoof.js', 'src/hoofart.js',
-  'src/main.js', 'src/noise.js', 'src/particles.js', 'src/render.js', 'src/route.js', 'src/scenery.js', 'src/view.js',
+  'src/main.js', 'src/noise.js', 'src/particles.js', 'src/render.js', 'src/route.js', 'src/save.js', 'src/scenery.js', 'src/view.js',
   'src/scoring.js', 'src/steps.js', 'src/toolart.js', 'src/tools.js', 'src/tutorial.js',
   'src/ui.js', 'src/walkoff.js',
   'audio/brush.mp3', 'audio/clunk.mp3', 'audio/grinder.mp3', 'audio/knife1.mp3',

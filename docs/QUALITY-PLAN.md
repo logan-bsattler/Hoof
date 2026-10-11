@@ -390,6 +390,9 @@ Not yet felt in play: whether the 'slip' trigger is too eager (thin-sole warning
 - On Android (Capacitor) localStorage persists; check that the APK keeps the save across restarts.
 - Test: save, reload, same state; also a corrupted save, which should fall back to a fresh start without throwing.
 
+**Status (2026-10-11): done, tests 95/95.** `src/save.js`: `SAVE_KEY` `truehoof.round.v1` holds `{v: 1, rep, visits, best, history}`. Opened farms and the tier follow from `rep`, so they aren't stored. `saveRound` runs at the end of each day (in showDay) and never includes a day in progress: a mid-day save drops that visit's history, so a reload goes back to the road map with the day unplayed. `loadRound` checks every field (version, counts ≥ 0, known farm ids, history rows with farm/tag/seed/condition) and falls back to `newRoute()` on a missing, corrupt or blocked store without throwing. main.js: the round loads at launch; once a day is finished, the title leads to the road map; "Start the round over" (a quiet link under the map, shown once there's progress) asks to confirm, then clears the save and opens Willow Bank. `sw.js` v15 precaches save.js. Tests (tests/save.test.js): save → reload gives the same state, the same return-visit herd and the same tier; the day in progress isn't saved; nine malformed saves, blocked storage and no storage all give a fresh round; reset clears the key. Browser: a finished Willow Bank day saved rep 35; after a reload the title went to the road map (Reputation 35, Apprentice), and Start over → confirm cleared the key and opened Willow Bank's first visit.
+Still to do: check on the phone that the APK keeps the save across a force-stop and restart (Capacitor's WebView localStorage should persist).
+
 ### Decisions for Ben
 Ben took all five defaults on 2026-10-10.
 

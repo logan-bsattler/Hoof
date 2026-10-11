@@ -15,6 +15,7 @@ import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
+import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
 import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
@@ -32,8 +33,8 @@ function devMods() {
 }
 const freePlay = devCase.has('cond');
 let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_B;
-// The trimmer's round (route.js). Kept for this launch only until saving lands (WP7.7).
-const route = newRoute();
+// The trimmer's round (route.js), saved on this device at the end of each day (save.js).
+const route = loadRound();
 if (devCase.has('rep')) route.rep = Math.max(0, +devCase.get('rep') || 0);
 let herd = [];         // the cows of the visit in progress, in order
 const canvas = document.getElementById('game');
@@ -65,6 +66,8 @@ const game = {
   tutorial: null,       // a Tutorial during the guided first run, else null
   ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false },
 };
+
+document.getElementById('routeReset').addEventListener('click', () => restartRound());
 
 const ui = new UI({
   onTool: (id) => selectTool(id),
@@ -658,6 +661,7 @@ function nextCow({ last }) {
 async function showDay() {
   game.state = 'results';
   const d = endVisit(route);
+  saveRound(route);
   Sound.step();
   const rows = d.rows.map((r) => `<tr class="${r.lame ? 'lame' : ''}">
       <td>${r.tag.replace('Holstein ', '')}${r.back ? ` <span class="again" title="${r.back === 'recheck' ? 'Recheck' : 'Seen before'}">↺</span>` : ''}</td><td>${r.title}</td><td>${r.grade}</td>
@@ -743,6 +747,7 @@ function showRoute() {
     return li;
   }));
   el.hidden = false;
+  document.getElementById('routeReset').hidden = !hasProgress(route);
   list.querySelector('.suggest')?.scrollIntoView({ block: 'center' });
   list.querySelector('.suggest button')?.focus({ preventScroll: true });
 }
@@ -752,6 +757,23 @@ function begin() {
   if (freePlay) { showIntro(); return; }
   const dev = farmById(devCase.get('farm'));
   if (dev && isOpen(dev, route.rep)) { showVisit(dev, { fromMap: false }); return; }
+  // With a saved round, the road map; the first time out, straight to the first farm.
+  if (hasProgress(route)) { showRoute(); return; }
+  showVisit(FARMS[0], { fromMap: false });
+}
+
+// "Start the round over", behind a confirm: wipes the save and goes back to farm 1.
+async function restartRound() {
+  const el = document.getElementById('route');
+  el.hidden = true;
+  game.state = 'modal';
+  const pick = await ui.modal(
+    `<h2>Start the round over?</h2><p>Your reputation (${route.rep}), every farm you’ve opened and every cow’s history will be gone. This can’t be undone.</p>`,
+    [{ id: 'keep', label: 'Keep my round', primary: true }, { id: 'reset', label: 'Start over' }],
+  );
+  if (pick !== 'reset') { showRoute(); return; }
+  clearRound();
+  Object.assign(route, newRoute());
   showVisit(FARMS[0], { fromMap: false });
 }
 

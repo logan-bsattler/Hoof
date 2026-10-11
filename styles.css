@@ -395,6 +395,7 @@ body.tutorial #stepTip { display: none; }
 .route-inner { max-width: 440px; margin: 0 auto; }
 .route h1 { margin: 4px 0 2px; font-family: Georgia, serif; font-size: 30px; }
 .route-rep { color: var(--muted); font-size: 14px; margin: 4px 0 18px; }
+.link-btn { display: block; margin: 18px auto 8px; min-height: 44px; padding: 0 14px; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 .route-rep b { color: var(--brass); font-size: 17px; }
 .road { list-style: none; margin: 0 0 16px; padding: 0; position: relative; }
 /* The road itself: a dashed lane down the left, through every stop's pin. */
