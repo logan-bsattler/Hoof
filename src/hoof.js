@@ -34,6 +34,10 @@ export const GEOM = {
   midX: MID_X,
   heelY: 258,              // above this line: heel bulb
   dishY0: 275, dishY1: 470, dishW: 46, // dish channel along the axial wall
+  // Zone targets blend over these spans (px) so trimmed horn slopes from zone to zone
+  // instead of stepping on a ruled line. The heel blends on its own side of heelY; the dish
+  // blends mostly inside its rect, so outside cells stay above the over-trim line (T - 1.25).
+  heelFeather: 18, dishFeather: [-4, 14],
   triY: 480, triW: 34,     // below this line, near the axial wall: toe triangle
   toeRamp: [450, 580],     // overgrowth thickens toward the toe
   overgrowY: 480,          // overgrown toe horn extends below this line
@@ -172,6 +176,7 @@ export class Hoof {
     this.blood = new Uint8Array(n);
     this.tint = new Float32Array(n); // antiseptic spray soaked into the tissue, 0..1
     this.edge = new Float32Array(n);
+    this.tgt = new Float32Array(n); // per-cell trim target (mm), feathered across zone edges
     this.noise = new Float32Array(n);
     this.block = CLAW.NONE;
     this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
@@ -252,11 +257,21 @@ export class Hoof {
         else if (y >= GEOM.dishY0 && y <= GEOM.dishY1 && ax < GEOM.dishW && !(this.zone[i] & Z.WALL)) this.zone[i] |= Z.DISH;
         if (y > GEOM.triY && ax < GEOM.triW) this.zone[i] |= Z.TRI;
 
+        const sole = T + excess + 2.2 * smoothstep(GEOM.toeRamp[0], GEOM.toeRamp[1], y) + nz * 0.35;
+        // A slow wobble so the feathered zone edges don't read as ruled lines.
+        const jit = smoothNoise(x * 1.9 + 41, y * 1.9 - 23);
         if (this.zone[i] & Z.HEEL) {
-          this.thick[i] = heel + nz * 0.2;
-          this.rough[i] = 0.1;
+          const w = smoothstep(GEOM.heelY - GEOM.heelFeather + jit * 6, GEOM.heelY - 2, y);
+          this.thick[i] = heel + nz * 0.2 + (sole - heel - nz * 0.2) * w;
+          this.tgt[i] = heel + (T - heel) * w;
+          this.rough[i] = 0.1 + 0.4 * w;
         } else {
-          this.thick[i] = T + excess + 2.2 * smoothstep(GEOM.toeRamp[0], GEOM.toeRamp[1], y) + nz * 0.35;
+          // Signed distance into the dish rect (the axial side is the wall, which stays at T).
+          const dIn = Math.min(y - GEOM.dishY0, GEOM.dishY1 - y, GEOM.dishW - ax);
+          const [f0, f1] = GEOM.dishFeather;
+          const w = this.zone[i] & Z.WALL ? 0 : smoothstep(f0 + jit * 3, f1 + jit * 3, dIn);
+          this.thick[i] = sole;
+          this.tgt[i] = T + (CFG.sole.dishTarget - T) * w;
           this.rough[i] = 0.5;
         }
       }
@@ -291,9 +306,7 @@ export class Hoof {
   zoneTarget(i) {
     const z = this.zone[i];
     if (z & Z.ULCER) return Infinity; // any cut into the ulcer core is resisted
-    if (z & Z.HEEL) return CFG.sole.heel;
-    if (z & Z.DISH) return CFG.sole.dishTarget;
-    return CFG.sole.target;
+    return this.tgt[i] || CFG.sole.target;
   }
 
   // The tester-readable mark (ulcer or decoy) covering cell i, if any.
@@ -400,7 +413,9 @@ export class Hoof {
 
       if (z & Z.HEEL) {
         if (lg !== LOOSE.HEEL) {
-          m.heelRemoved += Math.max(0, this.init[i] - t);
+          // Where the heel feathers into the sole, paring down to the blended target is fair.
+          const keep = this.tgt[i] > CFG.sole.heel + 0.05 ? Math.min(this.init[i], this.tgt[i]) : this.init[i];
+          m.heelRemoved += Math.max(0, keep - t);
           m.heelN++;
         }
       } else if (z & Z.DISH) {

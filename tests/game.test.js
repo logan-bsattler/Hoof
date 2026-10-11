@@ -258,7 +258,7 @@ test('the block does not lock out the loose heel horn or the rasp step', () => {
 test('cuts ease in above target: full rate well above, slowed near, `resist` below', () => {
   const h = new Hoof(CASE_B);
   const [x, y] = findCell(h, (i) => (h.zone[i] & Z.LIVE) && !(h.zone[i] & (Z.HEEL | Z.DISH | Z.ULCER | Z.WALL)) &&
-    !h.looseInit[i] && h.claw[i] === CLAW.INNER && h.cellY(i) > 380);
+    !h.looseInit[i] && h.claw[i] === CLAW.INNER && h.cellY(i) > 380 && h.zoneTarget(i) === T);
   const i = h.cellAt(x, y);
   const { rate, resist } = CFG.tools.grinder;
   const dt = 0.001;
