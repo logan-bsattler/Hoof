@@ -93,6 +93,14 @@ fresh cow: left or right hind (a right hind shows its outer claw on your right),
 ulcer size and position, sometimes on the inner claw, plus one or two harmless marks (a stain, a
 bruise) that look like trouble. Your best grade on the case is remembered on the device.
 
+The game is played as a trimmer's round: a road of seven farms, each visit a fixed number of that
+farm's cows (3–6), ending with a day summary and the road map. Each cow earns reputation by grade
+(a lame walk-off earns nothing; reputation never goes down), and reputation opens the next farm.
+Farms differ by housing: wet yards bring digital dermatitis, concrete brings ulcers and white-line
+abscesses, and later farms have front feet, longer growth and livelier cows. Dev params:
+`?farm=<id>` starts a visit at that farm, `?rep=n` sets the reputation, and `?cond=<id>&seed=n`
+is free play on one condition off the route.
+
 New players should pick **Guided first trim** on the opening card. It coaches the same case in
 13 small beats: each one picks the tool, outlines where to work, gives one instruction and shows
 a progress bar. **Lift the foot** plays it unguided.

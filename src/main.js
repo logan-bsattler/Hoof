@@ -1,5 +1,5 @@
 // Game bootstrap: state machine, input, and the frame loop.
-// title → intro → play → (failing → fail) | (walkoff → results)
+// title → route → visit → intro → play → (failing → fail) | (walkoff → results) → … → day → route
 
 import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
@@ -15,10 +15,12 @@ import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
+import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit } from './route.js';
 
-// The first run is the hand-built Case B; "Trim another" deals a fresh cow.
-// Dev aid: ?cond=<condition id>[&seed=n] starts on that condition instead, varied by any of
-// &foot=front &growth= &mud= &temper= &decoys= &size= &at= (see makeCase's mods).
+// The round starts at the first farm on the road, whose first cow is the hand-built Case B.
+// Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
+// deals fresh cows), varied by any of &foot=front &growth= &mud= &temper= &decoys= &size= &at=
+// (see makeCase's mods). ?farm=<id> starts a visit there; ?rep=n starts with that reputation.
 const devCase = new URLSearchParams(location.search);
 function devMods() {
   const num = (k) => (devCase.has(k) ? +devCase.get(k) : undefined);
@@ -28,7 +30,12 @@ function devMods() {
   };
   return Object.fromEntries(Object.entries(mods).filter(([, v]) => v !== undefined));
 }
-let caseDef = devCase.has('cond') ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_B;
+const freePlay = devCase.has('cond');
+let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_B;
+// The trimmer's round (route.js). Kept for this launch only until saving lands (WP7.7).
+const route = newRoute();
+if (devCase.has('rep')) route.rep = Math.max(0, +devCase.get('rep') || 0);
+let herd = [];         // the cows of the visit in progress, in order
 const canvas = document.getElementById('game');
 const renderer = new Renderer(canvas);
 const particles = new Particles();
@@ -114,7 +121,10 @@ function newCase() {
   particles.list = [];
   ui.setSteps(game.steps, caseDef);
   ui.setReadable(false);
-  document.getElementById('caseTitle').textContent = `Case ${caseDef.id} · ${caseDef.title} · ${caseDef.subtitle}`;
+  const v = route.visit;
+  document.getElementById('caseTitle').textContent = v
+    ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length} · ${caseDef.title} · ${caseDef.subtitle}`
+    : `Case ${caseDef.id} · ${caseDef.title} · ${caseDef.subtitle}`;
   selectTool('brush');
   document.body.classList.remove('steps-open');
 }
@@ -123,8 +133,9 @@ async function showIntro() {
   game.state = 'intro';
   newCase();
   const best = loadBest();
+  const v = route.visit;
   const mode = await ui.modal(
-    `<div class="eyebrow">Case ${caseDef.id} · Trimmer tier</div>
+    `<div class="eyebrow">${v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}` : `Case ${caseDef.id} · Trimmer tier`}</div>
      <h1>${caseDef.title}</h1>
      <p class="sub">${caseDef.subtitle}</p>
      <p>${caseDef.intro}</p>
@@ -578,28 +589,136 @@ async function showResults() {
       const v = Math.round(r.parts[key]);
       return `<div class="bar"><span>${label} <em>${w}%</em></span><div class="track"><div style="width:${v}%"></div></div><b>${v}</b></div>`;
     }).join('');
+  const earned = route.visit ? recordCow(route, caseDef, r) : null;
   await ui.modal(
-    `<div class="eyebrow">Trimmer’s ticket · Case ${caseDef.id}</div>
+    `<div class="eyebrow">Trimmer’s ticket · ${route.visit ? farmById(route.visit.farm).name : `Case ${caseDef.id}`}</div>
      <h1 class="grade ${r.medal}">${r.grade}</h1>
      <p class="sub">Score ${r.total} / 100 · walked off <b>${r.gait}</b>${newBest ? ' · <b>New best</b>' : ''}</p>
+     ${earned ? repLine(earned) : ''}
      ${bars}
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,
-    [{ id: 'again', label: 'Trim another', primary: true }],
+    [{ id: 'again', label: earned ? nextLabel(earned) : 'Trim another', primary: true }],
   );
+  if (earned) { nextCow(earned); return; }
   caseDef = dealCase((Math.random() * 1e9) >>> 0);
   showIntro();
 }
 
 async function showFail() {
   game.state = 'results';
+  const earned = route.visit ? recordCow(route, caseDef, { failed: true, grade: 'Failed', gait: 'lame' }) : null;
   await ui.modal(
     `<div class="eyebrow">Case failed</div>
      <h1 class="grade fail">Drew blood</h1>
      <p>You cut into the corium. She flinched, and the foot will be sore for weeks.</p>
+     ${earned ? repLine(earned) : ''}
      <p class="plan">Watch the pink tint and the mm gauge, and let the resistance tell you when to stop. When in doubt, leave it. Caution always beats aggression.</p>`,
-    [{ id: 'again', label: 'Try again', primary: true }],
+    [{ id: 'again', label: earned ? nextLabel(earned) : 'Try again', primary: true }],
   );
+  if (earned) { nextCow(earned); return; }
   showIntro();
+}
+
+// ---------------------------------------------------------------- the round
+
+// What this cow did for your name, on her ticket. Reputation only goes up.
+function repLine({ points, lame }) {
+  return lame
+    ? '<p class="rep-line lame">She’s going lame: no reputation for this one. The farmer will want her looked at again.</p>'
+    : `<p class="rep-line">+${points} reputation</p>`;
+}
+const nextLabel = ({ last }) => (last ? 'End of the day' : 'Next cow');
+
+function nextCow({ last }) {
+  if (last) { showDay(); return; }
+  caseDef = herd[route.visit.k];
+  showIntro();
+}
+
+// The day summary: every cow's grade and gait, and what the visit earned.
+async function showDay() {
+  game.state = 'results';
+  const d = endVisit(route);
+  Sound.step();
+  const rows = d.rows.map((r) => `<tr class="${r.lame ? 'lame' : ''}">
+      <td>${r.tag.replace('Holstein ', '')}</td><td>${r.title}</td><td>${r.grade}</td>
+      <td>${r.gait}</td><td class="pts">${r.lame ? '—' : `+${r.points}`}</td></tr>`).join('');
+  const flagged = d.rows.filter((r) => r.lame).length;
+  const opened = d.opened.map((f) => `<p class="rep-line">New on the road: <b>${f.name}</b> (${HOUSING[f.housing].toLowerCase()})</p>`).join('');
+  const next = nextLocked(route);
+  await ui.modal(
+    `<div class="eyebrow">End of the day · ${d.farm.name}</div>
+     <h1>+${d.earned} reputation</h1>
+     <p class="sub">Reputation ${d.before} → <b>${d.rep}</b>${next ? ` · ${next.name} opens at ${next.rep}` : ''}</p>
+     <table class="day"><thead><tr><th>Cow</th><th>Case</th><th>Grade</th><th>Walked</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+     ${d.bonus ? `<p class="rep-line">Whole herd walked off sound: +${d.bonus}</p>` : ''}
+     ${flagged ? `<p class="plan">${flagged === 1 ? 'One cow' : `${flagged} cows`} went off lame. ${d.farm.farmer[0].toUpperCase()}${d.farm.farmer.slice(1)} will want a second look next visit.</p>` : ''}
+     ${opened}`,
+    [{ id: 'road', label: 'Back on the road', primary: true }],
+  );
+  showRoute();
+}
+
+// The visit card: who the farmer is, what the yard is like, how many cows are waiting.
+async function showVisit(farm, { fromMap = true } = {}) {
+  game.state = 'modal';
+  const n = (route.visits[farm.id] ?? 0) + 1;
+  const pick = await ui.modal(
+    `<div class="eyebrow">${HOUSING[farm.housing]} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
+     <h1>${farm.name}</h1>
+     <p class="sub">${farm.farmer[0].toUpperCase()}${farm.farmer.slice(1)} · ${farm.cows} cows waiting</p>
+     <p>${farm.intro}</p>`,
+    fromMap
+      ? [{ id: 'go', label: 'Start the day', primary: true }, { id: 'back', label: 'Back to the road' }]
+      : [{ id: 'go', label: 'Start the day', primary: true }],
+  );
+  if (pick !== 'go') { showRoute(); return; }
+  herd = startVisit(route, farm.id);
+  caseDef = herd[0];
+  showIntro();
+}
+
+// The road: every farm in order, the open ones tappable, the locked ones showing what opens them.
+function showRoute() {
+  game.state = 'route';
+  stopHoldSounds();
+  const el = document.getElementById('route');
+  const next = nextLocked(route);
+  // The suggested stop: the furthest open farm you haven't worked yet, else the furthest open one.
+  const open = FARMS.filter((f) => isOpen(f, route.rep));
+  const suggest = [...open].reverse().find((f) => !route.visits[f.id]) ?? open[open.length - 1];
+  document.getElementById('routeRep').innerHTML = `Reputation <b>${route.rep}</b>` +
+    (next ? ` · ${next.name} opens at ${next.rep}` : ' · every farm on the road is open');
+  const list = document.getElementById('routeStops');
+  list.replaceChildren(...FARMS.map((f) => {
+    const li = document.createElement('li');
+    const on = isOpen(f, route.rep);
+    const visits = route.visits[f.id] ?? 0;
+    li.className = `stop ${on ? 'open' : 'locked'}${f === suggest ? ' suggest' : ''}${visits ? ' visited' : ''}`;
+    const meta = on
+      ? `${HOUSING[f.housing]} · ${f.cows} cows${visits ? ` · best day +${route.best[f.id]}` : ''}`
+      : `Opens at reputation ${f.rep}`;
+    li.innerHTML = `<button ${on ? '' : 'disabled'}><span class="pin" aria-hidden="true"></span>
+      <span class="stop-name">${f.name}</span><span class="stop-meta">${meta}</span></button>`;
+    if (on) {
+      li.querySelector('button').addEventListener('click', () => {
+        el.hidden = true;
+        showVisit(f);
+      });
+    }
+    return li;
+  }));
+  el.hidden = false;
+  list.querySelector('.suggest')?.scrollIntoView({ block: 'center' });
+  list.querySelector('.suggest button')?.focus({ preventScroll: true });
+}
+
+// After the title: free play on a dev case, a visit to ?farm, or the first farm on the road.
+function begin() {
+  if (freePlay) { showIntro(); return; }
+  const dev = farmById(devCase.get('farm'));
+  if (dev && isOpen(dev, route.rep)) { showVisit(dev, { fromMap: false }); return; }
+  showVisit(FARMS[0], { fromMap: false });
 }
 
 // --------------------------------------------------------------------- loop
@@ -628,8 +747,9 @@ function frame(now) {
   last = now;
   game.time += dt;
   game.shake = Math.max(0, game.shake - dt * 25);
-  // No case is dealt until the title card is tapped; the card covers the canvas meanwhile.
-  if (game.state === 'title') { requestAnimationFrame(frame); return; }
+  // No case is dealt until the title card is tapped, and the road map covers the canvas between visits.
+  // The first visit card also comes up before any cow is in the crush.
+  if (game.state === 'title' || game.state === 'route' || !game.session) { requestAnimationFrame(frame); return; }
 
   if (game.state === 'play') {
     const ptr = game.ptr;
@@ -789,8 +909,8 @@ function showTitle() {
 }
 
 // Dev aid: ?debug exposes the game state and renderer (its .cam maps logical ↔ screen) in the console.
-if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { hoofGame: game, hoofRenderer: renderer });
+if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { hoofGame: game, hoofRenderer: renderer, hoofRoute: route, hoofRound: { showRoute, showDay, recordCow: (r) => recordCow(route, caseDef, r), nextCow } });
 
 resize();
-showTitle().then(showIntro);
+showTitle().then(begin);
 requestAnimationFrame(frame);
