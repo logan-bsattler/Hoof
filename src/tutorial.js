@@ -2,11 +2,11 @@
 // names a tool, highlights where to work, says what to do, and shows progress.
 // Pure data + predicates over hoof metrics — no DOM, so it can be tested.
 
-import { CFG } from './config.js';
+import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, GEOM, clawBox, clawWhere, dishRect, soundClaw } from './hoof.js';
 import { STEPS } from './steps.js';
 
-const { target: T, dishTarget: D, tolerance: TOL } = CFG.sole;
+const { target: T, dishTarget: D } = CFG.sole;
 const step = (id) => STEPS.find((s) => s.id === id).done;
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -28,6 +28,7 @@ export function tutorialBeats(caseDef) {
   const where = (c) => clawWhere(c, side);
   const inner = (m) => m.claws[CLAW.INNER];
   const outer = (m) => m.claws[CLAW.OUTER];
+  const TOL = tolOf(caseDef);
   return [
     {
       id: 'clean', tool: 'brush', title: 'Clean the foot',

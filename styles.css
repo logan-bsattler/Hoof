@@ -430,6 +430,8 @@ body.tutorial #stepTip { display: none; }
 }
 .stop-name { font-weight: 700; font-size: 15px; }
 .stop-meta { font-size: 12px; color: var(--muted); }
+.stop-tier { grid-column: 2; font-size: 11px; color: var(--brass); letter-spacing: 0.04em; }
+#routeRep .tier { font-size: 12px; color: var(--brass); }
 .stop.visited .pin { background: var(--sound); border-color: var(--sound); }
 .stop.suggest button { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass) inset; }
 .stop.suggest .pin { border-color: var(--brass); }

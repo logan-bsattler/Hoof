@@ -719,3 +719,13 @@ test('a blade near thin living sole reports how thin it got (the flinch reads it
   for (let k = 0; k < 400; k++) { ev = applyGrind(hoof, 280, 400, 1 / 60); if (ev.minLive < 4) break; }
   assert.ok(ev.minLive < 4 && ev.minLive > 0, `minLive ${ev.minLive}`);
 });
+
+// WP7.6: the steps read the case's band, not the fixed one.
+test('a wider band (the apprentice tier) counts a claw at 7.9 mm as levelled', () => {
+  const wide = { ...CASE_B, tolerance: 1.0 };
+  const step1 = stepsFor(CASE_B).find((s) => s.id === 'step1');
+  const k = (wb) => ({ deadRemain: 0, wbMean: wb });
+  const m = (wb) => ({ claws: { [CLAW.INNER]: k(wb), [CLAW.OUTER]: k(wb) } });
+  assert.equal(step1.done(m(7.9), null, { caseDef: CASE_B }), false);
+  assert.equal(step1.done(m(7.9), null, { caseDef: wide }), true);
+});

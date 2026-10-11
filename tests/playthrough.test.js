@@ -227,3 +227,12 @@ test('a careless player holding the grinder still on one sole spot draws blood w
   assert.ok(blood, 'still no blood after 6 s');
   console.log(`careless grinder: blood after ${t.toFixed(2)} s`);
 });
+
+// WP7.6: the apprentice's wider band stops the steps a little higher; it must still be Textbook.
+test('the careful player reaches Textbook at every tier’s band, on every condition', async () => {
+  const { TIERS } = await import('../src/route.js');
+  for (const t of TIERS) {
+    for (const id of Object.keys(CONDITIONS)) for (const seed of [1, 2]) playthrough({ ...makeCase(id, seed), tolerance: t.tolerance }, true);
+  }
+  playthrough({ ...CASE_B, tolerance: TIERS[0].tolerance }, true);
+});

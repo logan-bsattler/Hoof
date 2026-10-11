@@ -31,6 +31,7 @@ export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.tol = CFG.sole.tolerance; // the case's on-target band (main.js sets it per cow)
     this.k = 1;
     this.cssScale = 1; // CSS px per logical px
     this.cam = fitCamera(W, H);
@@ -380,7 +381,7 @@ export class Renderer {
   stripMeter(m, side, clean) {
     const c = this.ctx;
     const { cssW: cw, hudH: hh } = this.cam;
-    const T = CFG.sole.target, tol = CFG.sole.tolerance;
+    const T = CFG.sole.target, tol = this.tol;
     const [lc, rc] = clawSide(CLAW.OUTER, side) < 0 ? [CLAW.OUTER, CLAW.INNER] : [CLAW.INNER, CLAW.OUTER];
     const name = (k) => (k === CLAW.OUTER ? 'OUTER' : 'INNER');
     const left = m.claws[lc].wbMean, right = m.claws[rc].wbMean;
@@ -441,7 +442,7 @@ export class Renderer {
   gauge(c, x, y, v, deadRemain) {
     const h = 46, max = 15;
     const ty = (mm) => y + h - (Math.min(max, mm) / max) * h;
-    const { target: T, tolerance: tol } = CFG.sole;
+    const T = CFG.sole.target, tol = this.tol;
     c.fillStyle = 'rgba(255,255,255,0.08)';
     c.fillRect(x, y, 16, h);
     c.fillStyle = 'rgba(123,191,106,0.45)';
@@ -498,7 +499,7 @@ export class Renderer {
         const tgt = hoof.zoneTarget(i);
         const dirty = hoof.mud[i] > 0.35;
         const txt = dirty ? '— mm' : `${t.toFixed(1)} mm`;
-        const col = dirty ? '#999' : t < CFG.sole.thin ? '#ff6b5b' : Math.abs(t - tgt) <= CFG.sole.tolerance ? '#7bbf6a' : t > tgt ? '#d8a64a' : '#f0a090';
+        const col = dirty ? '#999' : t < CFG.sole.thin ? '#ff6b5b' : Math.abs(t - tgt) <= this.tol ? '#7bbf6a' : t > tgt ? '#d8a64a' : '#f0a090';
         const fs = this.font(11, true);
         const tw = c.measureText(txt).width + 10;
         const flip = ptr.touch && CFG.touch.leftHanded; // keep the gauge away from the finger

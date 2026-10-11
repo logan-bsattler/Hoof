@@ -9,7 +9,7 @@ import { CFG } from '../src/config.js';
 import {
   FARMS, HOUSING, POINTS, HERD_BONUS, farmMods, visitCases, cowSeed, cowPoints,
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
-  farmCows, healedBack, backLine,
+  farmCows, healedBack, backLine, TIERS, tierFor, tierMods,
 } from '../src/route.js';
 import { Hoof } from '../src/hoof.js';
 
@@ -256,4 +256,47 @@ test('return cows build on every farm, visit after visit, whatever went lame', (
       if (day > 1) assert.ok(herd.some((cd) => cd.back), `${farm.name} day ${day}: some cows come back`);
     }
   }
+});
+
+// ------------------------------------------------------------------ WP7.6 difficulty ramp
+
+test('tiers: the help turns down with reputation, each step opening with a farm, ending at today’s band', () => {
+  assert.equal(TIERS[0].rep, 0);
+  assert.deepEqual(TIERS.map((t) => t.guides), ['on', 'mistake', 'off']);
+  for (let k = 1; k < TIERS.length; k++) {
+    assert.ok(TIERS[k].rep > TIERS[k - 1].rep);
+    assert.ok(TIERS[k].tolerance < TIERS[k - 1].tolerance, 'the band narrows');
+    assert.ok(TIERS[k].temper >= TIERS[k - 1].temper, 'cows get livelier');
+    assert.ok(FARMS.some((f) => f.rep === TIERS[k].rep), `${TIERS[k].name} opens with a farm`);
+  }
+  assert.equal(TIERS[TIERS.length - 1].tolerance, CFG.sole.tolerance);
+  assert.equal(tierFor(0).id, 'apprentice');
+  assert.equal(tierFor(TIERS[1].rep - 1).id, 'apprentice');
+  assert.equal(tierFor(TIERS[1].rep).id, 'journeyman');
+  assert.equal(tierFor(9999).id, 'master');
+});
+
+test('tierMods: calmer cows and an extra decoy early, livelier later, inside 0..1', () => {
+  const mods = { foot: 'hind', growth: 1, mud: 1, temper: 0.05 };
+  assert.equal(tierMods(null, mods), mods);
+  const early = tierMods(TIERS[0], mods);
+  assert.equal(early.temper, 0, 'clamped at calm');
+  assert.equal(early.decoyCount, 3);
+  assert.equal(tierMods(TIERS[0], { ...mods, decoyCount: 1 }).decoyCount, 2);
+  const late = tierMods(TIERS[2], { ...mods, temper: 0.97 });
+  assert.equal(late.temper, 1, 'clamped at lively');
+  assert.equal(late.decoyCount, undefined);
+});
+
+test('a visit deals its cows with the tier’s band; Case B itself is never changed', () => {
+  const route = newRoute();
+  const herd = startVisit(route, FARMS[0].id);
+  assert.ok(herd.every((cd) => cd.tolerance === TIERS[0].tolerance));
+  assert.equal(tag(herd[0]), tag(CASE_B));
+  assert.equal(CASE_B.tolerance, undefined);
+  route.visit = null;
+  route.rep = 300;
+  assert.ok(startVisit(route, FARMS[4].id).every((cd) => cd.tolerance === TIERS[2].tolerance));
+  // The tier leans the fresh cows only: with no tier the herd is as before.
+  assert.deepEqual(visitCases(FARMS[1], 1).map(tag), visitCases(FARMS[1], 1, [], TIERS[0]).map(tag));
 });

@@ -1,7 +1,7 @@
 // Game bootstrap: state machine, input, and the frame loop.
 // title → route → visit → intro → play → (failing → fail) | (walkoff → results) → … → day → route
 
-import { CFG, touchAngle } from './config.js';
+import { CFG, touchAngle, tolOf } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_B, dealCase, makeCase, temperament } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
@@ -15,7 +15,7 @@ import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
-import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit, farmCows, backLine, visitCases } from './route.js';
+import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
@@ -70,10 +70,22 @@ const ui = new UI({
   onTool: (id) => selectTool(id),
   onRelease: () => requestRelease(),
   onRead: () => { if (game.state === 'play' && !game.session.diagnosis) diagnose(); },
-  onToggleGuides: () => { game.guides = !game.guides; ui.setToggle('btnGuides', game.guides); },
+  onToggleGuides: () => setGuides(!game.guides),
   onToggleSound: () => { game.sound = !game.sound; Sound.setEnabled(game.sound); ui.setToggle('btnSound', game.sound); },
   onToggleLefty: () => setLefty(!CFG.touch.leftHanded),
 });
+
+function setGuides(on) {
+  game.guides = on;
+  ui.setToggle('btnGuides', on);
+}
+
+// A slip with this cow: at the 'mistake' tier the guides come on for the rest of her trim.
+function slip() {
+  if (game.guideMode !== 'mistake' || game.guides) return;
+  setGuides(true);
+  setTimeout(() => { if (game.state === 'play') ui.toast('Guides on for the rest of this one.', 'info', 2600); }, 3300);
+}
 
 // Left-handed touch grip, remembered on this device.
 function setLefty(on) {
@@ -108,6 +120,10 @@ function newCase() {
   game.walkoff = null;
   game.result = null;
   game.weepT = 0;
+  // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
+  renderer.tol = tolOf(caseDef);
+  game.guideMode = route.visit ? tierFor(route.rep).guides : null;
+  if (game.guideMode) setGuides(game.guideMode === 'on');
   game.found = [];      // marks the testers have read this case, in order
   game.temper = temperament(caseDef.temper);
   game.fidgetT = game.temper.fidgetEvery * (0.6 + Math.random() * 0.8);
@@ -420,7 +436,9 @@ function placeBlock(claw) {
     ui.toast(`That’s the sore claw! The block goes on the SOUND claw so the ${caseDef.noun} can rest.`, 'warn', 4000);
   } else {
     ui.toast(`Block glued to the sound ${CLAW_NAME[claw]} claw. The ${caseDef.noun} is off the ground now.`, 'good');
+    return;
   }
+  slip();
 }
 
 // The pressure-release beat, once per cow: the ulcer opened or the abscess drained.
@@ -460,7 +478,7 @@ function warnOnce(key, msg, kind = 'warn', gap = 4) {
   if ((game.lastWarn[key] ?? -99) + gap > game.time) return;
   game.lastWarn[key] = game.time;
   ui.toast(msg, kind, 3200);
-  if (kind === 'warn') { Sound.warn(); buzz([20, 30, 20]); }
+  if (kind === 'warn') { Sound.warn(); buzz([20, 30, 20]); slip(); }
 }
 
 // Turn tool events into feedback, log entries, and failure.
@@ -540,6 +558,7 @@ function nick(x, y) {
   buzz([40, 30, 60]);
   particles.spawn('blood', x, y, '#c0101c', 1);
   ui.toast('She felt that. One more and you’re done.', 'warn', 3600);
+  slip();
 }
 
 function fail(x, y) {
@@ -696,8 +715,10 @@ function showRoute() {
   // The suggested stop: the furthest open farm you haven't worked yet, else the furthest open one.
   const open = FARMS.filter((f) => isOpen(f, route.rep));
   const suggest = [...open].reverse().find((f) => !route.visits[f.id]) ?? open[open.length - 1];
+  const tier = tierFor(route.rep);
   document.getElementById('routeRep').innerHTML = `Reputation <b>${route.rep}</b>` +
-    (next ? ` · ${next.name} opens at ${next.rep}` : ' · every farm on the road is open');
+    (next ? ` · ${next.name} opens at ${next.rep}` : ' · every farm on the road is open') +
+    `<br><span class="tier">${tier.name} · ${GUIDES_TEXT[tier.guides].toLowerCase()} · ±${tier.tolerance.toFixed(2)} mm band</span>`;
   const list = document.getElementById('routeStops');
   list.replaceChildren(...FARMS.map((f) => {
     const li = document.createElement('li');
@@ -708,8 +729,11 @@ function showRoute() {
     const meta = on
       ? `${HOUSING[f.housing]} · ${f.cows} cows${visits ? ` · best day +${route.best[f.id]}` : ''}${sore ? ` · ${sore} to recheck` : ''}`
       : `Opens at reputation ${f.rep}`;
+    // Where the help turns down: the farm each tier opens with.
+    const step = TIERS.find((t) => t.rep > 0 && t.rep === f.rep);
+    const from = step ? `<span class="stop-tier">${GUIDES_TEXT[step.guides]} from here</span>` : '';
     li.innerHTML = `<button ${on ? '' : 'disabled'}><span class="pin" aria-hidden="true"></span>
-      <span class="stop-name">${f.name}</span><span class="stop-meta">${meta}</span></button>`;
+      <span class="stop-name">${f.name}</span><span class="stop-meta">${meta}</span>${from}</button>`;
     if (on) {
       li.querySelector('button').addEventListener('click', () => {
         el.hidden = true;

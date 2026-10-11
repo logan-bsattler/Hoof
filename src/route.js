@@ -66,6 +66,28 @@ export const FARMS = [
   },
 ];
 
+// ------------------------------------------------------------------ difficulty tiers (WP7.6)
+// The help turns down with reputation, never with a menu. Each tier opens with a farm, so the
+// road map can say "from here". `guides`: 'on' from the start, 'mistake' (they come on after
+// your first slip with that cow) or 'off'. `tolerance` is the on-target band in mm (today's 0.75
+// at the top). New cows lean calmer, with an extra decoy to read, early on; livelier later.
+export const TIERS = [
+  { id: 'apprentice', name: 'Apprentice', rep: 0, guides: 'on', tolerance: 1.0, temper: -0.1, decoys: 1 },
+  { id: 'journeyman', name: 'Journeyman', rep: 100, guides: 'mistake', tolerance: 0.85, temper: 0, decoys: 0 },
+  { id: 'master', name: 'Master trimmer', rep: 270, guides: 'off', tolerance: 0.75, temper: 0.1, decoys: 0 },
+];
+export const GUIDES_TEXT = { on: 'Guides on', mistake: 'Guides only after a slip', off: 'Guides off' };
+
+export const tierFor = (rep) => [...TIERS].reverse().find((t) => rep >= t.rep);
+
+// A fresh cow's mods, leaned by the tier. Returning cows keep their own temperament.
+export function tierMods(tier, mods) {
+  if (!tier) return mods;
+  const out = { ...mods, temper: Math.min(1, Math.max(0, mods.temper + tier.temper)) };
+  if (tier.decoys) out.decoyCount = (mods.decoyCount ?? 2) + tier.decoys;
+  return out;
+}
+
 export const farmById = (id) => FARMS.find((f) => f.id === id);
 export const isOpen = (farm, rep) => rep >= farm.rep;
 
@@ -157,7 +179,7 @@ export function backLine(cd) {
 
 // The cows of one visit, in order: anyone coming back first, then fresh cows. Ear tags are
 // unique within the visit, and a fresh cow never wears a tag already trimmed at this farm.
-export function visitCases(farm, visit = 1, history = []) {
+export function visitCases(farm, visit = 1, history = [], tier = null) {
   const back = returningCows(farm, visit, history);
   const cases = back.map((h, k) => returnCase(farm, h, visit, k));
   const tags = new Set(history.filter((h) => h.farm === farm.id).map((h) => h.tag));
@@ -168,13 +190,14 @@ export function visitCases(farm, visit = 1, history = []) {
     else {
       const seed = cowSeed(farm, visit, k);
       const { condition, mods } = farmMods(farm, seed);
-      cd = makeCase(condition, seed, mods);
+      cd = makeCase(condition, seed, tierMods(tier, mods));
     }
     if (tags.has(cd.subtitle.split(' · ')[0])) continue;
     tags.add(cd.subtitle.split(' · ')[0]);
     cases.push(cd);
   }
-  return cases;
+  // The tier's band rides on each cow (a copy, so Case B itself is never changed).
+  return tier ? cases.map((cd) => ({ ...cd, tolerance: tier.tolerance })) : cases;
 }
 
 // What one cow earns. Lame (or blood) earns nothing and flags her for the return visit.
@@ -205,7 +228,7 @@ export function startVisit(route, farmId) {
   if (!farm) throw new Error(`Unknown farm: ${farmId}`);
   if (!isOpen(farm, route.rep)) throw new Error(`${farm.name} needs reputation ${farm.rep}`);
   route.visit = { farm: farmId, n: (route.visits[farmId] ?? 0) + 1, k: 0, rows: [] };
-  return visitCases(farm, route.visit.n, route.history);
+  return visitCases(farm, route.visit.n, route.history, tierFor(route.rep));
 }
 
 // Record the current cow's result and move to the next. Points land at the end of the day.

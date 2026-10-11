@@ -1,7 +1,7 @@
 // Grade a finished hoof on Balance / Correctness / Restraint / Finish.
 // Speed is deliberately absent. Pure function of metrics + session log.
 
-import { CFG } from './config.js';
+import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, Z, distToPath, firstClaw, secondClaw, soundClaw } from './hoof.js';
 
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
@@ -84,7 +84,10 @@ export function scoreCase(m, session, hoof, caseDef) {
 
   // Balance: level claws, right height, toe length, heel preserved.
   const level = ramp(Math.abs(m.levelDiff), 0.3, 3);
-  const height = (ramp(Math.abs(inner.wbMean - T), 0.4, 3) + ramp(Math.abs(outer.wbMean - T), 0.4, 3)) / 2;
+  // A wider band early on the route (WP7.6) widens the full-marks height by the same slack.
+  const slack = Math.max(0, tolOf(caseDef) - CFG.sole.tolerance);
+  const off = (k) => ramp(Math.abs(k.wbMean - T), 0.4 + slack, 3 + slack);
+  const height = (off(inner) + off(outer)) / 2;
   const toe = 100 * (1 - (inner.deadRemain + outer.deadRemain) / 2);
   const heel = ramp(m.heelRemovedMean, 0.3, 2);
   const balance = 0.4 * level + 0.3 * height + 0.2 * toe + 0.1 * heel;
@@ -138,7 +141,7 @@ export function scoreCase(m, session, hoof, caseDef) {
     if (k.wbMean < CFG.sole.thin) {
       clawOver += 40;
       notes.push(`${name} claw ground to ${k.wbMean.toFixed(1)} mm: dangerously thin sole.`);
-    } else if (k.wbMean < T - CFG.sole.tolerance) {
+    } else if (k.wbMean < T - tolOf(caseDef)) {
       clawOver += 15;
       notes.push(`${name} claw over-trimmed to ${k.wbMean.toFixed(1)} mm (target ~${T}). Err on the side of caution.`);
     }

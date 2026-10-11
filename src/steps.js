@@ -3,15 +3,15 @@
 // function of the case for copy that names a claw (read it through stepTip); so is a label
 // (stepLabel). Steps 1 and 2 follow the foot: inner claw first on a hind foot, outer on a front.
 
-import { CFG } from './config.js';
+import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, firstClaw, secondClaw, soundClaw } from './hoof.js';
 
-const { target: T, dishTarget: D, tolerance: TOL } = CFG.sole;
+const { target: T, dishTarget: D } = CFG.sole;
 
 // One-sided on purpose: horn can't be put back, so an over-trimmed claw must
 // still let the case progress. Over-trimming is charged in scoring instead.
 const cap = (w) => w[0].toUpperCase() + w.slice(1);
-const levelled = (k) => k.deadRemain < 0.12 && k.wbMean <= T + TOL;
+const levelled = (k, cd) => k.deadRemain < 0.12 && k.wbMean <= T + tolOf(cd);
 
 export const STEPS = [
   {
@@ -27,18 +27,18 @@ export const STEPS = [
   {
     id: 'step1', label: (cd) => `1 · Trim the first (${CLAW_NAME[firstClaw(cd)]}) claw`, tool: 'nippers',
     tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.`,
-    done: (m, s, hoof) => levelled(m.claws[firstClaw(hoof?.caseDef)]),
+    done: (m, s, hoof) => levelled(m.claws[firstClaw(hoof?.caseDef)], hoof?.caseDef),
   },
   {
     id: 'step2', label: (cd) => `2 · Match the ${CLAW_NAME[secondClaw(cd)]} claw`, tool: 'grinder',
     tip: (cd) => `Bring the ${CLAW_NAME[secondClaw(cd)]} claw down to match the ${CLAW_NAME[firstClaw(cd)]}. Watch the balance beam: level is the goal.`,
     // Match the second claw to the first claw's actual height, not the fixed target.
-    done: (m, s, hoof) => levelled(m.claws[secondClaw(hoof?.caseDef)]) && Math.abs(m.levelDiff) <= 0.6,
+    done: (m, s, hoof) => levelled(m.claws[secondClaw(hoof?.caseDef)], hoof?.caseDef) && Math.abs(m.levelDiff) <= 0.6,
   },
   {
     id: 'step3', label: '3 · Dish out both claws', tool: 'knife',
     tip: (cd) => `With the knife, carve the dish along the inner edge of each claw (dashed channel) so weight comes off ${cd.lesion?.type === 'ulcer' ? 'the ulcer site' : 'the sole/heel junction, where ulcers start'}. Stay out of the toe triangle.`,
-    done: (m) => m.claws[CLAW.INNER].dishMean <= D + TOL && m.claws[CLAW.OUTER].dishMean <= D + TOL,
+    done: (m, s, hoof) => Math.max(m.claws[CLAW.INNER].dishMean, m.claws[CLAW.OUTER].dishMean) <= D + tolOf(hoof?.caseDef),
   },
   // The rasp trues up the sole before the block goes on and covers one claw.
   {

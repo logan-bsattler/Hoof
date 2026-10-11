@@ -380,6 +380,9 @@ Turn the help down with reputation, not with menus:
 
 Show the current tier on the route map ("Guides: off from here").
 
+**Status (2026-10-11): done, tests 91/91.** route.js `TIERS`, each opening with a farm: Apprentice (rep 0: guides on, ±1.0 mm band, new cows temper −0.1 and one extra decoy), Journeyman (100, Brackenford: guides only after a slip, ±0.85), Master trimmer (270, Marsh End: guides off, ±0.75, which is today's band, temper +0.1). `tierFor(rep)`; `tierMods` leans fresh cows only (returning cows keep their temperament); `visitCases(..., tier)` puts `tolerance` on copies of each case (Case B itself stays untouched). `tolOf(caseDef)` in config.js feeds the step checks (levelled, dish), the tutorial goals, the over-trim check, the gauges and cursor pill (`renderer.tol`), and Balance's height ramp, which widens its full-marks zone by the extra slack so stopping at the green band's edge isn't penalised. main.js: on the route each cow's guides follow the tier (the chip still overrides); at the 'mistake' tier any warn toast, a nick or a wrong block turns them on for that cow (`slip()`). The road map header shows the tier, its guides and band; Brackenford and Marsh End carry "… from here". `sw.js` v14. Tests: tier order and thresholds, tierMods clamping, the herd's band, step1 at 7.9 mm under both bands, and the bot at Textbook on every condition at every tier's band. Browser: at rep 120 the header reads Journeyman, both stops are marked, and a Brackenford cow starts with guides off at ±0.85.
+Not yet felt in play: whether the 'slip' trigger is too eager (thin-sole warnings count). Tune in Ben's playtest.
+
 ### 7.7 Saving progress
 - Save to `localStorage` under one versioned key: reputation, unlocked farms, cow history, best grade per farm, and tier.
 - Wrap every read and write in try/catch. If storage is blocked or cleared, the game still starts at farm 1.

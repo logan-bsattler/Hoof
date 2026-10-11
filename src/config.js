@@ -1,5 +1,8 @@
 // Central tunables. Everything that changes how the game *feels* lives here.
 
+// The on-target band (mm) for a case: wider early on the route (WP7.6), else CFG.sole.tolerance.
+export const tolOf = (caseDef) => caseDef?.tolerance ?? CFG.sole.tolerance;
+
 // Tip → handle direction for touch, mirrored for left-handed players.
 export const touchAngle = () => (CFG.touch.leftHanded ? Math.PI - CFG.touch.angle : CFG.touch.angle);
 
