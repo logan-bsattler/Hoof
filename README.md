@@ -97,7 +97,10 @@ The game is played as a trimmer's round: a road of seven farms, each visit a fix
 farm's cows (3–6), ending with a day summary and the road map. Each cow earns reputation by grade
 (a lame walk-off earns nothing; reputation never goes down), and reputation opens the next farm.
 Farms differ by housing: wet yards bring digital dermatitis, concrete brings ulcers and white-line
-abscesses, and later farms have front feet, longer growth and livelier cows. Dev params:
+abscesses, and later farms have front feet, longer growth and livelier cows. On a return visit
+some cows come back by ear tag: a cow that went off lame is a recheck (same foot, the lesion a
+little worse, her points to earn this time), and a few that walked off well are back healed for a
+routine trim. Dev params:
 `?farm=<id>` starts a visit at that farm, `?rep=n` sets the reputation, and `?cond=<id>&seed=n`
 is free play on one condition off the route.
 

@@ -6,7 +6,8 @@
 // grow sole ulcers and white-line disease; wet slurry breeds digital dermatitis; grazing cows
 // wear their feet down and come in cleaner, with the odd stone bruise or white-line track.
 
-import { CASE_B, makeCase } from './case.js';
+import { CASE_B, CASE_B_MODS, makeCase } from './case.js';
+import { CONDITIONS } from './conditions.js';
 import { mulberry32 } from './noise.js';
 
 export const HOUSING = {
@@ -30,7 +31,7 @@ export const FARMS = [
     intro: 'Ruth keeps a dozen old Holsteins on deep straw. She’ll show you round: a quiet herd to learn on.',
     mix: { ulcer: 0.5, routine: 0.5 }, growth: [0.85, 1.1], mud: [0.7, 1.0], temper: [0.1, 0.35], front: 0,
     // The first cow is the hand-built sole ulcer, with the guided trim on offer.
-    first: CASE_B,
+    first: CASE_B, firstMods: CASE_B_MODS,
   },
   {
     id: 'hollins', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30,
@@ -94,10 +95,73 @@ export function farmMods(farm, seed) {
   return { condition, mods };
 }
 
-// The cows of one visit, in order. Ear tags are unique within the visit.
-export function visitCases(farm, visit = 1) {
-  const cases = [];
-  const tags = new Set();
+// ------------------------------------------------------------------ return visits (WP7.5)
+// A few months on, some of the farm's cows come back by ear tag. A cow that went off lame is a
+// recheck: the same foot, the lesion where it was but a little worse, and her points to earn
+// this time. A cow that walked off well has healed, and is back for her next routine trim.
+
+// The latest record of every cow trimmed at this farm, in the order first seen.
+export function farmCows(history, farmId) {
+  const last = new Map();
+  for (const h of history) if (h.farm === farmId) last.set(h.tag, h);
+  return [...last.values()];
+}
+
+// Healed cows that come back on a return visit, besides every recheck.
+export const healedBack = (farm) => Math.max(1, Math.floor(farm.cows / 3));
+
+// Who comes back on visit `visit`: every cow still lame, then a few healed ones, picked
+// from the visit's own seed. Never more than the herd.
+export function returningCows(farm, visit, history) {
+  if (visit < 2) return [];
+  const cows = farmCows(history, farm.id);
+  const well = cows.filter((h) => !h.lame);
+  const rand = mulberry32(cowSeed(farm, visit, 999));
+  const healed = [];
+  while (well.length && healed.length < healedBack(farm)) healed.push(well.splice(Math.floor(rand() * well.length), 1)[0]);
+  return [...cows.filter((h) => h.lame), ...healed].slice(0, farm.cows);
+}
+
+// One cow back again, from her last record. She keeps her tag, foot and temperament; the
+// horn and muck are this visit's.
+export function returnCase(farm, h, visit, k) {
+  const now = farmMods(farm, cowSeed(farm, visit, 100 + k)).mods;
+  const { excess: _e, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
+  const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
+  if (base.temper !== undefined) cow.temper = base.temper;
+  const back = { visit: h.visit, grade: h.grade, was: h.condition };
+  if (!h.lame) {
+    if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
+    return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: 'healed' } };
+  }
+  // Recheck: the lesion has spread to the top of its band (a hand-placed one grows 2 px).
+  const worse = base.lesion ? { lesion: { ...base.lesion, r: base.lesion.r + 2 } } : { lesionSize: 1 };
+  return { ...makeCase(h.condition, h.seed, { ...base, ...cow, ...worse }), back: { ...back, outcome: 'recheck' } };
+}
+
+// What the intro says about last time, for a cow that's been trimmed here before.
+export function backLine(cd) {
+  const b = cd.back;
+  if (!b) return '';
+  const was = CONDITIONS[b.was];
+  const last = `Visit ${b.visit}: ${b.grade}`;
+  if (b.outcome === 'recheck') {
+    return was.diagnosis === 'sound'
+      ? `Back for a recheck. ${last}, and she went off sore. Go gently this time and she earns her points.`
+      : `Back for a recheck. ${last}, and she went off lame. The ${cd.noun} has got worse since: put it right and she earns her points this time.`;
+  }
+  return was.diagnosis === 'sound'
+    ? `You trimmed her on visit ${b.visit} (${b.grade}). She’s stayed sound: just due her trim.`
+    : `${last} on the ${was.noun ?? 'lesion'}. It’s healed: she’s just due her trim.`;
+}
+
+// The cows of one visit, in order: anyone coming back first, then fresh cows. Ear tags are
+// unique within the visit, and a fresh cow never wears a tag already trimmed at this farm.
+export function visitCases(farm, visit = 1, history = []) {
+  const back = returningCows(farm, visit, history);
+  const cases = back.map((h, k) => returnCase(farm, h, visit, k));
+  const tags = new Set(history.filter((h) => h.farm === farm.id).map((h) => h.tag));
+  for (const cd of cases) tags.add(cd.subtitle.split(' · ')[0]);
   for (let k = 0; cases.length < farm.cows; k++) {
     let cd;
     if (k === 0 && visit === 1 && farm.first) cd = farm.first;
@@ -124,7 +188,8 @@ export function cowPoints(result) {
 //   rep       reputation earned so far
 //   visits    { farmId: visits finished }
 //   best      { farmId: best day's earnings }
-//   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame }
+//   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame,
+//             back } where back is 'recheck', 'healed' or null for a cow new to the farm
 //   visit     the day in progress, or null: { farm, n, k, rows }
 
 export function newRoute() {
@@ -140,7 +205,7 @@ export function startVisit(route, farmId) {
   if (!farm) throw new Error(`Unknown farm: ${farmId}`);
   if (!isOpen(farm, route.rep)) throw new Error(`${farm.name} needs reputation ${farm.rep}`);
   route.visit = { farm: farmId, n: (route.visits[farmId] ?? 0) + 1, k: 0, rows: [] };
-  return visitCases(farm, route.visit.n);
+  return visitCases(farm, route.visit.n, route.history);
 }
 
 // Record the current cow's result and move to the next. Points land at the end of the day.
@@ -148,13 +213,14 @@ export function recordCow(route, caseDef, result) {
   const v = route.visit;
   const { points, lame } = cowPoints(result);
   const tag = caseDef.subtitle.split(' · ')[0];
-  v.rows.push({ tag, title: caseDef.title, grade: result.grade, gait: result.failed ? 'lame' : result.gait, points, lame });
+  const back = caseDef.back?.outcome ?? null;
+  v.rows.push({ tag, title: caseDef.title, grade: result.grade, gait: result.failed ? 'lame' : result.gait, points, lame, back });
   route.history.push({
     farm: v.farm, visit: v.n, tag, seed: caseDef.seed, condition: caseDef.condition,
-    foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame,
+    foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back,
   });
   v.k++;
-  return { points, lame, last: v.k >= farmById(v.farm).cows };
+  return { points, lame, back, last: v.k >= farmById(v.farm).cows };
 }
 
 // Close the day: bank the reputation and say what opened up.
@@ -169,5 +235,7 @@ export function endVisit(route) {
   route.best[v.farm] = Math.max(route.best[v.farm] ?? 0, earned);
   route.visit = null;
   const opened = FARMS.filter((f) => f.rep > before && f.rep <= route.rep);
-  return { farm, rows: v.rows, herdSound, bonus: herdSound ? HERD_BONUS : 0, earned, before, rep: route.rep, opened };
+  // Rechecks that walked off sound this time.
+  const mended = v.rows.filter((r) => r.back === 'recheck' && !r.lame).map((r) => r.tag);
+  return { farm, rows: v.rows, herdSound, mended, bonus: herdSound ? HERD_BONUS : 0, earned, before, rep: route.rep, opened };
 }

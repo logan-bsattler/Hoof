@@ -15,7 +15,7 @@ import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
-import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit } from './route.js';
+import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit, farmCows, backLine, visitCases } from './route.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
@@ -135,9 +135,10 @@ async function showIntro() {
   const best = loadBest();
   const v = route.visit;
   const mode = await ui.modal(
-    `<div class="eyebrow">${v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}` : `Case ${caseDef.id} · Trimmer tier`}</div>
+    `<div class="eyebrow">${v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}${caseDef.back?.outcome === 'recheck' ? ' · Recheck' : ''}` : `Case ${caseDef.id} · Trimmer tier`}</div>
      <h1>${caseDef.title}</h1>
      <p class="sub">${caseDef.subtitle}</p>
+     ${caseDef.back ? `<p class="back ${caseDef.back.outcome}">${backLine(caseDef)}</p>` : ''}
      <p>${caseDef.intro}</p>
      ${caseDef.traits ? `<p class="sub">${caseDef.traits}</p>` : ''}
      ${best ? `<p class="sub">Your best on this case: <b>${best.grade}</b> · ${best.total}</p>` : ''}
@@ -622,10 +623,9 @@ async function showFail() {
 // ---------------------------------------------------------------- the round
 
 // What this cow did for your name, on her ticket. Reputation only goes up.
-function repLine({ points, lame }) {
-  return lame
-    ? '<p class="rep-line lame">She’s going lame: no reputation for this one. The farmer will want her looked at again.</p>'
-    : `<p class="rep-line">+${points} reputation</p>`;
+function repLine({ points, lame, back }) {
+  if (lame) return '<p class="rep-line lame">She’s going lame: no reputation for this one. The farmer will want her looked at again.</p>';
+  return `<p class="rep-line">+${points} reputation${back === 'recheck' ? ' · back on her feet' : ''}</p>`;
 }
 const nextLabel = ({ last }) => (last ? 'End of the day' : 'Next cow');
 
@@ -641,7 +641,7 @@ async function showDay() {
   const d = endVisit(route);
   Sound.step();
   const rows = d.rows.map((r) => `<tr class="${r.lame ? 'lame' : ''}">
-      <td>${r.tag.replace('Holstein ', '')}</td><td>${r.title}</td><td>${r.grade}</td>
+      <td>${r.tag.replace('Holstein ', '')}${r.back ? ` <span class="again" title="${r.back === 'recheck' ? 'Recheck' : 'Seen before'}">↺</span>` : ''}</td><td>${r.title}</td><td>${r.grade}</td>
       <td>${r.gait}</td><td class="pts">${r.lame ? '—' : `+${r.points}`}</td></tr>`).join('');
   const flagged = d.rows.filter((r) => r.lame).length;
   const opened = d.opened.map((f) => `<p class="rep-line">New on the road: <b>${f.name}</b> (${HOUSING[f.housing].toLowerCase()})</p>`).join('');
@@ -652,6 +652,7 @@ async function showDay() {
      <p class="sub">Reputation ${d.before} → <b>${d.rep}</b>${next ? ` · ${next.name} opens at ${next.rep}` : ''}</p>
      <table class="day"><thead><tr><th>Cow</th><th>Case</th><th>Grade</th><th>Walked</th><th></th></tr></thead><tbody>${rows}</tbody></table>
      ${d.bonus ? `<p class="rep-line">Whole herd walked off sound: +${d.bonus}</p>` : ''}
+     ${d.mended.length ? `<p class="rep-line">Back on her feet: ${d.mended.map((t) => `<b>${t.replace('Holstein ', '')}</b>`).join(', ')}</p>` : ''}
      ${flagged ? `<p class="plan">${flagged === 1 ? 'One cow' : `${flagged} cows`} went off lame. ${d.farm.farmer[0].toUpperCase()}${d.farm.farmer.slice(1)} will want a second look next visit.</p>` : ''}
      ${opened}`,
     [{ id: 'road', label: 'Back on the road', primary: true }],
@@ -663,11 +664,19 @@ async function showDay() {
 async function showVisit(farm, { fromMap = true } = {}) {
   game.state = 'modal';
   const n = (route.visits[farm.id] ?? 0) + 1;
+  const farmer = `${farm.farmer[0].toUpperCase()}${farm.farmer.slice(1)}`;
+  // Who's coming back: the lame ones from last time, and a few you trimmed well.
+  const back = visitCases(farm, n, route.history).filter((cd) => cd.back);
+  const tags = (list) => list.map((cd) => `<b>${cd.subtitle.split(' · ')[0].replace('Holstein ', '')}</b>`).join(', ');
+  const rechecks = back.filter((cd) => cd.back.outcome === 'recheck');
+  const healed = back.length - rechecks.length;
   const pick = await ui.modal(
     `<div class="eyebrow">${HOUSING[farm.housing]} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
      <h1>${farm.name}</h1>
-     <p class="sub">${farm.farmer[0].toUpperCase()}${farm.farmer.slice(1)} · ${farm.cows} cows waiting</p>
-     <p>${farm.intro}</p>`,
+     <p class="sub">${farmer} · ${farm.cows} cows waiting${back.length ? ` · ${back.length} you’ve trimmed before` : ''}</p>
+     <p>${farm.intro}</p>
+     ${rechecks.length ? `<p class="back recheck">${farmer} wants a second look at ${tags(rechecks)}: lame after last time.</p>` : ''}
+     ${healed ? `<p class="back healed">${healed === 1 ? 'One cow' : `${healed} cows`} from last time ${healed === 1 ? 'is' : 'are'} back for ${healed === 1 ? 'her' : 'their'} next trim.</p>` : ''}`,
     fromMap
       ? [{ id: 'go', label: 'Start the day', primary: true }, { id: 'back', label: 'Back to the road' }]
       : [{ id: 'go', label: 'Start the day', primary: true }],
@@ -694,9 +703,10 @@ function showRoute() {
     const li = document.createElement('li');
     const on = isOpen(f, route.rep);
     const visits = route.visits[f.id] ?? 0;
+    const sore = farmCows(route.history, f.id).filter((h) => h.lame).length;
     li.className = `stop ${on ? 'open' : 'locked'}${f === suggest ? ' suggest' : ''}${visits ? ' visited' : ''}`;
     const meta = on
-      ? `${HOUSING[f.housing]} · ${f.cows} cows${visits ? ` · best day +${route.best[f.id]}` : ''}`
+      ? `${HOUSING[f.housing]} · ${f.cows} cows${visits ? ` · best day +${route.best[f.id]}` : ''}${sore ? ` · ${sore} to recheck` : ''}`
       : `Opens at reputation ${f.rep}`;
     li.innerHTML = `<button ${on ? '' : 'disabled'}><span class="pin" aria-hidden="true"></span>
       <span class="stop-name">${f.name}</span><span class="stop-meta">${meta}</span></button>`;

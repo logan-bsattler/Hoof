@@ -445,3 +445,7 @@ table.day td { padding: 6px 4px; border-top: 1px solid var(--line); }
 table.day td.pts { text-align: right; font-weight: 700; color: var(--sound); white-space: nowrap; }
 table.day tr.lame td { color: var(--warn); }
 table.day tr.lame td.pts { color: var(--muted); }
+table.day .again { color: var(--brass); font-weight: 700; }
+p.back { border-left: 3px solid var(--brass); padding-left: 10px; color: var(--text); }
+p.back.recheck { border-left-color: var(--warn); }
+p.back.healed { border-left-color: var(--sound); }

@@ -133,7 +133,8 @@ export function dealCase(seed) {
   return makeCase(id, seed, dealMods(seed));
 }
 
-export const CASE_B = makeCase('ulcer', 214, {
+// Case B's hand placing, kept so a return visit can deal her again (route.js).
+export const CASE_B_MODS = {
   side: 'LH',
   excess: { [CLAW.OUTER]: 4.6, [CLAW.INNER]: 2.4 },
   lesion: { claw: CLAW.OUTER, x: 172, y: 288, r: 12 },
@@ -142,4 +143,5 @@ export const CASE_B = makeCase('ulcer', 214, {
     { kind: 'stain', claw: CLAW.INNER, x: 262, y: 300, r: 13 },
     { kind: 'bruise', claw: CLAW.OUTER, x: 122, y: 430, r: 11 },
   ],
-});
+};
+export const CASE_B = makeCase('ulcer', 214, CASE_B_MODS);

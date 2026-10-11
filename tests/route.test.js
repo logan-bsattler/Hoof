@@ -9,7 +9,9 @@ import { CFG } from '../src/config.js';
 import {
   FARMS, HOUSING, POINTS, HERD_BONUS, farmMods, visitCases, cowSeed, cowPoints,
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
+  farmCows, healedBack, backLine,
 } from '../src/route.js';
+import { Hoof } from '../src/hoof.js';
 
 const tag = (cd) => cd.subtitle.split(' · ')[0];
 const result = (grade, gait = 'sound') => ({ failed: false, grade, gait });
@@ -99,7 +101,7 @@ test('a day at a farm banks the cows’ points, the herd bonus, and opens the ne
   assert.equal(route.visits[FARMS[0].id], 1);
   assert.equal(route.best[FARMS[0].id], d.earned);
   assert.equal(route.history.length, herd.length);
-  assert.deepEqual(Object.keys(route.history[0]).sort(), ['condition', 'farm', 'foot', 'grade', 'lame', 'seed', 'side', 'tag', 'visit']);
+  assert.deepEqual(Object.keys(route.history[0]).sort(), ['back', 'condition', 'farm', 'foot', 'grade', 'lame', 'seed', 'side', 'tag', 'visit']);
   // The round is plain data, ready to save as JSON (WP7.7).
   assert.deepEqual(JSON.parse(JSON.stringify(route)), route);
 });
@@ -139,4 +141,119 @@ test('pacing: a careful trimmer opens the whole road in a dozen days; a middling
   assert.ok(best >= FARMS.length - 1 && best <= 12, `Textbook: ${best} days`);
   assert.ok(ok > best && ok < 60, `Sound: ${ok} days`);
   console.log(`route pacing: all farms open after ${best} days at Textbook, ${ok} at Sound`);
+});
+
+// ------------------------------------------------------------------ WP7.5 return visits
+
+// Play one day at a farm: `lameAt` lists the cows (by position) that go off lame.
+function playDay(route, farmId, lameAt = []) {
+  const herd = startVisit(route, farmId);
+  herd.forEach((cd, k) => recordCow(route, cd, lameAt.includes(k) ? result('Needs work', 'lame') : result('Clean')));
+  return { herd, day: endVisit(route) };
+}
+
+test('a return visit deals the lame cows back as rechecks, a few healed ones, then fresh cows', () => {
+  const farm = FARMS[2]; // Brackenford, 4 cows
+  const route = newRoute();
+  route.rep = farm.rep;
+  const { herd: first } = playDay(route, farm.id, [1]);
+  const herd = startVisit(route, farm.id);
+  assert.equal(herd.length, farm.cows, 'the herd size stays fixed');
+  assert.equal(new Set(herd.map(tag)).size, herd.length, 'unique tags');
+
+  // The lame cow comes first: same tag, condition, foot and side, the lesion no smaller.
+  const was = first[1], re = herd[0];
+  assert.equal(tag(re), tag(was));
+  assert.equal(re.back.outcome, 'recheck');
+  assert.equal(re.back.visit, 1);
+  assert.deepEqual([re.condition, re.foot, re.side, re.seed], [was.condition, was.foot, was.side, was.seed]);
+  assert.equal(re.temper, was.temper, 'same cow, same temperament');
+  if (was.lesion) {
+    assert.equal(re.lesion.claw, was.lesion.claw, 'the lesion is where it was');
+    assert.ok(re.lesion.r >= was.lesion.r, `the lesion is no smaller: ${re.lesion.r} vs ${was.lesion.r}`);
+  }
+  assert.match(backLine(re), /recheck/);
+
+  // Then the healed cows: earlier tags, now a routine trim on the same foot.
+  const healed = herd.filter((cd) => cd.back?.outcome === 'healed');
+  assert.equal(healed.length, healedBack(farm));
+  const before = new Map(first.map((cd) => [tag(cd), cd]));
+  for (const cd of healed) {
+    const old = before.get(tag(cd));
+    assert.ok(old && tag(old) !== tag(was), 'a healed cow walked off well last time');
+    assert.equal(cd.condition, 'routine');
+    assert.equal(cd.lesion, null);
+    assert.deepEqual([cd.foot, cd.side], [old.foot, old.side]);
+    assert.ok(backLine(cd).length > 0);
+  }
+
+  // The rest are new to the farm: no tag it has seen before.
+  const fresh = herd.filter((cd) => !cd.back);
+  assert.equal(fresh.length, farm.cows - 1 - healed.length);
+  for (const cd of fresh) assert.ok(!before.has(tag(cd)), `${tag(cd)} is new to the farm`);
+  // The same history always deals the same herd.
+  assert.deepEqual(visitCases(farm, 2, route.history).map(tag), herd.map(tag));
+});
+
+test('Case B comes back as Case B: the hand-placed ulcer, a little bigger, or healed', () => {
+  const lame = newRoute();
+  playDay(lame, FARMS[0].id, [0]);
+  const [re] = startVisit(lame, FARMS[0].id);
+  assert.equal(tag(re), tag(CASE_B));
+  assert.equal(re.back.outcome, 'recheck');
+  assert.deepEqual([re.lesion.x, re.lesion.y, re.lesion.r], [CASE_B.lesion.x, CASE_B.lesion.y, CASE_B.lesion.r + 2]);
+  assert.deepEqual(re.looseHorn, CASE_B.looseHorn);
+
+  const well = newRoute();
+  playDay(well, FARMS[0].id);
+  const back = startVisit(well, FARMS[0].id).filter((cd) => cd.back);
+  assert.equal(back.length, healedBack(FARMS[0]));
+  for (const cd of back) {
+    assert.equal(cd.condition, 'routine');
+    assert.equal(cd.lesion, null, 'no hand-placed ulcer on a healed cow');
+  }
+});
+
+test('a recheck that walks off sound is mended and earns her points; one still lame comes back again', () => {
+  const farm = FARMS[1];
+  const route = newRoute();
+  route.rep = farm.rep;
+  const { herd: day1 } = playDay(route, farm.id, [0, 2]);
+  const sore = [tag(day1[0]), tag(day1[2])];
+  // Day 2: the first recheck goes well, the second goes lame again.
+  const herd = startVisit(route, farm.id);
+  assert.deepEqual(herd.slice(0, 2).map(tag), sore);
+  const r0 = recordCow(route, herd[0], result('Clean'));
+  assert.equal(r0.points, POINTS.Clean, 'the points she missed are there to earn');
+  assert.equal(r0.back, 'recheck');
+  recordCow(route, herd[1], result('Needs work', 'lame'));
+  for (let k = 2; k < herd.length; k++) recordCow(route, herd[k], result('Clean'));
+  const d = endVisit(route);
+  assert.deepEqual(d.mended, [sore[0]]);
+  assert.deepEqual(farmCows(route.history, farm.id).filter((h) => h.lame).map((h) => h.tag), [sore[1]]);
+  assert.equal(route.history.find((h) => h.visit === 2 && h.tag === sore[0]).back, 'recheck');
+  // Day 3: only the cow still lame is a recheck.
+  const third = startVisit(route, farm.id);
+  assert.deepEqual(third.filter((cd) => cd.back?.outcome === 'recheck').map(tag), [sore[1]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(route)), route);
+});
+
+test('return cows build on every farm, visit after visit, whatever went lame', () => {
+  for (const farm of FARMS) {
+    const route = newRoute();
+    route.rep = farm.rep;
+    for (let day = 1; day <= 4; day++) {
+      const herd = startVisit(route, farm.id);
+      assert.equal(herd.length, farm.cows);
+      assert.equal(new Set(herd.map(tag)).size, herd.length, `${farm.name} day ${day}: unique tags`);
+      herd.forEach((cd, k) => {
+        assert.ok(new Hoof(cd), `${farm.name} day ${day}: ${tag(cd)} builds`);
+        if (cd.back) assert.ok(backLine(cd), 'a returning cow says what happened last time');
+        // Every other cow goes lame, on alternating positions.
+        recordCow(route, cd, (k + day) % 2 ? result('Sound', 'lame') : result('Textbook'));
+      });
+      endVisit(route);
+      if (day > 1) assert.ok(herd.some((cd) => cd.back), `${farm.name} day ${day}: some cows come back`);
+    }
+  }
 });
