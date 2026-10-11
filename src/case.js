@@ -16,6 +16,7 @@ function buildCase(condition, { seed, side, excess, lesion, looseHorn, decoys })
     seed,
     side,
     title: C.title,
+    noun: C.noun ?? 'lesion', // what the copy calls the lesion: 'ulcer', 'abscess'
     subtitle: `Holstein #${cow} · ${leg} hind`,
 
     // The step ids this job needs, in order (see steps.js).

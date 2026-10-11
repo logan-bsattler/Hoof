@@ -49,6 +49,12 @@ export const STEPS = [
     tip: 'Pare the loose horn off the ulcer with the knife: open it, don’t carve it. Then glue the block on the SOUND claw.',
     done: (m, s, hoof) => m.looseRemain[LOOSE.ULCER] < 0.1 && hoof.block === soundClaw(hoof.caseDef),
   },
+  // White-line abscess: step 4 is following the track to the pus, then the block.
+  {
+    id: 'drain', label: '4 · Pare out the track, block the sound claw', tool: 'knife',
+    tip: 'Start where the dark line meets the wall and pare along it with the knife until it drains. Follow the line: don’t dig into the sole. Then glue the block on the SOUND claw.',
+    done: (m, s, hoof) => hoof.drained && hoof.block === soundClaw(hoof.caseDef),
+  },
   {
     id: 'step5', label: '5 · Remove loose heel horn', tool: 'knife',
     tip: (cd) => `There’s a curl of loose horn at the ${CLAW_NAME[cd.looseHorn.claw]} heel. Flick it off with the knife and leave the heel itself alone.`,

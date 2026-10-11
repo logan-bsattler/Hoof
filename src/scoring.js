@@ -2,7 +2,7 @@
 // Speed is deliberately absent. Pure function of metrics + session log.
 
 import { CFG } from './config.js';
-import { CLAW, LOOSE, soundClaw } from './hoof.js';
+import { CLAW, LOOSE, Z, distToPath, soundClaw } from './hoof.js';
 
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 // 100 at `good` or better, 0 at `bad`, linear between.
@@ -43,6 +43,27 @@ function decoysDug(hoof, caseDef) {
   return n;
 }
 
+// Sole cells beside the white-line track dug well below target: hunting for the pus
+// instead of following the line to it.
+function soleDugBesideTrack(hoof, L) {
+  if (L?.type !== 'whiteline') return 0;
+  let n = 0;
+  for (let i = 0; i < hoof.n; i++) {
+    if (hoof.claw[i] !== L.claw || hoof.tract[i] || !(hoof.zone[i] & Z.LIVE) || (hoof.zone[i] & (Z.DISH | Z.HEEL))) continue;
+    const x = hoof.cellX(i), y = hoof.cellY(i);
+    const near = distToPath(x, y, L.path).d < L.w + 14 || Math.hypot(x - L.pocket.x, y - L.pocket.y) < L.pocket.r + 14;
+    if (near && hoof.thick[i] < hoof.zoneTarget(i) - 1) n++;
+  }
+  return n;
+}
+
+// Is the lesion opened up the way its condition needs?
+export function lesionOpened(m, hoof) {
+  const L = hoof.caseDef.lesion;
+  if (!L) return true;
+  return L.type === 'whiteline' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
+}
+
 export function scoreCase(m, session, hoof, caseDef) {
   const T = CFG.sole.target, D = CFG.sole.dishTarget;
   const inner = m.claws[CLAW.INNER], outer = m.claws[CLAW.OUTER];
@@ -78,8 +99,11 @@ export function scoreCase(m, session, hoof, caseDef) {
   const need = caseDef.requires ?? { open: true, block: true, treat: true };
   if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
   if (L && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
-  if (need.block && hoof.block !== sound) { correctness -= 25; notes.push('No block on the sound claw, so the ulcer is still carrying weight.'); }
-  if (need.open && m.looseRemain[LOOSE.ULCER] > 0.1) { correctness -= 20; notes.push('Loose horn left over the ulcer: it needs opening up to heal.'); }
+  if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${L.type === 'whiteline' ? 'abscess' : 'ulcer'} is still carrying weight.`); }
+  if (need.open && !lesionOpened(m, hoof)) {
+    correctness -= 20;
+    notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
+  }
   if (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
   if (session.firstCutClaw === CLAW.OUTER) { correctness -= 10; notes.push('Started on the outer claw. On a hind foot, trim the inner claw first and match the outer to it.'); }
   if (need.treat && (hoof.wrap < 2 || m.lesionTint < CFG.treat.tintMin)) { correctness -= 10; notes.push('The ulcer went out untreated. Flush it with the spray, then pad and wrap it.'); }
@@ -106,8 +130,11 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (session.nicks) notes.push('You nicked the corium and she felt it. Ease off as the gauge drops and the sole turns pink.');
   // Digging a decoy out: the marks that stay firm are nothing to open.
   const dug = decoysDug(hoof, caseDef);
-  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25);
+  // Hunting for the abscess through the sole instead of following the track.
+  const hunted = soleDugBesideTrack(hoof, L) > 6;
+  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0));
   if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
+  if (hunted) notes.push('You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 
@@ -133,7 +160,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   // A block on the sore claw loads the ulcer even harder: she'll limp.
   // A sound foot has nothing to relieve; a needless block rocks her onto one claw.
   const relief = !L ? (hoof.block ? 40 : 100)
-    : (hoof.block === sound ? 60 : 0) + (m.looseRemain[LOOSE.ULCER] <= 0.1 ? 40 : 0);
+    : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
   const gaitScore = 0.5 * balance + 0.5 * relief;
   const blockedSore = !!L && hoof.block === L.claw;
   const gait = blockedSore ? 'lame'

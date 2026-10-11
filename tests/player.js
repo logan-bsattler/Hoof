@@ -1,7 +1,7 @@
 // A DOM-free "careful hand": drives the real tools over a hoof the way a steady player would.
 // Used by the playthrough test (can the tools reach Textbook without blood?) and by the art lab.
 
-import { Z, clawBox } from '../src/hoof.js';
+import { Z, LOOSE, clawBox } from '../src/hoof.js';
 import { CFG } from '../src/config.js';
 import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
 
@@ -16,7 +16,7 @@ export function makePlayer(hoof, opts = {}) {
   const emit = (ev, tool, x, y) => { if (onEvent) onEvent(ev, tool, x, y); return ev; };
 
   // A careful hand keeps the grinder disc off the ulcer: that's knife work.
-  const discTouchesUlcer = (x, y) => !!L &&
+  const discTouchesUlcer = (x, y) => L?.type === 'ulcer' &&
     Math.hypot(x - L.x, y - L.y) < L.r * 1.75 + CFG.tools.grinder.radius;
 
   const p = {
@@ -31,9 +31,11 @@ export function makePlayer(hoof, opts = {}) {
         for (let j = 1; j <= steps; j++) {
           const x = ax + ((bx - ax) * j) / steps, y = ay + ((by - ay) * j) / steps;
           const dx = x - px, dy = y - py;
-          // The grinder and knife lift off once the horn under them is at target.
+          // The grinder and knife lift off once the horn under them is at target. Loose horn
+          // still wants the knife; the grinder just levels over the white-line track.
           const i = hoof.cellAt(x, y);
-          const done = i >= 0 && (tool === 'grinder' || tool === 'knife') && !hoof.loose[i] &&
+          const settled = i >= 0 && (!hoof.loose[i] || (tool === 'grinder' && hoof.looseInit[i] === LOOSE.TRACT));
+          const done = settled && (tool === 'grinder' || tool === 'knife') &&
             hoof.thick[i] <= hoof.zoneTarget(i) + 0.4;
           if (done || (tool === 'grinder' && discTouchesUlcer(x, y))) { px = x; py = y; continue; }
           let ev;
@@ -79,6 +81,18 @@ export function makePlayer(hoof, opts = {}) {
         for (let y = y0 + off; y < y1; y += 14) {
           p.drag('grinder', [[xa, y], [xb, y - 10], [xa, y + 7]], 190);
         }
+      }
+      return p;
+    },
+    // White-line abscess: pare along the dark line from where it meets the wall, in short pulls,
+    // then work round the pocket at its end until it drains.
+    followTrack() {
+      const P = L.path, K = L.pocket;
+      p.drag('knife', P, 60);
+      p.drag('knife', [P[P.length - 1], [K.x, K.y]], 60);
+      for (let a = 0; a < 12; a++) {
+        const t = (a / 12) * 2 * Math.PI, r = K.r * 0.6;
+        p.drag('knife', [[K.x, K.y], [K.x + r * Math.cos(t), K.y + r * Math.sin(t)]], 60);
       }
       return p;
     },

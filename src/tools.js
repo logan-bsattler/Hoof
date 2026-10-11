@@ -3,7 +3,7 @@
 // into particles, sound, haptics and log entries. No DOM in here.
 
 import { CFG } from './config.js';
-import { Z, LOOSE, CLAW } from './hoof.js';
+import { Z, LOOSE, CLAW, TRACT } from './hoof.js';
 import { smoothstep } from './noise.js';
 
 export const TOOLS = {
@@ -54,10 +54,13 @@ export function toolRadius(id) {
 function newEvents() {
   return {
     removed: 0, mud: 0, dead: 0,
-    loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0 },
+    loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0 },
     blood: false, bloodCells: 0, thin: false, lesionCut: false, grinderLesion: false,
     dirtyCut: false, nipLive: false, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
+    // White-line abscess: drain fires once, when the pared track reaches the pocket of pus.
+    // offTrack: the knife dug at the pocket's sole without following the track there.
+    drain: false, offTrack: false,
   };
 }
 
@@ -115,6 +118,27 @@ function clearLoose(hoof, i, ev) {
   return true;
 }
 
+// How far below its trim target the pared-out track and the opened pocket sit (mm).
+const GROOVE = { [TRACT.ENTRY]: 1.5, [TRACT.TRACK]: 1.5, [TRACT.POCKET]: 2.5 };
+
+// Knife on the white-line tract. Under-run horn lifts away only where it joins an opened cell,
+// so the track has to be followed from the wall. Elsewhere it is ordinary sole: false, cut it.
+function pareTract(hoof, i, ev) {
+  if (hoof.looseInit[i] !== LOOSE.TRACT || !hoof.loose[i]) return false;
+  if (!hoof.tractOpenable(i)) {
+    if (hoof.tract[i] === TRACT.POCKET && hoof.thick[i] <= hoof.zoneTarget(i) + 0.3) ev.offTrack = true;
+    return false;
+  }
+  clearLoose(hoof, i, ev);
+  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - GROOVE[hoof.tract[i]]);
+  if (!hoof.drained && hoof.tract[i] === TRACT.POCKET) {
+    let n = 0, open = 0;
+    for (let j = 0; j < hoof.n; j++) if (hoof.tract[j] === TRACT.POCKET) { n++; if (!hoof.loose[j]) open++; }
+    if (open >= n * 0.5) { hoof.drained = true; ev.drain = true; }
+  }
+  return true;
+}
+
 // Stroke tools: called with the distance travelled since the last stamp.
 export function applyStroke(hoof, tool, x, y, dist) {
   const ev = newEvents();
@@ -131,7 +155,8 @@ export function applyStroke(hoof, tool, x, y, dist) {
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
       // Fresh cuts expose untreated tissue: the flush has to be repeated.
       hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * dist * f);
-      if (clearLoose(hoof, i, ev)) return;
+      if (pareTract(hoof, i, ev)) return;
+      if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
       // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
       const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f * 2.5), ev, cfg.resist);
       // A clean knife pass leaves a smooth surface.
@@ -141,7 +166,8 @@ export function applyStroke(hoof, tool, x, y, dist) {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       if (blocked(hoof, i, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.01 * dist * f);
-      if (hoof.loose[i]) return;
+      // The rasp lifts no loose horn, but trues the sole over the white-line track.
+      if (hoof.loose[i] && hoof.looseInit[i] !== LOOSE.TRACT) return;
       hoof.rough[i] = Math.max(0, hoof.rough[i] - cfg.smooth * dist * f);
       cut(hoof, i, cfg.rate * dist * f, ev, 0.3);
     });
@@ -163,7 +189,8 @@ export function applyGrind(hoof, x, y, dt) {
     }
     hoof.mud[i] = Math.max(0, hoof.mud[i] - 2 * dt * f);
     if (hoof.zone[i] & Z.ULCER) ev.grinderLesion = true;
-    if (clearLoose(hoof, i, ev)) {
+    // The disc levels over the white-line track but can't follow it: that's knife work.
+    if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) {
       hoof.rough[i] = 0.8;
       return;
     }
@@ -210,7 +237,7 @@ export function applyBite(hoof, x, y) {
     if (blocked(hoof, i, ev)) return;
     // Only the middle of the jaws bites living horn; the edges just graze it.
     if (f < 1 - cfg.liveCore ** 2) return;
-    clearLoose(hoof, i, ev);
+    if (hoof.looseInit[i] !== LOOSE.TRACT) clearLoose(hoof, i, ev);
     ev.nipLive = true;
     cut(hoof, i, cfg.liveBite, ev, 1);
     hoof.rough[i] = 0.9;
@@ -241,6 +268,7 @@ export function applySpray(hoof, x, y, dt) {
 export function applyWrap(hoof, claw, m, ready) {
   const L = hoof.caseDef.lesion;
   if (!L) return { ok: false, reason: 'nothing' };
+  if (hoof.caseDef.requires?.treat === false) return { ok: false, reason: 'untreated' };
   if (!claw) return { ok: false, reason: 'miss' };
   if (claw !== L.claw) return { ok: false, reason: 'sound' };
   if (hoof.wrap >= 2) return { ok: false, reason: 'done' };

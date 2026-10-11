@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, Z, CLAW, LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
+import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
 import { CASE_B, makeCase, dealCase } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { stepsFor } from '../src/steps.js';
@@ -24,9 +24,15 @@ function idealTrim(hoof) {
     hoof.thick[i] = z & Z.DISH ? D : T;
     hoof.rough[i] = 0;
   }
-  for (let i = 0; i < hoof.n; i++) if (hoof.looseInit[i] === LOOSE.ULCER) hoof.tint[i] = 1;
+  for (let i = 0; i < hoof.n; i++) {
+    if (hoof.looseInit[i] === LOOSE.ULCER) hoof.tint[i] = 1;
+    // The white-line track pared out as a groove below the sole, deepest at the pocket.
+    if (hoof.looseInit[i] === LOOSE.TRACT) hoof.thick[i] = hoof.zoneTarget(i) - (hoof.tract[i] === TRACT.POCKET ? 2.5 : 1.5);
+  }
   hoof.block = soundClaw(hoof.caseDef);
   if (!hoof.caseDef.lesion) return; // a sound foot gets no block and no wrap
+  hoof.drained = hoof.caseDef.lesion.type === 'whiteline';
+  if (!hoof.caseDef.requires.treat) return; // a drained abscess stays open to the air
   hoof.wrap = 2;
   hoof.wrapClaw = hoof.caseDef.lesion.claw;
 }
@@ -395,14 +401,19 @@ for (const id of Object.keys(CONDITIONS)) test(`${id}: 50 dealt cows all build, 
     assert.ok(cd.findings.length >= (L ? 2 : 1), `seed ${seed}: at least one decoy`);
     for (const f of cd.findings) assert.ok(insideClaw(f.claw, f.x, f.y, cd.side, 4), `seed ${seed}: ${f.kind} outside its claw`);
     const { h, status, r, t } = await idealRun(cd);
-    if (L) assert.ok(h.metrics().looseN[LOOSE.ULCER] > 10, `seed ${seed}: ulcer cells`);
-    else assert.equal(h.metrics().looseN[LOOSE.ULCER], 0, `seed ${seed}: no ulcer cells on a sound foot`);
+    if (L) assert.ok(h.metrics().looseN[LESION_LOOSE[L.type]] > 10, `seed ${seed}: lesion cells`);
+    else assert.equal(h.metrics().looseN[LOOSE.ULCER] + h.metrics().looseN[LOOSE.TRACT], 0, `seed ${seed}: no lesion cells on a sound foot`);
+    if (L?.path) {
+      for (const [x, y] of [...L.path, [L.pocket.x, L.pocket.y]]) assert.ok(insideClaw(L.claw, x, y, cd.side, 4), `seed ${seed}: track outside its claw`);
+      const kinds = new Set(h.tract.filter(Boolean));
+      for (const k of [TRACT.ENTRY, TRACT.TRACK, TRACT.POCKET]) assert.ok(kinds.has(k), `seed ${seed}: tract part ${k}`);
+    }
     for (const s of status) assert.ok(s.done, `seed ${seed}: ${s.id}`);
     assert.equal(r.grade, 'Textbook', `seed ${seed}: ${r.total} ${r.notes.join(' | ')}`);
     if (t) assert.equal(t.finished, true, `seed ${seed}: tutorial`);
   }
   assert.equal(sides.size, 2, 'both hind feet dealt');
-  if (CONDITIONS[id].steps.includes('step4')) assert.equal(sore.size, 2, 'both claws carry the lesion');
+  if (CONDITIONS[id].requires.block) assert.equal(sore.size, 2, 'both claws carry the lesion');
 });
 
 test('routine: opening a decoy, a needless block or a misread all cost points', () => {
@@ -463,4 +474,78 @@ test('mobility score follows the gait: ideal is 0, a block on the sore claw is 3
   assert.equal(scoreCase(h.metrics(), idealSession(), h, CASE_B).mobility, 0);
   h.block = CASE_B.lesion.claw;
   assert.equal(scoreCase(h.metrics(), idealSession(), h, CASE_B).mobility, 3);
+});
+
+// A knife pull along a polyline, stamped every px.
+function knifeAlong(hoof, pts) {
+  const evs = [];
+  for (let k = 1; k < pts.length; k++) {
+    const [ax, ay] = pts[k - 1], [bx, by] = pts[k];
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay)));
+    for (let j = 1; j <= n; j++) evs.push(applyStroke(hoof, 'knife', ax + ((bx - ax) * j) / n, ay + ((by - ay) * j) / n, 1));
+  }
+  return evs;
+}
+
+test('whiteline: following the track from the wall drains the pocket, once', () => {
+  const cd = makeCase('whiteline', 1);
+  const h = new Hoof(cd);
+  const L = cd.lesion;
+  h.mud.fill(0);
+  assert.equal(h.probe(h.cellAt(L.x, L.y), false).kind, 'lesion', 'the dark line flinches');
+  let drains = 0;
+  for (let k = 0; k < 4 && !h.drained; k++) {
+    const evs = knifeAlong(h, [...L.path, [L.pocket.x, L.pocket.y], [L.pocket.x + 4, L.pocket.y + 4], [L.pocket.x - 4, L.pocket.y - 4]]);
+    drains += evs.filter((e) => e.drain).length;
+  }
+  assert.ok(h.drained, 'drained');
+  assert.equal(drains, 1, 'drain fires once');
+  knifeAlong(h, [[L.pocket.x - 5, L.pocket.y], [L.pocket.x + 5, L.pocket.y]]);
+  assert.equal(h.probe(h.cellAt(L.pocket.x, L.pocket.y), true).kind, 'firm', 'reads drained afterwards');
+});
+
+test('whiteline: the pocket will not open from the sole, the grinder or the nippers', () => {
+  const cd = makeCase('whiteline', 1);
+  const h = new Hoof(cd);
+  const K = cd.lesion.pocket;
+  // Go straight for the pus: the knife only digs sole and warns off-track.
+  let off = false;
+  for (let k = 0; k < 400 && !off; k++) off = applyStroke(h, 'knife', K.x + (k % 3) - 1, K.y, 1).offTrack;
+  assert.ok(off, 'offTrack fires at the pocket');
+  for (let k = 0; k < 120; k++) applyGrind(h, cd.lesion.x, cd.lesion.y, 1 / 60);
+  assert.equal(h.drained, false);
+  assert.equal(h.metrics().looseRemain[LOOSE.TRACT], 1, 'nothing opened');
+});
+
+test('whiteline: hunting through the sole beside the track costs restraint', () => {
+  const cd = makeCase('whiteline', 1);
+  const good = new Hoof(cd);
+  idealTrim(good);
+  const base = scoreCase(good.metrics(), idealSession(cd), good, cd);
+  assert.equal(base.grade, 'Textbook', base.notes.join(' | '));
+
+  const hunt = new Hoof(cd);
+  idealTrim(hunt);
+  const K = cd.lesion.pocket;
+  hunt.stampExact(K.x, K.y, K.r + 12, (i) => {
+    if (hunt.claw[i] === cd.lesion.claw && !hunt.tract[i]) hunt.thick[i] = Math.max(0.5, hunt.zoneTarget(i) - 1.6);
+  });
+  const r = scoreCase(hunt.metrics(), idealSession(cd), hunt, cd);
+  assert.ok(r.parts.restraint <= base.parts.restraint - 25, `restraint ${r.parts.restraint}`);
+  assert.ok(r.notes.some((n) => /beside the track/.test(n)), r.notes.join(' | '));
+
+  const shut = new Hoof(cd);
+  idealTrim(shut);
+  shut.drained = false;
+  const rShut = scoreCase(shut.metrics(), idealSession(cd), shut, cd);
+  assert.ok(rShut.parts.correctness <= base.parts.correctness - 20, 'undrained abscess');
+  assert.ok(rShut.notes.some((n) => /never pared out/.test(n)), rShut.notes.join(' | '));
+});
+
+test('whiteline: no pad or wrap; it heals open', () => {
+  const cd = makeCase('whiteline', 1);
+  const h = new Hoof(cd);
+  idealTrim(h);
+  assert.deepEqual(applyWrap(h, cd.lesion.claw, h.metrics(), true), { ok: false, reason: 'untreated' });
+  assert.equal(h.wrap, 0);
 });

@@ -2,7 +2,7 @@
 // title → intro → play → (failing → fail) | (walkoff → results)
 
 import { CFG, touchAngle } from './config.js';
-import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
+import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_B, dealCase, makeCase } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip } from './steps.js';
@@ -122,6 +122,7 @@ async function showIntro() {
        <li><b>Clean</b> to reveal what’s hiding under the muck.</li>
        <li><b>Read</b> it with the hoof testers before you commit.</li>
        <li><b>Trim</b> the five steps in order: balance beats speed.</li>
+       ${caseDef.howto ?? ''}
        ${caseDef.requires?.treat ? '<li><b>Treat</b> it: flush, pad and wrap before she goes.</li>' : '<li><b>Leave</b> what’s firm alone: not every mark is trouble.</li>'}
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
@@ -293,10 +294,15 @@ function tap(x, y) {
     if (r.kind === 'lesion' && !game.session.diagnosis) {
       Sound.spring();
       buzz([10, 40, 20]);
-      // The weeping hole: squeezing it pushes fluid and bubbles out.
+      // The weeping hole: squeezing it pushes fluid and bubbles out. A white-line track is
+      // still sealed under the wall: she just flinches.
       const L = caseDef.lesion;
-      renderer.weep(L.x, L.y, 1);
-      Sound.bubbles();
+      if (L.type === 'ulcer') {
+        renderer.weep(L.x, L.y, 1);
+        Sound.bubbles();
+      } else {
+        game.shake = 2;
+      }
       ui.toast(r.text, 'info');
       // The guided run commits the read straight away; otherwise the player decides when.
       if (game.tutorial) diagnose();
@@ -316,6 +322,7 @@ function tap(x, y) {
 const WRAP_MSG = {
   miss: 'Tap the treated claw to pad and wrap it.',
   sound: 'That’s the sound claw: it has the block. The pad and wrap go over the ulcer.',
+  untreated: 'No wrap for this one. Pared out and drained, it heals best open to the air.',
   closed: 'Open the ulcer first. Pare the loose horn off it with the knife.',
   unflushed: 'Flush the opened ulcer with the spray bottle before you cover it.',
   nothing: 'She’s sound: nothing to pad or wrap.',
@@ -378,10 +385,23 @@ function placeBlock(claw) {
   if (!caseDef.lesion) {
     ui.toast('She’s sound. A block only goes on to rest a sore claw.', 'warn', 4000);
   } else if (claw === caseDef.lesion.claw) {
-    ui.toast('That’s the sore claw! The block goes on the SOUND claw so the ulcer can rest.', 'warn', 4000);
+    ui.toast(`That’s the sore claw! The block goes on the SOUND claw so the ${caseDef.noun} can rest.`, 'warn', 4000);
   } else {
-    ui.toast(`Block glued to the sound ${CLAW_NAME[claw]} claw. The ulcer is off the ground now.`, 'good');
+    ui.toast(`Block glued to the sound ${CLAW_NAME[claw]} claw. The ${caseDef.noun} is off the ground now.`, 'good');
   }
+}
+
+// The pressure-release beat, once per cow: the ulcer opened or the abscess drained.
+function releasePressure(msg) {
+  if (game.session.released) return;
+  game.session.released = true;
+  const W = lesionSpot(caseDef.lesion);
+  Sound.release();
+  Sound.bubbles();
+  buzz([15, 30, 40]);
+  renderer.weep(W.x, W.y, 3);
+  game.weepT = 4;
+  ui.toast(msg, 'good', 3200);
 }
 
 function warnOnce(key, msg, kind = 'warn', gap = 4) {
@@ -415,7 +435,7 @@ function handle(ev, x, y) {
       if (Math.random() < 0.15) particles.spawn('dust', x, y, '#e6d8b8');
     }
   }
-  if (ev.loose[LOOSE.HEEL] + ev.loose[LOOSE.ULCER] > 0) {
+  if (ev.loose[LOOSE.HEEL] + ev.loose[LOOSE.ULCER] + ev.loose[LOOSE.TRACT] > 0) {
     particles.spawn('flake', x, y, '#d9c79c', 1);
     Sound.flake();
   }
@@ -429,10 +449,12 @@ function handle(ev, x, y) {
   if (ev.nipLive) warnOnce('nip', 'Nippers are for the overgrown toe. Too blunt for the living sole.');
   if (ev.grinderLesion) {
     s.grinderLesion = true;
-    warnOnce('grindLesion', 'Not the grinder near the ulcer! Use the knife there.');
+    warnOnce('grindLesion', `Not the grinder near the ${caseDef.noun}! Use the knife there.`);
   }
   if (ev.lesionCut) warnOnce('lesion', 'Easy. That’s the ulcer itself. Open it, don’t carve it.');
   else if (ev.thin) warnOnce('thin', 'Sole’s getting thin here. Ease off.');
+  if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.');
+  if (ev.offTrack) warnOnce('offTrack', 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
   if (ev.blockedSkip) warnOnce('blocked', 'Can’t trim under the block.', 'info', 6);
 
   if (ev.blood) {
@@ -584,7 +606,8 @@ function frame(now) {
     // The opened pocket keeps weeping for a while.
     if (game.weepT > 0) {
       game.weepT -= dt;
-      if (Math.random() < dt * 5) renderer.weep(caseDef.lesion.x, caseDef.lesion.y, 0.5);
+      const W = lesionSpot(caseDef.lesion);
+      if (Math.random() < dt * 5) renderer.weep(W.x, W.y, 0.5);
     }
     game.scrubLevel = Math.max(0, game.scrubLevel - dt * 4);
     Sound.scrub('brush', game.tool === 'brush' && ptr.down ? game.scrubLevel : 0);
@@ -606,15 +629,8 @@ function frame(now) {
         else ui.toast('Every step done. Release her and watch her walk.', 'good', 4500);
       }
       // The pressure-release beat: first time the ulcer is opened.
-      if (!game.session.released && caseDef.lesion && game.metrics.looseRemain[LOOSE.ULCER] < 0.6) {
-        game.session.released = true;
-        const L = caseDef.lesion;
-        Sound.release();
-        Sound.bubbles();
-        buzz([15, 30, 40]);
-        renderer.weep(L.x, L.y, 3);
-        game.weepT = 4;
-        ui.toast('Pressure released. You can almost hear her sigh.', 'good', 3200);
+      if (caseDef.lesion?.type === 'ulcer' && game.metrics.looseRemain[LOOSE.ULCER] < 0.6) {
+        releasePressure('Pressure released. You can almost hear her sigh.');
       }
       ui.setSteps(game.steps, caseDef);
     }

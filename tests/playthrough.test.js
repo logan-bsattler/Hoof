@@ -94,7 +94,14 @@ function playthrough(cd) {
     }
   }, 20);
 
-  if (cd.requires.open) {
+  if (L?.type === 'whiteline') {
+    // Step 4: follow the track to the pocket until it drains, then block the sound claw.
+    for (let k = 0; k < 6 && !hoof.drained; k++) p.followTrack();
+    assert.ok(hoof.drained, `abscess drained (track ${(hoof.metrics().looseRemain[LOOSE.TRACT] * 100).toFixed(0)}% closed)`);
+    hoof.block = soundClaw(cd);
+    s.blockAttempts.push(hoof.block);
+    until('drain', () => {});
+  } else if (cd.requires.open) {
     // Step 4: pare the loose horn off the ulcer, then block the sound claw.
     for (let k = 0; k < 8 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) {
       for (let a = 0; a < 6; a++) {
@@ -136,7 +143,7 @@ function playthrough(cd) {
   assert.equal(m.blood, 0);
   const r = scoreCase(m, s, hoof, cd);
   const parts = Object.entries(r.parts).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(', ');
-  console.log(`playthrough ${cd.subtitle}, ${L ? `ulcer ${L.claw === CLAW.OUTER ? 'outer' : 'inner'}` : cd.condition}: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
+  console.log(`playthrough ${cd.subtitle}, ${L ? `${L.type} ${L.claw === CLAW.OUTER ? 'outer' : 'inner'}` : cd.condition}: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
     `outer ${m.claws[CLAW.OUTER].wbMean.toFixed(2)} mm · ${r.notes.join(' | ')}`);
   assert.equal(r.grade, 'Textbook', `${r.total}: ${r.notes.join(' | ')}`);
   assert.equal(r.gait, 'sound');
@@ -153,6 +160,15 @@ test('the careful player also wins on mirrored feet and inner-claw ulcers', () =
   const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
   for (let seed = 1; want.size && seed < 500; seed++) {
     const cd = makeCase('ulcer', seed);
+    if (want.delete(cd.side + cd.lesion.claw)) playthrough(cd);
+  }
+  assert.equal(want.size, 0, 'every layout dealt');
+});
+
+test('the careful player follows the white line on both feet and both claws', () => {
+  const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
+  for (let seed = 1; want.size && seed < 500; seed++) {
+    const cd = makeCase('whiteline', seed);
     if (want.delete(cd.side + cd.lesion.claw)) playthrough(cd);
   }
   assert.equal(want.size, 0, 'every layout dealt');

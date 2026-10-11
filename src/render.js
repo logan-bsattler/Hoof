@@ -151,12 +151,25 @@ export class Renderer {
       c.strokeStyle = '#ff6b5b';
       c.lineWidth = 1.5;
       c.beginPath();
-      c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
-      c.stroke();
-      c.setLineDash([]);
       const fs = this.font(11, true);
       c.textAlign = 'center';
-      label(c, 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
+      if (L.path) {
+        // A white-line track: trace it on the sole side of the line, ring the pocket it leads to.
+        const P = L.path, K = L.pocket;
+        const dx = Math.sign(K.x - P[P.length - 1][0]) * (L.w + 5);
+        P.forEach(([x, y], k) => (k ? c.lineTo(x + dx, y) : c.moveTo(x + dx, y)));
+        c.stroke();
+        c.beginPath();
+        c.arc(K.x, K.y, K.r * 1.6, 0, Math.PI * 2);
+        c.stroke();
+        c.setLineDash([]);
+        label(c, '▲ white line', P[0][0], P[0][1] + 22, '#ff6b5b', fs);
+      } else {
+        c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
+        c.stroke();
+        c.setLineDash([]);
+        label(c, 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
+      }
       c.restore();
     }
   }

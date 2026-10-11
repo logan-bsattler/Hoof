@@ -20,8 +20,14 @@ export const Z = {
 export const CLAW = { NONE: 0, OUTER: 1, INNER: 2 };
 export const CLAW_NAME = { 1: 'outer', 2: 'inner' };
 
-// Loose-horn groups.
-export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2 };
+// Loose-horn groups. TRACT is the white-line abscess: under-run horn along the white line.
+export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2, TRACT: 3 };
+
+// Which loose group carries each lesion kind.
+export const LESION_LOOSE = { ulcer: LOOSE.ULCER, whiteline: LOOSE.TRACT };
+
+// The white-line tract, per cell: where it starts at the wall, the track, the abscess pocket.
+export const TRACT = { NONE: 0, ENTRY: 1, TRACK: 2, POCKET: 3 };
 
 const MID_X = 200;
 
@@ -108,6 +114,26 @@ export function dishRect(claw, side = 'LH') {
   return { x: Math.min(a, b), y: GEOM.dishY0, w: Math.abs(b - a), h: GEOM.dishY1 - GEOM.dishY0 };
 }
 
+// Where a lesion hurts most: the abscess pocket for a white-line track, else the lesion itself.
+export function lesionSpot(L) {
+  return L?.pocket ?? L;
+}
+
+// Distance from (x, y) to a polyline, and how far along it (0..1) the nearest point sits.
+export function distToPath(x, y, path) {
+  let best = Infinity, at = 0, run = 0, total = 0;
+  for (let k = 1; k < path.length; k++) total += Math.hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]);
+  for (let k = 1; k < path.length; k++) {
+    const [ax, ay] = path[k - 1], [bx, by] = path[k];
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (len * len)));
+    const d = Math.hypot(x - (ax + t * dx), y - (ay + t * dy));
+    if (d < best) { best = d; at = (run + t * len) / (total || 1); }
+    run += len;
+  }
+  return { d: best, u: at };
+}
+
 // The claw without the lesion: it carries the block.
 export function soundClaw(caseDef) {
   if (!caseDef.lesion) return CLAW.NONE; // a sound foot: both claws are sound, neither needs a block
@@ -179,6 +205,8 @@ export class Hoof {
     this.edge = new Float32Array(n);
     this.tgt = new Float32Array(n); // per-cell trim target (mm), feathered across zone edges
     this.noise = new Float32Array(n);
+    this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
+    this.drained = false;           // the abscess pocket has been opened and has drained
     this.block = CLAW.NONE;
     this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
     this.wrapClaw = CLAW.NONE;
@@ -280,7 +308,8 @@ export class Hoof {
 
     // Lesion: a core of exposed corium hidden under a cap of loose horn.
     const L = cd.lesion;
-    if (L) this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
+    if (L?.type === 'whiteline') this.buildTract(L);
+    else if (L) this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
       if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw) return;
       this.zone[i] &= ~Z.DISH;
       this.loose[i] = this.looseInit[i] = LOOSE.ULCER;
@@ -298,6 +327,32 @@ export class Hoof {
     });
 
     this.init.set(this.thick);
+  }
+
+  // White-line abscess: under-run horn along the white line from where it opens at the wall
+  // (path[0]) to a pocket of pus under the sole. Opening it means paring along it from the entry.
+  buildTract(L) {
+    const P = L.pocket;
+    for (let i = 0; i < this.n; i++) {
+      if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw || this.edge[i] < 2.5) continue;
+      const x = this.cellX(i), y = this.cellY(i);
+      const inPocket = Math.hypot(x - P.x, y - P.y) <= P.r;
+      const { d, u } = distToPath(x, y, L.path);
+      if (!inPocket && d > L.w) continue;
+      this.tract[i] = inPocket ? TRACT.POCKET : u * L.len < 8 ? TRACT.ENTRY : TRACT.TRACK;
+      this.loose[i] = this.looseInit[i] = LOOSE.TRACT;
+      this.zone[i] &= ~Z.DISH;
+    }
+  }
+
+  // Can the knife open tract cell i yet? Only from the entry, or next to an opened cell:
+  // following the line is the only way to the pocket.
+  tractOpenable(i) {
+    if (this.tract[i] === TRACT.ENTRY) return true;
+    const cols = this.g.cols, x = i % cols;
+    const open = (j) => this.looseInit[j] === LOOSE.TRACT && !this.loose[j];
+    return (x > 0 && open(i - 1)) || (x < cols - 1 && open(i + 1)) ||
+      (i >= cols && open(i - cols)) || (i + cols < this.n && open(i + cols));
   }
 
   stampExact(x, y, r, fn) {
@@ -323,11 +378,11 @@ export class Hoof {
     const z = this.zone[i];
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
     if (z & Z.DEAD) return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
-    if (this.looseInit[i] === LOOSE.ULCER) {
-      const finding = this.caseDef.findings?.find((f) => f.kind === this.caseDef.lesion.type) ?? null;
-      return diagnosed
-        ? { kind: 'lesion', finding, text: 'The ulcer. Open it up and keep weight off it.' }
-        : { kind: 'lesion', finding, text: 'It springs under the testers. Something soft under there.' };
+    const L = this.caseDef.lesion;
+    if (L && this.looseInit[i] === LESION_LOOSE[L.type]) {
+      const finding = this.caseDef.findings?.find((f) => f.kind === L.type) ?? null;
+      if (this.drained) return { kind: 'firm', text: 'Drained. The pressure’s off: keep weight off this claw.' };
+      return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
     }
     // Decoys sit in the surface horn: once it's trimmed away there is nothing left to read.
     const f = this.findingAt(i);
@@ -354,7 +409,7 @@ export class Hoof {
     const n = this.thick.length;
     const out = new Float32Array(n);
     const bears = (i) => (this.zone[i] & Z.LIVE) && !(this.zone[i] & (Z.DEAD | Z.DISH | Z.HEEL | Z.ULCER))
-      && this.looseInit[i] !== LOOSE.ULCER && this.thick[i] > 0.05;
+      && this.looseInit[i] !== LOOSE.ULCER && this.looseInit[i] !== LOOSE.TRACT && this.thick[i] > 0.05;
     const top = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
     for (let i = 0; i < n; i++) if (bears(i)) top[this.claw[i]] = Math.max(top[this.claw[i]], this.thick[i]);
     for (let i = 0; i < n; i++) {
@@ -375,7 +430,7 @@ export class Hoof {
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
-      looseN: { 1: 0, 2: 0 }, looseLeft: { 1: 0, 2: 0 }, tintSum: 0,
+      looseN: { 1: 0, 2: 0, 3: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0 }, tintSum: 0,
       thinCells: 0, overWB: 0, wbN: 0, overDish: 0, dishN: 0,
       triCut: 0, triN: 0, heelRemoved: 0, heelN: 0, blood: 0,
     };
@@ -404,7 +459,8 @@ export class Hoof {
         if (lg === LOOSE.ULCER) m.tintSum += this.tint[i];
       }
 
-      if (z & Z.ULCER) continue;
+      // The ulcer core and the pared-out white-line groove are meant to sit low.
+      if ((z & Z.ULCER) || lg === LOOSE.TRACT) continue;
       // Horn under the block can't be rasped, and no longer needs to be.
       if (!(z & Z.HEEL) && !(this.block && c === this.block)) {
         m.roughSum += this.rough[i];
@@ -445,6 +501,7 @@ export class Hoof {
     m.looseRemain = {
       1: m.looseN[1] ? m.looseLeft[1] / m.looseN[1] : 0,
       2: m.looseN[2] ? m.looseLeft[2] / m.looseN[2] : 0,
+      3: m.looseN[3] ? m.looseLeft[3] / m.looseN[3] : 0,
     };
     // How well the opened ulcer has been flushed with the spray (0..1).
     m.lesionTint = m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER] : 0;

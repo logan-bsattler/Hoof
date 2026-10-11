@@ -5,7 +5,7 @@
 
 import { CFG } from './config.js';
 import { roundRect } from './toolart.js';
-import { CLAW, clawPolygon } from './hoof.js';
+import { CLAW, clawPolygon, lesionSpot } from './hoof.js';
 import { mulberry32, valueNoise, fbm, smoothstep } from './noise.js';
 
 const { w: W, h: H } = CFG.view;
@@ -117,7 +117,7 @@ export class Walkoff {
     c.fill(this.contact);
     c.restore();
     c.globalAlpha = k;
-    const L = this.hoof.caseDef.lesion;
+    const L = lesionSpot(this.hoof.caseDef.lesion);
     c.textAlign = 'center';
     if (L) {
       c.setLineDash([5, 4]);

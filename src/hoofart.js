@@ -11,7 +11,7 @@
 // All art is procedural: nothing here is traced from reference footage.
 
 import { CFG } from './config.js';
-import { Z, CLAW, LOOSE, GEOM, DECOY_DEPTH, clawPolygon } from './hoof.js';
+import { Z, CLAW, LOOSE, GEOM, DECOY_DEPTH, clawPolygon, distToPath } from './hoof.js';
 import { mulberry32, valueNoise, fbm, smoothstep } from './noise.js';
 
 export const MARK = { NONE: 0, GRINDER: 1, KNIFE: 2, RASP: 3 };
@@ -280,9 +280,12 @@ export class HoofArt {
       this.bloodF = new Float32Array(hoof.n);
       // Where the ulcer's cap of loose horn started: the pocket can only open inside it.
       this.ulcerF = new Float32Array(hoof.n);
+      // Likewise the white-line track's under-run horn: the groove can only open along it.
+      this.tractF = new Float32Array(hoof.n);
       for (let i = 0; i < hoof.n; i++) {
         this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i];
         this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
+        this.tractF[i] = hoof.looseInit[i] === LOOSE.TRACT ? 1 : 0;
       }
       this.markT.fill(0);
       this.octx.save();
@@ -427,9 +430,19 @@ export class HoofArt {
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell;
     const d = this.img.data;
     const { thick, init, mud, rough, tint } = hoof;
-    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF;
+    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const lesionC = L?.claw ?? CLAW.NONE, heelC = LH.claw;
+    // The ulcer art keys off dL (distance to the ulcer) and Lr; with no ulcer, dL stays huge.
+    const ulcerC = L?.type === 'ulcer' ? L.claw : CLAW.NONE, Lr = ulcerC ? L.r : 0;
+    // The white-line track's box: pixels outside it skip the per-pixel path distance.
+    const T = L?.type === 'whiteline' ? L : null;
+    let tb = null;
+    if (T) {
+      const K = T.pocket, m = T.w * 2.2, xs = T.path.map((q) => q[0]), ys = T.path.map((q) => q[1]);
+      tb = [Math.min(...xs, K.x - K.r * 1.8) - m, Math.min(...ys, K.y - K.r * 1.8) - m,
+        Math.max(...xs, K.x + K.r * 1.8) + m, Math.max(...ys, K.y + K.r * 1.8) + m];
+    }
     const heelY = GEOM.heelY;
     const decoys = (hoof.caseDef.findings ?? []).filter((f) => f.kind !== L?.type);
 
@@ -542,8 +555,7 @@ export class HoofArt {
           gx += (reliefOut[1] / cell) * RELIEF;
           gy += (reliefOut[2] / cell) * RELIEF;
           sheen = 1 - 0.6 * r;
-          const onLesion = c === lesionC;
-          const dL = onLesion ? Math.hypot(lx - L.x, ly - L.y) : 1e9;
+          const dL = c === ulcerC ? Math.hypot(lx - L.x, ly - L.y) : 1e9;
           let decoyDark = 0;
 
           // 1. Ivory sole, coloured by thickness.
@@ -594,8 +606,8 @@ export class HoofArt {
           }
 
           // 2. Bruise streaks around the ulcer, running toward the toe.
-          if (dL < L.r * 4.2) {
-            const fall = (1 - dL / (L.r * 4.2)) * (ly > L.y - L.r * 0.5 ? 1 : 0.45);
+          if (dL < Lr * 4.2) {
+            const fall = (1 - dL / (Lr * 4.2)) * (ly > L.y - Lr * 0.5 ? 1 : 0.45);
             const br = smoothstep(0.5, 0.78, nStreak[p] / 255) * fall * 0.8;
             R += (222 - R) * br; G += (112 - G) * br; B += (124 - B) * br;
           }
@@ -617,7 +629,7 @@ export class HoofArt {
 
           // Lesion cap: a small dark hole in the horn over the ulcer.
           let lf = 0;
-          if (dL < L.r * 2.4) {
+          if (dL < Lr * 2.4) {
             lf = sm(looseF);
             const holeR = 2.1 + ncv * 1.1;
             if (dL < holeR * 2.4) {
@@ -672,8 +684,8 @@ export class HoofArt {
               sr += (40 - sr) * res * 0.8; sg += (29 - sg) * res * 0.8; sb += (17 - sb) * res * 0.8;
               crust = Math.max(crust, res * st * 0.8);
               // The dark, cracked patch that gives the ulcer away on a cleaned foot.
-              if (dL < L.r * 1.9) {
-                const k = smoothstep(L.r * 1.9, L.r * 0.4, dL) * 0.55;
+              if (dL < Lr * 1.9) {
+                const k = smoothstep(Lr * 1.9, Lr * 0.4, dL) * 0.55;
                 sr *= 1 - k; sg *= 1 - k; sb *= 1 - k;
                 if (Math.abs(ncv - 0.5) < 0.02 && ngr > 0.35) { sr *= 0.7; sg *= 0.7; sb *= 0.7; }
               }
@@ -683,7 +695,7 @@ export class HoofArt {
           }
 
           // 4. Opened cavity: wet peach/pink tissue in layers, corium at the core.
-          if (dL < L.r * 2.4) {
+          if (dL < Lr * 2.4) {
             // Ragged opening: the edge wanders with two scales of noise. It follows the knife
             // where the cap was cut, and the cap's own ragged outline where it is all gone.
             const thr = 0.22 + 0.36 * ncv + 0.3 * (nIsle[p] / 255 - 0.5);
@@ -691,7 +703,7 @@ export class HoofArt {
             const uf = fieldAt(ulcerF, lx + (nIsle[p] / 255 - 0.5) * 9, ly + (nStain[p] / 255 - 0.5) * 9), ut = 0.3 + 0.4 * ncv + 0.2 * (ngr - 0.5);
             const open = smoothstep(thr + 0.08, thr - 0.08, lf) * smoothstep(ut - 0.06, ut + 0.06, uf);
             if (open > 0) {
-              const u = dL / L.r;
+              const u = dL / Lr;
               // Loose layers: wet, translucent pale-yellow horn, greyer where it sits deeper, with
               // dark crevices between flaps. Noise contours, not rings, so no two flaps match.
               const ls = nStreak[p] / 255;
@@ -724,9 +736,39 @@ export class HoofArt {
             }
           }
 
+          // White-line abscess: a dark seam of packed grit in the white line, the pared groove
+          // that follows it in from the wall, and the drained pocket at its end.
+          if (c === lesionC && T && lx > tb[0] && lx < tb[2] && ly > tb[1] && ly < tb[3]) {
+            const dT = distToPath(lx, ly, T.path).d, K = T.pocket, dP = Math.hypot(lx - K.x, ly - K.y);
+            const lf = sm(looseF);
+            // Sealed: a ragged dark line, thinner than the track, and a faint grey shadow over
+            // the pocket where the pus pools under the sole.
+            const sw = T.w * (0.45 + 0.35 * ncv);
+            const seam = smoothstep(sw, sw * 0.3, dT + (ngr - 0.5) * 1.2) * lf * 0.85;
+            R += (58 - R) * seam; G += (48 - G) * seam; B += (40 - B) * seam;
+            const pool = smoothstep(K.r * 1.3, K.r * 0.3, dP) * 0.16 * lf;
+            R *= 1 - pool; G *= 1 - pool; B *= 1 - pool * 0.8;
+            // Opened: walls of clean pale horn, grey grit and pus along the bottom, heaviest in the
+            // pocket. The footprint is read through a warped lookup so the groove's edge is ragged.
+            const tf = fieldAt(tractF, lx + (nIsle[p] / 255 - 0.5) * 5, ly + (nStain[p] / 255 - 0.5) * 5);
+            const open = smoothstep(0.65, 0.25, lf) * smoothstep(0.25, 0.55, tf);
+            if (open > 0) {
+              const inPocket = smoothstep(K.r * 1.1, K.r * 0.6, dP);
+              const bottom = Math.max(smoothstep(T.w * 0.9, T.w * 0.2, dT), inPocket);
+              let cr = 228 - 10 * ngr, cg = 210 - 10 * ngr, cb = 176 - 8 * ngr;
+              const pus = bottom * (0.5 + 0.35 * inPocket) * (0.8 + 0.4 * ncv);
+              cr += (74 - cr) * pus; cg += (70 - cg) * pus; cb += (62 - cb) * pus;
+              // Pink-grey corium shows through at the pocket's centre once it has drained.
+              const core = smoothstep(0.55, 0.2, dP / K.r + (ncv - 0.5) * 0.4) * inPocket * 0.6;
+              cr += (168 - cr) * core; cg += (110 - cg) * core; cb += (106 - cb) * core;
+              R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
+              wetness = Math.max(wetness, open * (0.4 + 0.6 * bottom));
+            }
+          }
+
           // Light spray tint on the horn.
           const tn = sm(tint);
-          if (tn > 0.01 && dL > L.r * 1.6) {
+          if (tn > 0.01 && dL > Lr * 1.6) {
             const k = tn * 0.16;
             R += (140 - R) * k; G += (206 - G) * k; B += (184 - B) * k;
           }
