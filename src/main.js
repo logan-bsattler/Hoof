@@ -1,5 +1,5 @@
 // Game bootstrap: state machine, input, and the frame loop.
-// intro → play → (failing → fail) | (walkoff → results)
+// title → intro → play → (failing → fail) | (walkoff → results)
 
 import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
@@ -8,6 +8,7 @@ import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, appl
 import { STEPS, evaluateSteps, trimFinished, stepTip } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
 import { Renderer } from './render.js';
+import { paintScenery } from './scenery.js';
 import { fitCamera, toScene } from './view.js';
 import { Particles } from './particles.js';
 import { Sound, buzz } from './audio.js';
@@ -22,7 +23,7 @@ const renderer = new Renderer(canvas);
 const particles = new Particles();
 
 const game = {
-  state: 'intro',
+  state: 'title',
   hoof: null,
   session: null,
   metrics: null,
@@ -541,6 +542,8 @@ function frame(now) {
   last = now;
   game.time += dt;
   game.shake = Math.max(0, game.shake - dt * 25);
+  // No case is dealt until the title card is tapped; the card covers the canvas meanwhile.
+  if (game.state === 'title') { requestAnimationFrame(frame); return; }
 
   if (game.state === 'play') {
     const ptr = game.ptr;
@@ -664,9 +667,48 @@ function draw() {
   if (game.state === 'play') renderer.cursor(game.tool, game.ptr, hoof, game.guides, game.time);
 }
 
+// Title card, once per launch. Browsers only allow audio after a gesture, so the first tap
+// starts the barn's room tone and a distant moo as the card fades into the case.
+function showTitle() {
+  const el = document.getElementById('title');
+  const barn = document.getElementById('titleBarn');
+  const paint = () => {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const sw = CFG.view.w + 2 * CFG.view.phone.bleed, sh = CFG.view.h;
+    const cw = el.clientWidth, ch = el.clientHeight;
+    const s = Math.max(cw / sw, ch / sh); // cover
+    barn.width = Math.round(cw * dpr);
+    barn.height = Math.round(ch * dpr);
+    const img = paintScenery(s * dpr);
+    barn.getContext('2d').drawImage(img, (barn.width - img.width) / 2, (barn.height - img.height) / 2);
+  };
+  paint();
+  window.addEventListener('resize', paint);
+  return new Promise((resolve) => {
+    const go = (e) => {
+      if (e.type === 'keydown') {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault(); // or the same key press activates the case card's first button
+      }
+      el.removeEventListener('pointerup', go);
+      el.removeEventListener('keydown', go);
+      window.removeEventListener('resize', paint);
+      Sound.init();
+      Sound.setEnabled(game.sound);
+      Sound.distantMoo(0.5);
+      el.classList.add('leaving');
+      setTimeout(() => el.remove(), 450);
+      resolve(); // the case card comes up under the fade
+    };
+    el.addEventListener('pointerup', go);
+    el.addEventListener('keydown', go);
+    el.focus();
+  });
+}
+
 // Dev aid: ?debug exposes the game state and renderer (its .cam maps logical ↔ screen) in the console.
 if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { hoofGame: game, hoofRenderer: renderer });
 
 resize();
-showIntro();
+showTitle().then(showIntro);
 requestAnimationFrame(frame);

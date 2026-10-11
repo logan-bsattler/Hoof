@@ -64,7 +64,7 @@ async function loadSamples() {
 
 // Plays one of `names` (picked at random) with a little pitch and gain variation.
 // Returns false when no recording is loaded so the caller can fall back.
-function sample(names, { gain = 0.5, jitter = 0.06, delay = 0, minGap = 0 } = {}) {
+function sample(names, { gain = 0.5, jitter = 0.06, delay = 0, minGap = 0, lp = 0 } = {}) {
   if (!ctx) return false;
   const list = (Array.isArray(names) ? names : [names]).filter((n) => buffers[n]);
   if (!list.length) return false;
@@ -77,7 +77,13 @@ function sample(names, { gain = 0.5, jitter = 0.06, delay = 0, minGap = 0 } = {}
   s.playbackRate.value = 1 + (Math.random() * 2 - 1) * jitter;
   const g = ctx.createGain();
   g.gain.value = gain * (0.85 + Math.random() * 0.15);
-  s.connect(g).connect(master);
+  let out = s.connect(g);
+  if (lp) { // muffled, as if from the far end of the barn
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = lp;
+    out = out.connect(f);
+  }
+  out.connect(master);
   s.start(t);
   return true;
 }
@@ -273,6 +279,11 @@ export const Sound = {
     burst({ dur: 0.06, freq: 700, type: 'lowpass', gain: 0.3 });
     tone({ freq: 140, to: 90, dur: 0.06, gain: 0.12 });
   },
+  // A cow somewhere down the barn, under the room tone: the title card's first sound.
+  distantMoo(delay = 0) {
+    sample('moo', { gain: 0.16, jitter: 0.05, delay, lp: 900 });
+  },
+
   moo(flinch = false) {
     if (!ctx) return;
     if (flinch) {

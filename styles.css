@@ -313,3 +313,69 @@ button.primary[hidden] { display: none; }
 
 /* The coach card replaces the plain step tip during the guided run. */
 body.tutorial #stepTip { display: none; }
+
+/* ---- title card (once per launch; the first tap also unlocks audio) ---- */
+.title {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  cursor: pointer;
+  overflow: hidden;
+  transition: opacity 0.45s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.title.leaving { opacity: 0; pointer-events: none; }
+#titleBarn { position: absolute; inset: 0; width: 100%; height: 100%; }
+.title::before {
+  /* Lamplight on the chute, falling off into the dark barn. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 55% at 50% 45%, rgba(29,22,17,0.35), rgba(16,11,8,0.92) 75%);
+  z-index: 1;
+}
+.title-inner { position: relative; z-index: 2; text-align: center; padding: 16px; }
+.title-mark { width: min(36vw, 150px); height: auto; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.6)); }
+.title-mark path { fill: #f1e7d0; stroke: var(--brass); stroke-width: 22; stroke-linejoin: round; }
+.title-mark path.line { fill: none; stroke: #8a5a2b; stroke-width: 12; stroke-linecap: round; }
+.title-logo {
+  margin: 14px 0 6px;
+  font-family: Georgia, serif;
+  font-size: clamp(40px, 12vw, 64px);
+  letter-spacing: 0.08em;
+  color: var(--text);
+  text-shadow: 0 4px 20px rgba(0,0,0,0.7);
+}
+.title-logo span { color: var(--brass); }
+.title-tag { margin: 0 auto 28px; max-width: 30ch; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.title-go {
+  display: inline-block;
+  margin: 0;
+  padding: 12px 28px;
+  border: 1px solid var(--brass);
+  border-radius: 999px;
+  color: var(--brass);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  animation: titlePulse 2.4s ease-in-out infinite;
+}
+.title-fine {
+  position: absolute;
+  z-index: 2;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 0; right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+@keyframes titlePulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .title { transition: none; }
+  .title-go { animation: none; }
+}
