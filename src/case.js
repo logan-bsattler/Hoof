@@ -25,14 +25,14 @@ function buildCase(condition, { seed, side, excess, lesion, looseHorn, decoys })
     // Excess sole (mm above target) on each claw. Outer hind claws overgrow most.
     excess,
 
-    // The hidden lesion, its kind named by the condition's diagnosis.
-    lesion: { type: C.diagnosis, ...lesion },
+    // The hidden lesion, its kind named by the condition's diagnosis (null on a sound foot).
+    lesion: lesion && { type: C.diagnosis, ...lesion },
 
     // A curl of loose heel horn for step 5, on the sound claw.
     looseHorn,
 
     // Marks the testers can read: the lesion and the decoys that only look like trouble.
-    findings: [{ kind: C.diagnosis, ...lesion }, ...decoys].map((f) => ({ ...f, ...FINDING[f.kind] })),
+    findings: [...(lesion ? [{ kind: C.diagnosis, ...lesion }] : []), ...decoys].map((f) => ({ ...f, ...FINDING[f.kind] })),
 
     diagnosis: C.diagnosis,
     ...C.copy({ cow, leg, lesion }),
@@ -51,6 +51,14 @@ export function makeCase(condition, seed, mods = {}) {
   const placed = C.place(rand, side);
   const excess = { [CLAW.OUTER]: between(3.5, 5.5), [CLAW.INNER]: between(1.8, 3.0) };
   return buildCase(condition, { seed, side, excess, ...placed, ...mods });
+}
+
+// Any condition, picked by its weight. Until the route (WP7.4) chooses per farm.
+export function dealCase(seed) {
+  const ids = Object.keys(CONDITIONS);
+  let r = mulberry32(seed ^ 0x5eed)() * ids.reduce((a, id) => a + CONDITIONS[id].weight, 0);
+  const id = ids.find((k) => (r -= CONDITIONS[k].weight) < 0) ?? ids[0];
+  return makeCase(id, seed);
 }
 
 export const CASE_B = makeCase('ulcer', 214, {

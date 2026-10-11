@@ -3,7 +3,7 @@
 
 import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE } from './hoof.js';
-import { CASE_B, makeCase } from './case.js';
+import { CASE_B, dealCase, makeCase } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
@@ -17,7 +17,9 @@ import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
 
 // The first run is the hand-built Case B; "Trim another" deals a fresh cow.
-let caseDef = CASE_B;
+// Dev aid: ?cond=<condition id>[&seed=n] starts on that condition instead.
+const devCase = new URLSearchParams(location.search);
+let caseDef = devCase.has('cond') ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1)) : CASE_B;
 const canvas = document.getElementById('game');
 const renderer = new Renderer(canvas);
 const particles = new Particles();
@@ -120,10 +122,12 @@ async function showIntro() {
        <li><b>Clean</b> to reveal what’s hiding under the muck.</li>
        <li><b>Read</b> it with the hoof testers before you commit.</li>
        <li><b>Trim</b> the five steps in order: balance beats speed.</li>
-       <li><b>Treat</b> it: flush, pad and wrap before she goes.</li>
+       ${caseDef.requires?.treat ? '<li><b>Treat</b> it: flush, pad and wrap before she goes.</li>' : '<li><b>Leave</b> what’s firm alone: not every mark is trouble.</li>'}
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
-    [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }],
+    caseDef.condition === 'ulcer'
+      ? [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }]
+      : [{ id: 'start', label: 'Lift the foot', primary: true }],
   );
   Sound.init();
   Sound.setEnabled(game.sound);
@@ -314,6 +318,7 @@ const WRAP_MSG = {
   sound: 'That’s the sound claw: it has the block. The pad and wrap go over the ulcer.',
   closed: 'Open the ulcer first. Pare the loose horn off it with the knife.',
   unflushed: 'Flush the opened ulcer with the spray bottle before you cover it.',
+  nothing: 'She’s sound: nothing to pad or wrap.',
   early: 'Finish the trim first. The wrap goes on last, just before she’s released.',
   done: 'She’s wrapped. Release her.',
 };
@@ -370,7 +375,9 @@ function placeBlock(claw) {
   Sound.clunk();
   buzz(30);
   game.shake = 4;
-  if (claw === caseDef.lesion.claw) {
+  if (!caseDef.lesion) {
+    ui.toast('She’s sound. A block only goes on to rest a sore claw.', 'warn', 4000);
+  } else if (claw === caseDef.lesion.claw) {
     ui.toast('That’s the sore claw! The block goes on the SOUND claw so the ulcer can rest.', 'warn', 4000);
   } else {
     ui.toast(`Block glued to the sound ${CLAW_NAME[claw]} claw. The ulcer is off the ground now.`, 'good');
@@ -500,7 +507,7 @@ async function showResults() {
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,
     [{ id: 'again', label: 'Trim another', primary: true }],
   );
-  caseDef = makeCase('ulcer', (Math.random() * 1e9) >>> 0);
+  caseDef = dealCase((Math.random() * 1e9) >>> 0);
   showIntro();
 }
 
@@ -599,7 +606,7 @@ function frame(now) {
         else ui.toast('Every step done. Release her and watch her walk.', 'good', 4500);
       }
       // The pressure-release beat: first time the ulcer is opened.
-      if (!game.session.released && game.metrics.looseRemain[LOOSE.ULCER] < 0.6) {
+      if (!game.session.released && caseDef.lesion && game.metrics.looseRemain[LOOSE.ULCER] < 0.6) {
         game.session.released = true;
         const L = caseDef.lesion;
         Sound.release();

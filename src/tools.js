@@ -240,6 +240,7 @@ export function applySpray(hoof, x, y, dt) {
 // Returns { ok, stage } or { ok: false, reason }.
 export function applyWrap(hoof, claw, m, ready) {
   const L = hoof.caseDef.lesion;
+  if (!L) return { ok: false, reason: 'nothing' };
   if (!claw) return { ok: false, reason: 'miss' };
   if (claw !== L.claw) return { ok: false, reason: 'sound' };
   if (hoof.wrap >= 2) return { ok: false, reason: 'done' };

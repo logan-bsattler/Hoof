@@ -118,14 +118,16 @@ export class Walkoff {
     c.restore();
     c.globalAlpha = k;
     const L = this.hoof.caseDef.lesion;
-    c.setLineDash([5, 4]);
-    c.strokeStyle = '#8fd0ff';
-    c.lineWidth = 2;
-    c.beginPath(); c.arc(L.x, L.y, L.r * 2.1, 0, TAU); c.stroke();
-    c.setLineDash([]);
-    c.font = 'bold 14px system-ui, sans-serif';
     c.textAlign = 'center';
-    pill(c, 'off the floor', L.x, L.y + L.r * 2.1 + 20, '#8fd0ff');
+    if (L) {
+      c.setLineDash([5, 4]);
+      c.strokeStyle = '#8fd0ff';
+      c.lineWidth = 2;
+      c.beginPath(); c.arc(L.x, L.y, L.r * 2.1, 0, TAU); c.stroke();
+      c.setLineDash([]);
+      c.font = 'bold 14px system-ui, sans-serif';
+      pill(c, 'off the floor', L.x, L.y + L.r * 2.1 + 20, '#8fd0ff');
+    }
     c.font = 'bold 18px system-ui, sans-serif';
     pill(c, 'Weight test: where she stands', W / 2, 150, '#c8f0c0');
     c.restore();

@@ -35,7 +35,7 @@ export const STEPS = [
   },
   {
     id: 'step3', label: '3 · Dish out both claws', tool: 'knife',
-    tip: 'With the knife, carve the dish along the inner edge of each claw (dashed channel) so weight comes off the ulcer site. Stay out of the toe triangle.',
+    tip: (cd) => `With the knife, carve the dish along the inner edge of each claw (dashed channel) so weight comes off ${cd.lesion ? 'the ulcer site' : 'the sole/heel junction, where ulcers start'}. Stay out of the toe triangle.`,
     done: (m) => m.claws[CLAW.INNER].dishMean <= D + TOL && m.claws[CLAW.OUTER].dishMean <= D + TOL,
   },
   // The rasp trues up the sole before the block goes on and covers one claw.

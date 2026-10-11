@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
 import { Hoof, Z, CLAW, LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
-import { CASE_B, makeCase } from '../src/case.js';
+import { CASE_B, makeCase, dealCase } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { stepsFor } from '../src/steps.js';
 import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
@@ -26,6 +26,7 @@ function idealTrim(hoof) {
   }
   for (let i = 0; i < hoof.n; i++) if (hoof.looseInit[i] === LOOSE.ULCER) hoof.tint[i] = 1;
   hoof.block = soundClaw(hoof.caseDef);
+  if (!hoof.caseDef.lesion) return; // a sound foot gets no block and no wrap
   hoof.wrap = 2;
   hoof.wrapClaw = hoof.caseDef.lesion.claw;
 }
@@ -38,8 +39,9 @@ function findCell(hoof, pred) {
 
 function idealSession(cd = CASE_B) {
   return {
-    ...newSession(), diagnosis: 'ulcer', diagnosisCorrect: true, probes: ['ulcer'],
-    firstCutClaw: CLAW.INNER, blockAttempts: [soundClaw(cd)],
+    ...newSession(), diagnosis: cd.diagnosis, diagnosisCorrect: true,
+    probes: cd.lesion ? [cd.lesion.type] : cd.findings.map((f) => f.kind),
+    firstCutClaw: CLAW.INNER, blockAttempts: cd.lesion ? [soundClaw(cd)] : [],
   };
 }
 
@@ -322,8 +324,9 @@ async function idealRun(cd) {
   idealTrim(h);
   const m = h.metrics();
   const { status } = evaluateSteps(m, idealSession(cd), h, 1);
-  const t = new Tutorial(cd);
-  t.update(m, idealSession(cd), h);
+  // The guided run is written for the ulcer case only.
+  const t = cd.condition === 'ulcer' ? new Tutorial(cd) : null;
+  t?.update(m, idealSession(cd), h);
   return { h, status, r: scoreCase(m, idealSession(cd), h, cd), t };
 }
 
@@ -384,20 +387,54 @@ for (const id of Object.keys(CONDITIONS)) test(`${id}: 50 dealt cows all build, 
     const cd = makeCase(id, seed);
     assert.equal(cd.condition, id);
     assert.ok(stepsFor(cd).every(Boolean), `seed ${seed}: every step id exists`);
-    sides.add(cd.side); sore.add(cd.lesion.claw);
     const L = cd.lesion;
-    assert.ok(insideClaw(L.claw, L.x, L.y, cd.side, 4), `seed ${seed}: lesion outside its claw`);
+    sides.add(cd.side); sore.add(L?.claw);
+    if (L) assert.ok(insideClaw(L.claw, L.x, L.y, cd.side, 4), `seed ${seed}: lesion outside its claw`);
     assert.ok(insideClaw(cd.looseHorn.claw, cd.looseHorn.x, cd.looseHorn.y, cd.side, 4), `seed ${seed}: heel horn`);
     assert.ok(cd.excess[CLAW.OUTER] > cd.excess[CLAW.INNER], `seed ${seed}: outer overgrows most`);
-    assert.ok(cd.findings.length >= 2, `seed ${seed}: at least one decoy`);
+    assert.ok(cd.findings.length >= (L ? 2 : 1), `seed ${seed}: at least one decoy`);
+    for (const f of cd.findings) assert.ok(insideClaw(f.claw, f.x, f.y, cd.side, 4), `seed ${seed}: ${f.kind} outside its claw`);
     const { h, status, r, t } = await idealRun(cd);
-    assert.ok(h.metrics().looseN[LOOSE.ULCER] > 10, `seed ${seed}: ulcer cells`);
+    if (L) assert.ok(h.metrics().looseN[LOOSE.ULCER] > 10, `seed ${seed}: ulcer cells`);
+    else assert.equal(h.metrics().looseN[LOOSE.ULCER], 0, `seed ${seed}: no ulcer cells on a sound foot`);
     for (const s of status) assert.ok(s.done, `seed ${seed}: ${s.id}`);
     assert.equal(r.grade, 'Textbook', `seed ${seed}: ${r.total} ${r.notes.join(' | ')}`);
-    assert.equal(t.finished, true, `seed ${seed}: tutorial`);
+    if (t) assert.equal(t.finished, true, `seed ${seed}: tutorial`);
   }
   assert.equal(sides.size, 2, 'both hind feet dealt');
-  assert.equal(sore.size, 2, 'both claws ulcerate');
+  if (CONDITIONS[id].steps.includes('step4')) assert.equal(sore.size, 2, 'both claws carry the lesion');
+});
+
+test('routine: opening a decoy, a needless block or a misread all cost points', () => {
+  const cd = makeCase('routine', 3);
+  const clean = new Hoof(cd);
+  idealTrim(clean);
+  const base = scoreCase(clean.metrics(), idealSession(cd), clean, cd);
+  assert.equal(base.grade, 'Textbook', base.notes.join(' | '));
+
+  const dug = new Hoof(cd);
+  idealTrim(dug);
+  const f = cd.findings[0];
+  dug.stampExact(f.x, f.y, f.r, (i) => { if (dug.claw[i] === f.claw) dug.thick[i] = Math.max(0.5, dug.zoneTarget(i) - 2); });
+  const rDug = scoreCase(dug.metrics(), idealSession(cd), dug, cd);
+  assert.ok(rDug.parts.restraint < base.parts.restraint, 'digging a decoy costs restraint');
+  assert.ok(rDug.notes.some((n) => /dug into a mark/.test(n)), rDug.notes.join(' | '));
+
+  const blocked = new Hoof(cd);
+  idealTrim(blocked);
+  blocked.block = CLAW.OUTER;
+  const rBlock = scoreCase(blocked.metrics(), idealSession(cd), blocked, cd);
+  assert.ok(rBlock.parts.correctness <= base.parts.correctness - 20, 'needless block');
+
+  const s = { ...idealSession(cd), diagnosis: 'ulcer', diagnosisCorrect: false };
+  assert.ok(scoreCase(clean.metrics(), s, clean, cd).parts.correctness < base.parts.correctness, 'misread');
+});
+
+test('dealCase deals both conditions, and the same seed deals the same cow', () => {
+  const seen = new Set();
+  for (let seed = 1; seed <= 40; seed++) seen.add(dealCase(seed).condition);
+  assert.deepEqual([...seen].sort(), Object.keys(CONDITIONS).sort());
+  assert.deepEqual(dealCase(99), dealCase(99));
 });
 
 test('weight test: an ideal trim stands on the blocked sound claw, never on the ulcer', () => {

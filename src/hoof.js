@@ -110,6 +110,7 @@ export function dishRect(claw, side = 'LH') {
 
 // The claw without the lesion: it carries the block.
 export function soundClaw(caseDef) {
+  if (!caseDef.lesion) return CLAW.NONE; // a sound foot: both claws are sound, neither needs a block
   return caseDef.lesion.claw === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
 }
 
@@ -279,7 +280,7 @@ export class Hoof {
 
     // Lesion: a core of exposed corium hidden under a cap of loose horn.
     const L = cd.lesion;
-    this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
+    if (L) this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
       if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw) return;
       this.zone[i] &= ~Z.DISH;
       this.loose[i] = this.looseInit[i] = LOOSE.ULCER;
@@ -330,7 +331,7 @@ export class Hoof {
     }
     // Decoys sit in the surface horn: once it's trimmed away there is nothing left to read.
     const f = this.findingAt(i);
-    if (f && f.kind !== 'ulcer' && this.init[i] - this.thick[i] < DECOY_DEPTH[f.kind]) {
+    if (f && f.kind !== this.caseDef.lesion?.type && this.init[i] - this.thick[i] < DECOY_DEPTH[f.kind]) {
       return { kind: f.kind, finding: f, text: f.probeText };
     }
     if (this.looseInit[i] === LOOSE.HEEL && this.loose[i]) {

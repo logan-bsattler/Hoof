@@ -144,7 +144,7 @@ export class Renderer {
     drawStrap(c);
 
     // Colour-blind-safe lesion marker once it's been diagnosed.
-    if (diagnosed && hoof.wrap < 1) {
+    if (diagnosed && hoof.wrap < 1 && hoof.caseDef.lesion) {
       const L = hoof.caseDef.lesion;
       c.save();
       c.setLineDash([4, 3]);
@@ -289,6 +289,7 @@ export class Renderer {
   dressing(hoof, ghostClaw = 0) {
     const c = this.ctx;
     const L = hoof.caseDef.lesion;
+    if (!L) return;
     if (hoof.wrap >= 1) {
       const pts = clawPolygon(hoof.wrapClaw, false, hoof.side);
       drawPad(c, L, pts, Math.min(1, (this.time - this.placed.pad) / 0.2));

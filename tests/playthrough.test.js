@@ -46,11 +46,19 @@ function playthrough(cd) {
   // Clean.
   until('clean', () => p.brushAll());
 
-  // Read: test the dark patch, then commit the read (main.js diagnose()).
+  // Read: test the dark patch (or, on a sound foot, the marks), then commit the read (main.js diagnose()).
   const L = cd.lesion;
-  assert.equal(hoof.probe(hoof.cellAt(L.x, L.y), false).kind, 'lesion');
-  s.probes.push('ulcer');
-  s.diagnosis = 'ulcer';
+  if (L) {
+    assert.equal(hoof.probe(hoof.cellAt(L.x, L.y), false).kind, 'lesion');
+    s.probes.push(L.type);
+  } else {
+    for (const f of cd.findings) {
+      const r = hoof.probe(hoof.cellAt(f.x, f.y), false);
+      assert.equal(r.kind, f.kind, `decoy ${f.kind} reads as itself`);
+      s.probes.push(f.kind);
+    }
+  }
+  s.diagnosis = cd.diagnosis;
   s.diagnosisCorrect = true;
   assert.ok(done('diagnose'));
 
@@ -66,10 +74,10 @@ function playthrough(cd) {
     for (const c of [CLAW.INNER, CLAW.OUTER]) {
       // Around the ulcer core, not through it: split each column where the blade would reach
       // the core. Grazing the loose cap only starts opening it, which step 4 does anyway.
-      const R = L.r + CFG.tools.knife.radius + 2;
+      const R = (L?.r ?? 0) + CFG.tools.knife.radius + 2;
       for (const x of dishX(c)) {
-        const dx = Math.abs(x - L.x);
-        if (c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
+        const dx = L ? Math.abs(x - L.x) : Infinity;
+        if (!L || c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
         const h = Math.sqrt(R * R - dx * dx);
         if (L.y - h > GEOM.dishY0 + 4) p.drag('knife', [[x, GEOM.dishY0], [x, L.y - h]], 120);
         p.drag('knife', [[x, L.y + h], [x, GEOM.dishY1]], 120);
@@ -86,18 +94,21 @@ function playthrough(cd) {
     }
   }, 20);
 
-  // Step 4: pare the loose horn off the ulcer, then block the sound claw.
-  for (let k = 0; k < 8 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) {
-    for (let a = 0; a < 6; a++) {
-      const r = 6 + a * 3;
-      p.drag('knife', [[L.x - r, L.y - r], [L.x + r * 0.5, L.y + r]], 90);
-      p.drag('knife', [[L.x + r, L.y - r], [L.x - r * 0.5, L.y + r]], 90);
+  if (cd.requires.open) {
+    // Step 4: pare the loose horn off the ulcer, then block the sound claw.
+    for (let k = 0; k < 8 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) {
+      for (let a = 0; a < 6; a++) {
+        const r = 6 + a * 3;
+        p.drag('knife', [[L.x - r, L.y - r], [L.x + r * 0.5, L.y + r]], 90);
+        p.drag('knife', [[L.x + r, L.y - r], [L.x - r * 0.5, L.y + r]], 90);
+      }
     }
+    assert.ok(hoof.metrics().looseRemain[LOOSE.ULCER] < 0.1, 'ulcer opened');
+    hoof.block = soundClaw(cd);
+    s.blockAttempts.push(hoof.block);
+    until('step4', () => {});
+
   }
-  assert.ok(hoof.metrics().looseRemain[LOOSE.ULCER] < 0.1, 'ulcer opened');
-  hoof.block = soundClaw(cd);
-  s.blockAttempts.push(hoof.block);
-  until('step4', () => {});
 
   // Step 5: flick the loose heel horn off.
   const H = cd.looseHorn;
@@ -105,16 +116,19 @@ function playthrough(cd) {
     for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
   });
 
-  // Treat: flush the opened ulcer, then pad and wrap it.
-  until('treat', () => {
-    p.drag('spray', [[L.x - 10, L.y], [L.x + 10, L.y], [L.x - 10, L.y]], 20);
-    if (hoof.metrics().lesionTint >= CFG.treat.tintMin) {
-      for (let k = 0; k < 2; k++) {
-        const r = applyWrap(hoof, L.claw, hoof.metrics(), trimFinished(steps()));
-        assert.ok(r.ok, `wrap refused: ${r.reason}`);
+  if (cd.requires.treat) {
+    // Treat: flush the opened ulcer, then pad and wrap it.
+    until('treat', () => {
+      p.drag('spray', [[L.x - 10, L.y], [L.x + 10, L.y], [L.x - 10, L.y]], 20);
+      if (hoof.metrics().lesionTint >= CFG.treat.tintMin) {
+        for (let k = 0; k < 2; k++) {
+          const r = applyWrap(hoof, L.claw, hoof.metrics(), trimFinished(steps()));
+          assert.ok(r.ok, `wrap refused: ${r.reason}`);
+        }
       }
-    }
-  });
+    });
+
+  }
 
   const m = hoof.metrics();
   const { current } = evaluateSteps(m, s, hoof, ++now);
@@ -122,7 +136,7 @@ function playthrough(cd) {
   assert.equal(m.blood, 0);
   const r = scoreCase(m, s, hoof, cd);
   const parts = Object.entries(r.parts).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(', ');
-  console.log(`playthrough ${cd.subtitle}, ulcer ${L.claw === CLAW.OUTER ? 'outer' : 'inner'}: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
+  console.log(`playthrough ${cd.subtitle}, ${L ? `ulcer ${L.claw === CLAW.OUTER ? 'outer' : 'inner'}` : cd.condition}: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
     `outer ${m.claws[CLAW.OUTER].wbMean.toFixed(2)} mm · ${r.notes.join(' | ')}`);
   assert.equal(r.grade, 'Textbook', `${r.total}: ${r.notes.join(' | ')}`);
   assert.equal(r.gait, 'sound');

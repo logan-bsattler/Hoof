@@ -16,7 +16,7 @@ export function makePlayer(hoof, opts = {}) {
   const emit = (ev, tool, x, y) => { if (onEvent) onEvent(ev, tool, x, y); return ev; };
 
   // A careful hand keeps the grinder disc off the ulcer: that's knife work.
-  const discTouchesUlcer = (x, y) =>
+  const discTouchesUlcer = (x, y) => !!L &&
     Math.hypot(x - L.x, y - L.y) < L.r * 1.75 + CFG.tools.grinder.radius;
 
   const p = {
