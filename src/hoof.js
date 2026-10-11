@@ -1,4 +1,4 @@
-// The hoof model: a grid of cells over a two-claw hind foot (sole view).
+// The hoof model: a grid of cells over a two-claw foot (sole view), hind or front.
 // Pure data + geometry — no DOM, so it can be unit-tested in Node.
 
 import { CFG } from './config.js';
@@ -144,6 +144,16 @@ export function soundClaw(caseDef) {
   return caseDef.lesion.claw === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
 }
 
+// Which claw the functional trim sets first: the smaller one, matched to it in step 2.
+// On a hind foot the outer claw overgrows, so the inner goes first; a front foot is the
+// other way round (AHDB five-step protocol: the inner front claws grow faster).
+export function firstClaw(caseDef) {
+  return caseDef?.foot === 'front' ? CLAW.OUTER : CLAW.INNER;
+}
+export function secondClaw(caseDef) {
+  return firstClaw(caseDef) === CLAW.INNER ? CLAW.OUTER : CLAW.INNER;
+}
+
 // "outer (left)": a claw's name and where it sits on screen, for coaching copy.
 export function clawWhere(claw, side = 'LH') {
   return `${CLAW_NAME[claw]} (${clawSide(claw, side) > 0 ? 'right' : 'left'})`;
@@ -211,6 +221,11 @@ export class Hoof {
     this.noise = new Float32Array(n);
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
     this.drained = false;           // the abscess pocket has been opened and has drained
+    // How caked the foot is: muck covers it fully from 1 up, and past 1 it's packed harder,
+    // so the brush shifts it more slowly (tools.js).
+    const mud = caseDef.mud ?? 1;
+    this.mudCover = Math.min(1, mud);
+    this.mudHard = Math.max(1, mud);
     this.block = CLAW.NONE;
     this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
     this.wrapClaw = CLAW.NONE;
@@ -279,7 +294,7 @@ export class Hoof {
       const span = clawSpan(c, y, this.side);
       const fromAxial = span ? (clawSide(c, this.side) > 0 ? x - span[0] : span[1] - x) : Infinity;
       const excess = cd.excess[c];
-      this.mud[i] = Math.min(1, 0.78 + 0.22 * nz + this.rand() * 0.12);
+      this.mud[i] = Math.min(1, 0.78 + 0.22 * nz + this.rand() * 0.12) * this.mudCover;
 
       if (this.zone[i] & Z.DEAD) {
         this.thick[i] = T + excess + 2.5 + nz * 0.5;

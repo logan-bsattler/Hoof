@@ -1,14 +1,16 @@
 // The case checklist: clean → diagnose → five-step trim (rasp after step 3) → treat.
 // Each step is a predicate over hoof metrics + the session log. A tip is a string, or a
-// function of the case for copy that names a claw (read it through stepTip).
+// function of the case for copy that names a claw (read it through stepTip); so is a label
+// (stepLabel). Steps 1 and 2 follow the foot: inner claw first on a hind foot, outer on a front.
 
 import { CFG } from './config.js';
-import { CLAW, CLAW_NAME, LOOSE, soundClaw } from './hoof.js';
+import { CLAW, CLAW_NAME, LOOSE, firstClaw, secondClaw, soundClaw } from './hoof.js';
 
 const { target: T, dishTarget: D, tolerance: TOL } = CFG.sole;
 
 // One-sided on purpose: horn can't be put back, so an over-trimmed claw must
 // still let the case progress. Over-trimming is charged in scoring instead.
+const cap = (w) => w[0].toUpperCase() + w.slice(1);
 const levelled = (k) => k.deadRemain < 0.12 && k.wbMean <= T + TOL;
 
 export const STEPS = [
@@ -23,15 +25,15 @@ export const STEPS = [
     done: (m, s) => !!s.diagnosis,
   },
   {
-    id: 'step1', label: '1 · Trim the first (inner) claw', tool: 'nippers',
-    tip: 'Inner claw first. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.',
-    done: (m) => levelled(m.claws[CLAW.INNER]),
+    id: 'step1', label: (cd) => `1 · Trim the first (${CLAW_NAME[firstClaw(cd)]}) claw`, tool: 'nippers',
+    tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.`,
+    done: (m, s, hoof) => levelled(m.claws[firstClaw(hoof?.caseDef)]),
   },
   {
-    id: 'step2', label: '2 · Match the outer claw', tool: 'grinder',
-    tip: 'Bring the outer claw down to match the inner. Watch the balance beam: level is the goal.',
-    // Match the outer claw to the inner claw's actual height, not the fixed target.
-    done: (m) => levelled(m.claws[CLAW.OUTER]) && Math.abs(m.levelDiff) <= 0.6,
+    id: 'step2', label: (cd) => `2 · Match the ${CLAW_NAME[secondClaw(cd)]} claw`, tool: 'grinder',
+    tip: (cd) => `Bring the ${CLAW_NAME[secondClaw(cd)]} claw down to match the ${CLAW_NAME[firstClaw(cd)]}. Watch the balance beam: level is the goal.`,
+    // Match the second claw to the first claw's actual height, not the fixed target.
+    done: (m, s, hoof) => levelled(m.claws[secondClaw(hoof?.caseDef)]) && Math.abs(m.levelDiff) <= 0.6,
   },
   {
     id: 'step3', label: '3 · Dish out both claws', tool: 'knife',
@@ -42,7 +44,7 @@ export const STEPS = [
   {
     id: 'finish', label: 'Rasp it smooth', tool: 'rasp',
     tip: 'True up the grinder marks on both soles with the rasp before the block covers one of them.',
-    done: (m) => m.roughMean < 0.15 && m.claws[CLAW.OUTER].deadRemain < 0.12,
+    done: (m, s, hoof) => m.roughMean < 0.15 && m.claws[secondClaw(hoof?.caseDef)].deadRemain < 0.12,
   },
   {
     id: 'step4', label: '4 · Open the ulcer, block the sound claw', tool: 'knife',
@@ -83,6 +85,10 @@ export function stepsFor(caseDef) {
 
 export function stepTip(step, caseDef) {
   return typeof step.tip === 'function' ? step.tip(caseDef) : step.tip;
+}
+
+export function stepLabel(step, caseDef) {
+  return typeof step.label === 'function' ? step.label(caseDef) : step.label;
 }
 
 // The wrap goes on last: every step but the treatment must be done.

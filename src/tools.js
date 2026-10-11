@@ -63,6 +63,8 @@ function newEvents() {
     drain: false, offTrack: false,
     // A blade (knife, grinder, nippers) bit into the skin of the heel cleft.
     cleftCut: false,
+    // Thinnest living sole a tool cut into this stamp (mm): the cow's flinch reads it.
+    minLive: Infinity,
   };
 }
 
@@ -87,7 +89,10 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist) {
   if (d > 0.005) ev.claws.add(hoof.claw[i]);
   if (hoof.mud[i] > 0.5) ev.dirtyCut = true;
   if (z & Z.ULCER) ev.lesionCut = true;
-  else if (hoof.thick[i] < CFG.sole.thin) ev.thin = true;
+  else {
+    if (hoof.thick[i] < CFG.sole.thin) ev.thin = true;
+    if (d > 0.005 && hoof.thick[i] < ev.minLive) ev.minLive = hoof.thick[i];
+  }
   if (hoof.thick[i] <= 0.05) {
     hoof.thick[i] = 0;
     hoof.blood[i] = 1;
@@ -158,7 +163,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
   const cfg = CFG.tools[tool];
   if (tool === 'brush') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
-      const a = Math.min(hoof.mud[i], cfg.mudRate * dist * f);
+      const a = Math.min(hoof.mud[i], (cfg.mudRate / hoof.mudHard) * dist * f);
       hoof.mud[i] -= a;
       ev.mud += a;
     });

@@ -59,6 +59,13 @@ export const CFG = {
 
   nick: { maxCells: 3, restraint: 40, capGrade: 'Sound' },
 
+  // Cow temperament, 0 calm to 1 lively (0.5 is the old default cow). Each pair runs calm → lively.
+  // flinchAt: the living sole (mm) she flinches at under a blade; kept under the dish target's
+  // band so a correct dish never sets her off. shake: how hard every flinch jolts the view.
+  // Above `fidgetFrom` she shifts her weight every `fidgetEvery` s or so while you work;
+  // above `kickFrom` a shift knocks a held tool off the foot.
+  temper: { flinchAt: [2.4, 3.6], shake: [0.6, 1.5], fidgetFrom: 0.45, fidgetEvery: [16, 6], kickFrom: 0.8 },
+
   // Treatment: how well-flushed the opened ulcer must be before it's padded and wrapped.
   treat: { tintMin: 0.6 },
 

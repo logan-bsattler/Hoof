@@ -1,7 +1,7 @@
 // DOM-side UI: tool dock, steps checklist, toasts, and modal cards.
 
 import { TOOLS, TOOL_ORDER } from './tools.js';
-import { DONE_TIP, stepTip, stepsFor } from './steps.js';
+import { DONE_TIP, stepLabel, stepTip, stepsFor } from './steps.js';
 import { drawToolIcon } from './toolart.js';
 
 const $ = (id) => document.getElementById(id);
@@ -96,7 +96,7 @@ export class UI {
       this.stepsOf = steps.map((s) => s.id).join();
       $('stepsList').replaceChildren(...(this.stepItems = steps.map((s) => {
         const li = document.createElement('li');
-        li.textContent = s.label;
+        li.textContent = stepLabel(s, caseDef);
         return li;
       })));
     }
@@ -106,7 +106,7 @@ export class UI {
       li.classList.toggle('current', k === current);
     });
     const tip = current < 0 ? DONE_TIP : stepTip(steps[current], caseDef);
-    const label = current < 0 ? 'All steps done' : steps[current].label;
+    const label = current < 0 ? 'All steps done' : stepLabel(steps[current], caseDef);
     $('stepTip').textContent = tip;
     if (!this.coaching) {
       $('stepBarLabel').textContent = label;

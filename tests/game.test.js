@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
 import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
-import { CASE_B, makeCase, dealCase } from '../src/case.js';
+import { CASE_B, makeCase, dealCase, dealMods, temperament } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
-import { stepsFor } from '../src/steps.js';
+import { stepsFor, stepLabel } from '../src/steps.js';
 import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase, judgeBlood } from '../src/scoring.js';
@@ -617,4 +617,105 @@ test('dd: a blade in the cleft costs Correctness and Restraint', () => {
   assert.ok(r.parts.correctness <= base.parts.correctness - 15);
   assert.ok(r.parts.restraint <= base.parts.restraint - 20);
   assert.ok(r.notes.some((n) => /treated, not cut/.test(n)), r.notes.join(' | '));
+});
+
+// ------------------------------------------------------------ WP7.3 per-cow variations
+
+test('variations: a cow with no mods is the usual hind-foot cow', () => {
+  const cd = makeCase('ulcer', 7);
+  assert.equal(cd.foot, 'hind');
+  assert.equal(cd.temper, 0.5);
+  assert.equal(cd.mud, 1);
+  assert.equal(cd.traits, '');
+  assert.ok(cd.excess[CLAW.OUTER] > cd.excess[CLAW.INNER], 'outer hind claw overgrows');
+  // A mod changes only what it names: the same seed keeps its side, sore claw and spot.
+  const v = makeCase('ulcer', 7, { mud: 1.4, temper: 0.9, growth: 1.2 });
+  assert.equal(v.side, cd.side);
+  assert.deepEqual(v.lesion, cd.lesion);
+  assert.deepEqual(v.decoys, cd.decoys);
+  assert.ok(Math.abs(v.excess[CLAW.OUTER] - cd.excess[CLAW.OUTER] * 1.2) < 1e-9);
+});
+
+test('variations: a front foot overgrows the inner claw and trims the outer claw first', () => {
+  const cd = makeCase('routine', 3, { foot: 'front' });
+  assert.match(cd.subtitle, /front$/);
+  assert.match(cd.intro, /front/);
+  assert.ok(cd.excess[CLAW.INNER] > cd.excess[CLAW.OUTER], 'inner front claw overgrows');
+  const [s1, s2] = stepsFor(cd).filter((st) => st.id === 'step1' || st.id === 'step2');
+  assert.match(stepLabel(s1, cd), /outer/);
+  assert.match(stepLabel(s2, cd), /inner/);
+  assert.match(stepLabel(s1, makeCase('routine', 3)), /inner/);
+  // Starting on the inner claw is the wrong order on a front foot, the right one on a hind.
+  const hoof = new Hoof(cd);
+  const s = newSession();
+  s.firstCutClaw = CLAW.INNER;
+  const r = scoreCase(hoof.metrics(), s, hoof, cd);
+  assert.ok(r.notes.some((n) => /Started on the inner claw\. On a front foot/.test(n)), r.notes.join(' | '));
+  // Front-foot ulcers favour the inner claw.
+  let inner = 0;
+  for (let seed = 1; seed <= 60; seed++) if (makeCase('ulcer', seed, { foot: 'front' }).lesion.claw === CLAW.INNER) inner++;
+  assert.ok(inner > 40, `${inner}/60 front ulcers on the inner claw`);
+});
+
+test('variations: mud level sets how much muck there is and how long brushing takes', () => {
+  const brushTime = (mud) => {
+    const hoof = new Hoof(makeCase('routine', 2, { mud }));
+    const start = hoof.metrics().mudMean;
+    let k = 0;
+    for (; k < 60 && hoof.metrics().mudMean >= 0.12; k++) {
+      for (let y = 180; y < 640; y += 14) for (let x = 40; x < 370; x += 20) applyStroke(hoof, 'brush', x, y, 3);
+    }
+    return { start, k };
+  };
+  const light = brushTime(0.65), usual = brushTime(1), caked = brushTime(1.6);
+  assert.ok(light.start < usual.start - 0.2, 'a clean-straw cow carries less muck');
+  assert.ok(Math.abs(caked.start - usual.start) < 1e-9, 'caked is fully covered, like usual');
+  assert.ok(light.k <= usual.k && usual.k < caked.k, `brush passes ${light.k} / ${usual.k} / ${caked.k}`);
+});
+
+test('variations: decoy count and kinds, lesion size and position follow the mods', () => {
+  for (const id of Object.keys(CONDITIONS)) {
+    for (const n of [0, 1, 3]) {
+      const cd = makeCase(id, 4, { decoyCount: n, decoyKinds: ['bruise'] });
+      const decoys = cd.findings.filter((f) => f.kind === 'bruise' || f.kind === 'stain');
+      assert.equal(decoys.length, id === 'routine' ? Math.max(1, n) : n, `${id} ${n} decoys`);
+      assert.ok(decoys.every((f) => f.kind === 'bruise'));
+    }
+  }
+  const small = makeCase('ulcer', 4, { lesionSize: 0, lesionAt: 0 }).lesion;
+  const big = makeCase('ulcer', 4, { lesionSize: 1, lesionAt: 1 }).lesion;
+  assert.equal(small.r, 10); assert.equal(big.r, 14);
+  assert.equal(small.y, 275); assert.equal(big.y, 305);
+  const t0 = makeCase('whiteline', 4, { lesionSize: 0 }).lesion, t1 = makeCase('whiteline', 4, { lesionSize: 1 }).lesion;
+  assert.ok(t1.len > t0.len && t1.pocket.r > t0.pocket.r, 'a bigger abscess has a longer track and pocket');
+});
+
+test('variations: temperament tunes the flinch, the jolt and the fidget, calm to lively', () => {
+  const calm = temperament(0), usual = temperament(0.5), lively = temperament(1);
+  assert.ok(calm.flinchAt < usual.flinchAt && usual.flinchAt < lively.flinchAt);
+  assert.ok(Math.abs(usual.flinchAt - CFG.sole.thin) < 0.05, 'the usual cow flinches where the sole turns thin');
+  assert.ok(lively.flinchAt < CFG.sole.dishTarget - CFG.sole.tolerance, 'a correct dish never sets her off');
+  assert.ok(calm.shake < lively.shake);
+  assert.equal(calm.fidgetEvery, 0);
+  assert.ok(lively.fidgetEvery > 0 && lively.fidgetEvery < temperament(0.6).fidgetEvery);
+  assert.ok(lively.kicks && !usual.kicks);
+});
+
+test('variations: dealt cows vary but stay in range, and the deal is deterministic per seed', () => {
+  const feet = new Set();
+  for (let seed = 1; seed <= 200; seed++) {
+    const m = dealMods(seed);
+    feet.add(m.foot);
+    assert.ok(m.growth >= 0.75 && m.growth <= 1.35 && m.mud >= 0.65 && m.mud <= 1.5 && m.temper >= 0.1 && m.temper <= 0.95);
+  }
+  assert.deepEqual([...feet].sort(), ['front', 'hind']);
+  assert.deepEqual(dealCase(42), dealCase(42));
+  assert.equal(dealCase(42).foot, dealMods(42).foot);
+});
+
+test('a blade near thin living sole reports how thin it got (the flinch reads it)', () => {
+  const hoof = new Hoof(CASE_B);
+  let ev;
+  for (let k = 0; k < 400; k++) { ev = applyGrind(hoof, 280, 400, 1 / 60); if (ev.minLive < 4) break; }
+  assert.ok(ev.minLive < 4 && ev.minLive > 0, `minLive ${ev.minLive}`);
 });

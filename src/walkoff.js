@@ -37,10 +37,10 @@ const LEGS = [
 
 export class Walkoff {
   // `drawFoot(ctx)` paints the trimmed foot for the weight test; `hoof` supplies its contact map.
-  constructor(result, sound, { wrapped = false, side = 'LH', hoof = null, drawFoot = null } = {}) {
+  constructor(result, sound, { wrapped = false, side = 'LH', foot = 'hind', hoof = null, drawFoot = null } = {}) {
     this.result = result;
     this.wrapped = wrapped;
-    this.limpLeg = side === 'RH' ? 2 : 0; // index into LEGS
+    this.limpLeg = LEGS.findIndex((L) => L.id === side[0] + (foot === 'front' ? 'F' : 'H')); // index into LEGS
     this.gait = result.gait;
     this.mobility = result.mobility ?? 0;
     this.sound = sound;

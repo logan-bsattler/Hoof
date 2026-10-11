@@ -2,7 +2,7 @@
 // Speed is deliberately absent. Pure function of metrics + session log.
 
 import { CFG } from './config.js';
-import { CLAW, LOOSE, Z, distToPath, soundClaw } from './hoof.js';
+import { CLAW, CLAW_NAME, LOOSE, Z, distToPath, firstClaw, secondClaw, soundClaw } from './hoof.js';
 
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 // 100 at `good` or better, 0 at `bad`, linear between.
@@ -110,7 +110,11 @@ export function scoreCase(m, session, hoof, caseDef) {
     notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
   if (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
-  if (session.firstCutClaw === CLAW.OUTER) { correctness -= 10; notes.push('Started on the outer claw. On a hind foot, trim the inner claw first and match the outer to it.'); }
+  if (session.firstCutClaw === secondClaw(caseDef)) {
+    const [a, b] = [CLAW_NAME[firstClaw(caseDef)], CLAW_NAME[secondClaw(caseDef)]];
+    correctness -= 10;
+    notes.push(`Started on the ${b} claw. On a ${caseDef.foot ?? 'hind'} foot, trim the ${a} claw first and match the ${b} to it.`);
+  }
   if (need.treat && !treated(m, hoof)) {
     correctness -= 10;
     notes.push(L.type === 'dd' ? 'The DD lesion went out untreated. Spray it, then pad and wrap it.' : 'The ulcer went out untreated. Flush it with the spray, then pad and wrap it.');

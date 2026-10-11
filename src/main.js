@@ -3,7 +3,7 @@
 
 import { CFG, touchAngle } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
-import { CASE_B, dealCase, makeCase } from './case.js';
+import { CASE_B, dealCase, makeCase, temperament } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
@@ -17,9 +17,18 @@ import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
 
 // The first run is the hand-built Case B; "Trim another" deals a fresh cow.
-// Dev aid: ?cond=<condition id>[&seed=n] starts on that condition instead.
+// Dev aid: ?cond=<condition id>[&seed=n] starts on that condition instead, varied by any of
+// &foot=front &growth= &mud= &temper= &decoys= &size= &at= (see makeCase's mods).
 const devCase = new URLSearchParams(location.search);
-let caseDef = devCase.has('cond') ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1)) : CASE_B;
+function devMods() {
+  const num = (k) => (devCase.has(k) ? +devCase.get(k) : undefined);
+  const mods = {
+    foot: devCase.get('foot') ?? undefined, growth: num('growth'), mud: num('mud'), temper: num('temper'),
+    decoyCount: num('decoys'), lesionSize: num('size'), lesionAt: num('at'),
+  };
+  return Object.fromEntries(Object.entries(mods).filter(([, v]) => v !== undefined));
+}
+let caseDef = devCase.has('cond') ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_B;
 const canvas = document.getElementById('game');
 const renderer = new Renderer(canvas);
 const particles = new Particles();
@@ -93,6 +102,8 @@ function newCase() {
   game.result = null;
   game.weepT = 0;
   game.found = [];      // marks the testers have read this case, in order
+  game.temper = temperament(caseDef.temper);
+  game.fidgetT = game.temper.fidgetEvery * (0.6 + Math.random() * 0.8);
   // Nothing carries over from the last foot: no held stroke, shake or half-pulled strip.
   stopHoldSounds();
   Object.assign(game.ptr, { down: false, moved: 0, biteAccum: 0, id: null });
@@ -117,6 +128,7 @@ async function showIntro() {
      <h1>${caseDef.title}</h1>
      <p class="sub">${caseDef.subtitle}</p>
      <p>${caseDef.intro}</p>
+     ${caseDef.traits ? `<p class="sub">${caseDef.traits}</p>` : ''}
      ${best ? `<p class="sub">Your best on this case: <b>${best.grade}</b> · ${best.total}</p>` : ''}
      <ul class="howto">
        <li><b>Clean</b> to reveal what’s hiding under the muck.</li>
@@ -126,7 +138,8 @@ async function showIntro() {
        ${caseDef.requires?.treat ? '<li><b>Treat</b> it: flush, pad and wrap before she goes.</li>' : '<li><b>Leave</b> what’s firm alone: not every mark is trouble.</li>'}
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
-    caseDef.condition === 'ulcer'
+    // The guided run teaches the hind foot (inner claw first).
+    caseDef.condition === 'ulcer' && caseDef.foot !== 'front'
       ? [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }]
       : [{ id: 'start', label: 'Lift the foot', primary: true }],
   );
@@ -302,10 +315,10 @@ function tap(x, y) {
         Sound.bubbles();
       } else if (L.type === 'dd') {
         // Raw skin: a sharp flinch, the foot snatched against the strap.
-        game.shake = 5;
+        jolt(5);
         Sound.moo(true);
       } else {
-        game.shake = 2;
+        jolt(2);
       }
       ui.toast(r.text, 'info');
       // The guided run commits the read straight away; otherwise the player decides when.
@@ -411,6 +424,26 @@ function releasePressure(msg) {
   ui.toast(msg, 'good', 3200);
 }
 
+// A flinch or shift, scaled by how lively this cow is.
+function jolt(amount) {
+  game.shake = Math.max(game.shake, amount * game.temper.shake);
+}
+
+// A lively cow shifts her weight now and then while you work; a very lively one knocks a held
+// tool off the foot. Calm cows (fidgetEvery 0) stand still.
+function fidget(dt) {
+  const every = game.temper.fidgetEvery;
+  if (!every || (game.fidgetT -= dt) > 0) return;
+  game.fidgetT = every * (0.6 + Math.random() * 0.8);
+  jolt(3.5);
+  Sound.clop();
+  buzz(12);
+  if (game.temper.kicks && game.ptr.down && TOOLS[game.tool].mode === 'hold') {
+    releaseHold();
+    warnOnce('kick', 'She shifted and knocked the tool off. Let her settle, then go again.', 'info', 6);
+  }
+}
+
 function warnOnce(key, msg, kind = 'warn', gap = 4) {
   if ((game.lastWarn[key] ?? -99) + gap > game.time) return;
   game.lastWarn[key] = game.time;
@@ -460,13 +493,21 @@ function handle(ev, x, y) {
   }
   if (ev.lesionCut) warnOnce('lesion', 'Easy. That’s the ulcer itself. Open it, don’t carve it.');
   else if (ev.thin) warnOnce('thin', 'Sole’s getting thin here. Ease off.');
+  // She flinches as a blade nears the living sole: a lively cow sooner and harder.
+  if (ev.minLive < game.temper.flinchAt && (game.lastWarn.flinch ?? -99) + 2.5 <= game.time) {
+    game.lastWarn.flinch = game.time;
+    jolt(3);
+    buzz([15, 20, 15]);
+    if (game.temper.kicks) Sound.moo(true);
+    warnOnce('flinchTip', 'She flinched: the sole’s getting thin under there.', 'info', 8);
+  }
   if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.');
   if (ev.offTrack) warnOnce('offTrack', 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
   if (ev.cleftCut) {
     s.cleftCuts++;
     // She flinches once per warning, not on every stamp of the blade.
     const fresh = (game.lastWarn.cleft ?? -99) + 4 <= game.time;
-    if (fresh && caseDef.lesion?.type === 'dd') { game.shake = 4; Sound.moo(true); }
+    if (fresh && caseDef.lesion?.type === 'dd') { jolt(4); Sound.moo(true); }
     warnOnce('cleft', caseDef.lesion?.type === 'dd'
       ? 'No blade in the cleft! That’s raw skin: spray it and wrap it, don’t cut it.'
       : 'That’s the heel cleft: skin, not horn. Keep the blades out of it.');
@@ -482,7 +523,7 @@ function handle(ev, x, y) {
 // A shallow first nick: she flinches, the tool comes off, and the case goes on.
 function nick(x, y) {
   releaseHold();
-  game.shake = 6;
+  jolt(6);
   Sound.moo(true);
   buzz([40, 30, 60]);
   particles.spawn('blood', x, y, '#c0101c', 1);
@@ -524,7 +565,7 @@ async function requestRelease() {
     renderer.block(hoof);
     renderer.dressing(hoof);
   };
-  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrap >= 2, side: hoof.side, hoof, drawFoot });
+  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrap >= 2, side: hoof.side, foot: caseDef.foot, hoof, drawFoot });
   game.state = 'walkoff';
 }
 
@@ -592,6 +633,7 @@ function frame(now) {
 
   if (game.state === 'play') {
     const ptr = game.ptr;
+    fidget(dt);
     renderer.fx.grindOn = ptr.down && game.tool === 'grinder';
     if (ptr.down && TOOLS[game.tool].mode === 'hold') {
       const last = game.holdLast ?? { x: ptr.x, y: ptr.y };

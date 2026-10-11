@@ -1,6 +1,13 @@
 // Condition registry. Each entry says what is wrong with the foot, where it sits on the grid,
 // what the testers find, which steps the job needs, the right read, and the treatment plan.
 // makeCase() in case.js turns a condition + seed (+ mods) into a case.
+//
+// place(rand, side, v) draws where everything sits. `v` carries the per-cow variations (WP7.3):
+//   big     the claw that overgrows and carries most load (outer on a hind foot, inner on a front)
+//   size    0..1, where the lesion's size falls in its band (undefined: random)
+//   at      0..1, where its position falls in its band (undefined: random)
+//   decoys  how many decoys (undefined: the condition's usual 1-2); kinds: which kinds to use
+// Every random draw happens whatever `v` says, so a variation only changes what it names.
 
 import { CLAW, CLAW_NAME, GEOM, clawSide, clawSpan, insideClaw, soundClaw } from './hoof.js';
 
@@ -35,11 +42,23 @@ export const FINDING = {
 // The five-step functional trim every case shares (rasp after step 3).
 const TRIM = ['clean', 'diagnose', 'step1', 'step2', 'step3', 'finish'];
 
-// One or two decoys on the weight-bearing sole, clear of `avoid` (the lesion and heel horn).
-function placeDecoys(rand, at, side, avoid) {
+export const DECOY_KINDS = ['stain', 'bruise'];
+
+// A value in [lo, hi]: at fraction u of the band when given, else random. Always draws.
+const band = (rand, lo, hi, u) => { const r = rand(); return lo + (u ?? r) * (hi - lo); };
+
+const otherClaw = (c) => (c === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER);
+
+// Decoys on the weight-bearing sole, clear of `avoid` (the lesion and heel horn): one or two
+// by default, or `v.decoys` of them, of `v.kinds`, taking turns from a random start.
+function placeDecoys(rand, at, side, avoid, v = {}) {
   const between = (a, b) => a + rand() * (b - a);
   const decoys = [];
-  const kinds = rand() < 0.6 ? ['stain', 'bruise'] : [rand() < 0.5 ? 'stain' : 'bruise'];
+  let kinds = rand() < 0.6 ? ['stain', 'bruise'] : [rand() < 0.5 ? 'stain' : 'bruise'];
+  if (v.decoys != null || v.kinds) {
+    const pool = v.kinds ?? DECOY_KINDS, off = Math.floor(rand() * pool.length);
+    kinds = Array.from({ length: v.decoys ?? kinds.length }, (_, k) => pool[(off + k) % pool.length]);
+  }
   for (const kind of kinds) {
     for (let tries = 0; tries < 60; tries++) {
       const claw = rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
@@ -60,12 +79,12 @@ function placeHeelHorn(rand, at, claw) {
 // A white-line abscess on `claw`: a dark track in the abaxial white line, opening at the wall
 // toward the toe (path[0]) and running back to a pocket of pus at the heel-sole-wall junction,
 // where white-line separation is most common (Shearer, white line disease).
-function placeTract(rand, side, claw) {
-  const between = (a, b) => a + rand() * (b - a);
+// A bigger abscess has the longer track (it opens further toward the toe) and the bigger pocket.
+function placeTract(rand, side, claw, v = {}) {
   const s = clawSide(claw, side);
   // A point `inset` px in from the abaxial wall at height y.
   const wl = (y, inset) => { const [l, r] = clawSpan(claw, y, side); return (s > 0 ? r : l) - s * inset; };
-  const y0 = between(370, 415), y1 = between(282, 296);
+  const y0 = band(rand, 370, 415, v.size), y1 = band(rand, 282, 296, v.at);
   const path = [];
   for (let k = 0, n = 9; k <= n; k++) {
     const t = k / n, y = y0 + (y1 - y0) * t;
@@ -73,7 +92,7 @@ function placeTract(rand, side, claw) {
     path.push([wl(y, 8 + 5 * t * t + (rand() - 0.5) * 2), y]);
   }
   const [px, py] = path[path.length - 1];
-  const pocket = { x: px - s * 6, y: py - 6, r: between(9, 11) };
+  const pocket = { x: px - s * 6, y: py - 6, r: band(rand, 9, 11, v.size) };
   let len = 0;
   for (let k = 1; k < path.length; k++) len += Math.hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]);
   // x, y, r: the entry, where the dark line shows at the wall. w: half-width of the track.
@@ -82,12 +101,12 @@ function placeTract(rand, side, claw) {
 
 // Digital dermatitis on `claw`'s side of the heel cleft, between the bulbs: a round raw patch
 // on the skin just above the bulbs, its centre a little in from the axial edge.
-function placeCleft(rand, side, claw) {
+function placeCleft(rand, side, claw, v = {}) {
   const between = (a, b) => a + rand() * (b - a);
   const s = clawSide(claw, side);
-  const y = between(GEOM.cleftY0 + 12, GEOM.cleftY1 - 8);
+  const y = band(rand, GEOM.cleftY0 + 12, GEOM.cleftY1 - 8, v.at);
   const [l, r] = clawSpan(claw, y, side);
-  return { claw, x: (s > 0 ? l : r) + s * between(6, 8), y, r: between(10, 12) };
+  return { claw, x: (s > 0 ? l : r) + s * between(6, 8), y, r: band(rand, 10, 12, v.size) };
 }
 
 export const CONDITIONS = {
@@ -101,19 +120,24 @@ export const CONDITIONS = {
     requires: { open: false, block: false, treat: false },
     diagnosis: 'sound',
 
-    place(rand, side) {
+    place(rand, side, v = {}) {
       const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
       const looseHorn = placeHeelHorn(rand, at, rand() < 0.5 ? CLAW.OUTER : CLAW.INNER);
+      // At least one mark: they are the whole read, and there must be something to test.
+      if (v.decoys != null || v.kinds) {
+        const n = Math.max(1, v.decoys ?? 2);
+        return { lesion: null, looseHorn, decoys: placeDecoys(rand, at, side, [looseHorn], { ...v, decoys: n }) };
+      }
       // More marks than an ulcer cow carries, since they are the whole read.
       const decoys = placeDecoys(rand, at, side, [looseHorn]);
       if (rand() < 0.5) decoys.push(...placeDecoys(rand, at, side, [looseHorn, ...decoys]).slice(0, 1));
       return { lesion: null, looseHorn, decoys };
     },
 
-    copy({ cow, leg }) {
+    copy({ cow, limb }) {
       return {
         intro:
-          `Routine herd trim. #${cow} is due on the ${leg} hind and the farmer hasn't seen her favour it. ` +
+          `Routine herd trim. #${cow} is due on the ${limb} and the farmer hasn't seen her favour it. ` +
           'Not every foot has a problem: check before you cut.',
         diagnosisPrompt: 'Anything wrong with this foot?',
         diagnosisOptions: [
@@ -157,22 +181,23 @@ export const CONDITIONS = {
 
     // Ulcer on the axial half near the sole/heel junction, heel horn on the sound claw.
     // The draw order is fixed: changing it changes every seeded cow.
-    place(rand, side) {
+    place(rand, side, v = {}) {
       const between = (a, b) => a + rand() * (b - a);
       const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
-      const sore = rand() < 0.8 ? CLAW.OUTER : CLAW.INNER; // outer hind claws ulcerate most
-      const sound = sore === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
-      const lesion = { claw: sore, x: at(sore, between(22, 36)), y: between(275, 305), r: between(10, 14) };
+      const big = v.big ?? CLAW.OUTER;
+      const sore = rand() < 0.8 ? big : otherClaw(big); // the bigger, loaded claw ulcerates most
+      const sound = otherClaw(sore);
+      const lesion = { claw: sore, x: at(sore, between(22, 36)), y: band(rand, 275, 305, v.at), r: band(rand, 10, 14, v.size) };
       const looseHorn = placeHeelHorn(rand, at, sound);
-      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn]);
+      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn], v);
       return { lesion, looseHorn, decoys };
     },
 
-    copy({ cow, leg, lesion }) {
+    copy({ cow, limb, lesion }) {
       const sore = CLAW_NAME[lesion.claw], sound = CLAW_NAME[soundClaw({ lesion })];
       return {
         intro:
-          `Farmer says #${cow}'s been shifting her weight off the ${leg} hind and lying down more than usual. ` +
+          `Farmer says #${cow}'s been shifting her weight off the ${limb} and lying down more than usual. ` +
           "She's overdue for a trim. Lift the foot and have a look.",
         diagnosisPrompt: 'She’s been sore on this foot. What are you looking at?',
         diagnosisOptions: [
@@ -213,24 +238,25 @@ export const CONDITIONS = {
     requires: { open: true, block: true, treat: false },
     diagnosis: 'whiteline',
 
-    place(rand, side) {
-      const sore = rand() < 0.75 ? CLAW.OUTER : CLAW.INNER; // the lateral hind claw, mostly
-      const sound = sore === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
+    place(rand, side, v = {}) {
+      const big = v.big ?? CLAW.OUTER;
+      const sore = rand() < 0.75 ? big : otherClaw(big); // the bigger claw (lateral hind), mostly
+      const sound = otherClaw(sore);
       const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
-      const lesion = placeTract(rand, side, sore);
+      const lesion = placeTract(rand, side, sore, v);
       const looseHorn = placeHeelHorn(rand, at, sound);
       // Keep decoys off the track: avoid its ends and middle.
       const P = lesion.path, mid = P[P.length >> 1];
       const avoid = [lesion, { x: mid[0], y: mid[1] }, lesion.pocket, looseHorn];
-      const decoys = placeDecoys(rand, at, side, avoid);
+      const decoys = placeDecoys(rand, at, side, avoid, v);
       return { lesion, looseHorn, decoys };
     },
 
-    copy({ cow, leg, lesion }) {
+    copy({ cow, limb, lesion }) {
       const sore = CLAW_NAME[lesion.claw], sound = CLAW_NAME[soundClaw({ lesion })];
       return {
         intro:
-          `#${cow} went hopping lame on the ${leg} hind overnight and won't put the toe down. ` +
+          `#${cow} went hopping lame on the ${limb} overnight and won't put the toe down. ` +
           'Lift the foot: look along the wall as well as the sole.',
         diagnosisPrompt: 'She’s very sore on this foot. What are you looking at?',
         diagnosisOptions: [
@@ -274,19 +300,19 @@ export const CONDITIONS = {
     requires: { open: false, block: false, treat: true },
     diagnosis: 'dd',
 
-    place(rand, side) {
+    place(rand, side, v = {}) {
       const sore = rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
       const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
-      const lesion = placeCleft(rand, side, sore);
+      const lesion = placeCleft(rand, side, sore, v);
       const looseHorn = placeHeelHorn(rand, at, rand() < 0.5 ? CLAW.OUTER : CLAW.INNER);
-      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn]);
+      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn], v);
       return { lesion, looseHorn, decoys };
     },
 
-    copy({ cow, leg }) {
+    copy({ cow, limb }) {
       return {
         intro:
-          `#${cow} is walking on her toes on the ${leg} hind and the farmer says she kicks in the parlour. ` +
+          `#${cow} is walking on her toes on the ${limb} and the farmer says she kicks in the parlour. ` +
           'Lift the foot: look between the heel bulbs as well as at the sole.',
         diagnosisPrompt: 'She won’t let you near the back of this foot. What are you looking at?',
         diagnosisOptions: [
