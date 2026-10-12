@@ -24,12 +24,13 @@ export const HERD_BONUS = 5;
 
 // One road, in order. `rep` is the reputation that opens the farm. Ranges are [lo, hi]:
 // growth scales the excess horn, mud 1 = usual muck, temper 0 calm .. 1 lively.
-// `mix` weights the conditions; `front` is the share of front feet.
+// `mix` sets each visit's share of conditions (dealt as a deck, see herdDeck); `front` is the
+// share of front feet.
 export const FARMS = [
   {
     id: 'willowbank', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
     intro: 'Ruth keeps a dozen old Holsteins on deep straw. She’ll show you round: a quiet herd to learn on.',
-    mix: { ulcer: 0.5, routine: 0.5 }, growth: [0.85, 1.1], mud: [0.7, 1.0], temper: [0.1, 0.35], front: 0,
+    mix: { routine: 0.67, ulcer: 0.33 }, growth: [0.85, 1.1], mud: [0.7, 1.0], temper: [0.1, 0.35], front: 0,
     // The first cow is the hand-built sole ulcer, with the guided trim on offer.
     first: CASE_B, firstMods: CASE_B_MODS,
   },
@@ -117,6 +118,35 @@ export function farmMods(farm, seed) {
   return { condition, mods };
 }
 
+// A visit's conditions as a deck: the mix shared out over the herd by largest remainder (ties
+// to the condition listed first), so Willow Bank is always 1 ulcer and 2 routine and Hollins
+// always brings its white line. Independent draws gave streaks that broke the early ramp.
+export function herdDeck(farm) {
+  const ids = Object.keys(farm.mix);
+  const total = ids.reduce((a, id) => a + farm.mix[id], 0);
+  const share = ids.map((id) => (farm.mix[id] / total) * farm.cows);
+  const n = share.map(Math.floor);
+  const order = ids.map((_, i) => i).sort((a, b) => (share[b] - n[b]) - (share[a] - n[a]) || a - b);
+  for (let k = 0, left = farm.cows - n.reduce((a, b) => a + b, 0); k < left; k++) n[order[k]]++;
+  return ids.flatMap((id, i) => Array(n[i]).fill(id));
+}
+
+// The deck for one visit, shuffled from the visit's own seed. On a first visit with a hand-built
+// cow, she takes her own condition's card.
+function visitDeck(farm, visit) {
+  const deck = herdDeck(farm);
+  if (visit === 1 && farm.first) {
+    const i = deck.indexOf(farm.first.condition);
+    if (i >= 0) deck.splice(i, 1);
+  }
+  const rand = mulberry32(cowSeed(farm, visit, 777));
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
 // ------------------------------------------------------------------ return visits (WP7.5)
 // A few months on, some of the farm's cows come back by ear tag. A cow that went off lame is a
 // recheck: the same foot, the lesion where it was but a little worse, and her points to earn
@@ -177,23 +207,27 @@ export function backLine(cd) {
     : `${last} on the ${was.noun ?? 'lesion'}. It’s healed: she’s just due her trim.`;
 }
 
-// The cows of one visit, in order: anyone coming back first, then fresh cows. Ear tags are
-// unique within the visit, and a fresh cow never wears a tag already trimmed at this farm.
+// The cows of one visit, in order: anyone coming back first, then fresh cows dealt from the
+// visit's deck (fewer fresh cows on a return visit take the top of it). Ear tags are unique
+// within the visit, and a fresh cow never wears a tag already trimmed at this farm.
 export function visitCases(farm, visit = 1, history = [], tier = null) {
   const back = returningCows(farm, visit, history);
   const cases = back.map((h, k) => returnCase(farm, h, visit, k));
   const tags = new Set(history.filter((h) => h.farm === farm.id).map((h) => h.tag));
   for (const cd of cases) tags.add(cd.subtitle.split(' · ')[0]);
+  const deck = visitDeck(farm, visit);
+  let d = 0;
   for (let k = 0; cases.length < farm.cows; k++) {
     let cd;
     if (k === 0 && visit === 1 && farm.first) cd = farm.first;
     else {
       const seed = cowSeed(farm, visit, k);
       const { condition, mods } = farmMods(farm, seed);
-      cd = makeCase(condition, seed, tierMods(tier, mods));
+      cd = makeCase(deck[d] ?? condition, seed, tierMods(tier, mods));
     }
     if (tags.has(cd.subtitle.split(' · ')[0])) continue;
     tags.add(cd.subtitle.split(' · ')[0]);
+    if (cd !== farm.first) d++;
     cases.push(cd);
   }
   // The tier's band rides on each cow (a copy, so Case B itself is never changed).

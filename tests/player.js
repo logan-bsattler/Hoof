@@ -19,19 +19,10 @@ export function makePlayer(hoof, opts = {}) {
   const discTouchesUlcer = (x, y) => L?.type === 'ulcer' &&
     Math.hypot(x - L.x, y - L.y) < L.r * 1.75 + CFG.tools.grinder.radius;
 
-  // While dishing (p.avoidCore), nor does it run the knife's working edge over an ulcer core
-  // it has already opened: the bare corium sits 2 mm down and would bleed.
-  const edge = CFG.tools.knife.radius * 0.8;
-  const bladeOnOpenCore = (x, y) => {
-    if (!p.avoidCore || L?.type !== 'ulcer' || Math.hypot(x - L.x, y - L.y) > L.r + edge + 4) return false;
-    let hit = false;
-    hoof.stamp(x, y, edge, (i) => { if ((hoof.zone[i] & Z.ULCER) && !hoof.loose[i]) hit = true; });
-    return hit;
-  };
-
   const p = {
     hoof,
-    // Drag a tool along a polyline at a steady speed (px/s), like a player would.
+    // Drag a tool along a polyline at a steady speed (px/s), like a player would. When the
+    // ulcer cap gives, the knife comes off the foot (main.js popCap) and the drag ends there.
     drag(tool, pts, speed = 160) {
       for (let k = 1; k < pts.length; k++) {
         const [ax, ay] = pts[k - 1], [bx, by] = pts[k];
@@ -47,7 +38,7 @@ export function makePlayer(hoof, opts = {}) {
           const settled = i >= 0 && (!hoof.loose[i] || (tool === 'grinder' && hoof.looseInit[i] === LOOSE.TRACT));
           const done = settled && (tool === 'grinder' || tool === 'knife') &&
             hoof.thick[i] <= hoof.zoneTarget(i) + 0.4;
-          if (done || (tool === 'grinder' && discTouchesUlcer(x, y)) || (tool === 'knife' && bladeOnOpenCore(x, y))) { px = x; py = y; continue; }
+          if (done || (tool === 'grinder' && discTouchesUlcer(x, y))) { px = x; py = y; continue; }
           let ev;
           if (tool === 'grinder') ev = applyGrind(hoof, x, y, DT);
           else if (tool === 'spray') ev = applySpray(hoof, x, y, DT);
@@ -55,6 +46,7 @@ export function makePlayer(hoof, opts = {}) {
           emit(ev, tool, x, y);
           if (onStamp) onStamp(tool, x, y, dx, dy);
           px = x; py = y;
+          if (ev.capPop) { if (onAction) onAction(); return p; }
         }
       }
       if (onAction) onAction();

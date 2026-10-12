@@ -117,9 +117,9 @@ a progress bar. **Lift the foot** plays it unguided.
 | Read | Test anything suspicious; only the ulcer springs. Then press **Commit read** and name it | 🧪 Hoof testers |
 | 1 | Inner claw first: nip the overgrown toe from the tip back to the dashed line, level the sole to ~7 mm | ✂️ Nippers, ⚙️ Grinder |
 | 2 | Match the outer claw until the balance beam reads LEVEL | ⚙️ Grinder |
-| 3 | Carve the dish along each claw's inner edge (dashed channel), staying out of the toe triangle | 🔪 Knife |
+| 3 | Carve the dish along each claw's inner edge (dashed channel), staying out of the toe triangle and around the ulcer's cap | 🔪 Knife |
 | Rasp | Rasp out the grinder swirls on both soles, before the block covers one | 🪵 Rasp |
-| 4 | Pare the loose horn off the ulcer (pressure release), then glue the block on the **sound** claw | 🔪 Knife, 🧱 Block |
+| 4 | Work the knife across the ulcer's cap until it gives (pressure release), pare the loose edge from outside the open core, then glue the block on the **sound** claw | 🔪 Knife, 🧱 Block |
 | 5 | Flick off the curl of loose heel horn | 🔪 Knife |
 | Treat | Flush the opened ulcer, then pad and wrap it. **Release the cow** and watch her walk | 🧴 Spray bottle, 🩹 Pad + wrap |
 

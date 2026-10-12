@@ -5,6 +5,7 @@
 import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, GEOM, clawBox, clawWhere, dishRect, soundClaw } from './hoof.js';
 import { STEPS } from './steps.js';
+import { KNIFE_FLAT } from './tools.js';
 
 const { target: T, dishTarget: D } = CFG.sole;
 const step = (id) => STEPS.find((s) => s.id === id).done;
@@ -29,6 +30,12 @@ export function tutorialBeats(caseDef) {
   const inner = (m) => m.claws[CLAW.INNER];
   const outer = (m) => m.claws[CLAW.OUTER];
   const TOL = tolOf(caseDef);
+  // The ulcer's cap, ringed red on the steps that work that claw: grinder and dish keep off it.
+  const capRing = { x: L.x, y: L.y, r: L.r * 1.75 };
+  const avoidOn = (c) => (L.claw === c ? { avoid: capRing } : {});
+  const keepOff = (c, what) => (L.claw === c ? ` ${what}` : '');
+  // Paring the rim: the blade's centre on this ring keeps its flat clear of the open core.
+  const pareR = L.r + CFG.tools.knife.radius * Math.sqrt(1 - KNIFE_FLAT) + 3;
   return [
     {
       id: 'clean', tool: 'brush', title: 'Clean the foot',
@@ -52,8 +59,8 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'grindInner', tool: 'grinder', title: 'Grind the inner sole',
-      text: `Press and hold the grinder, gliding over the inner sole. Watch the gauge: stop near ${T} mm. Keep moving: lingering draws blood.`,
-      target: { kind: 'rect', ...soleRect(box(CLAW.INNER)) },
+      text: `Press and hold the grinder, gliding over the inner sole. Watch the gauge: stop near ${T} mm. Keep moving: lingering draws blood.${keepOff(CLAW.INNER, 'Keep the disc off the red ring: that’s knife work.')}`,
+      target: { kind: 'rect', ...soleRect(box(CLAW.INNER)), ...avoidOn(CLAW.INNER) },
       measure: (m) => inner(m).wbMean, goal: T + TOL,
       done: step('step1'),
     },
@@ -66,15 +73,15 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'grindOuter', tool: 'grinder', title: 'Match the outer claw',
-      text: 'Grind the outer sole down until the balance beam at the top sits level. Matching the claws matters more than any one number.',
-      target: { kind: 'rect', ...soleRect(box(CLAW.OUTER)) },
+      text: `Grind the outer sole down until the balance beam at the top sits level. Matching the claws matters more than any one number.${keepOff(CLAW.OUTER, 'Keep the disc off the red ring.')}`,
+      target: { kind: 'rect', ...soleRect(box(CLAW.OUTER)), ...avoidOn(CLAW.OUTER) },
       measure: (m) => Math.abs(m.levelDiff) + Math.max(0, outer(m).wbMean - T - TOL), goal: 0.6,
       done: step('step2'),
     },
     {
       id: 'dish', tool: 'knife', title: 'Dish out both claws',
-      text: 'With the hoof knife, press, hold and pull down the blue channels along the inner edge of each claw. That takes weight off the ulcer site.',
-      target: { kind: 'rects', list: [dishRect(CLAW.INNER, side), dishRect(CLAW.OUTER, side)] },
+      text: 'With the hoof knife, press, hold and pull down the blue channels along the inner edge of each claw. That takes weight off the ulcer site. Dish around the red ring, not through it: the ulcer comes later.',
+      target: { kind: 'rects', list: [dishRect(CLAW.INNER, side), dishRect(CLAW.OUTER, side)], avoid: capRing },
       measure: (m) => Math.max(inner(m).dishMean, outer(m).dishMean), goal: D + TOL,
       done: step('step3'),
     },
@@ -87,8 +94,8 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'openUlcer', tool: 'knife', title: 'Open the ulcer',
-      text: 'Pull the knife across the circle to flake off the loose horn capping the ulcer. Stop when the ring fills. Open it, don’t carve it.',
-      target: { kind: 'ring', x: L.x, y: L.y, r: L.r * 1.75 },
+      text: 'Work the knife back and forth across the dark circle. The cap holds, then gives, and the knife comes off. Then pare the loose edge with the knife on the ring, not inside it: the open ulcer is raw.',
+      target: { kind: 'ring', x: L.x, y: L.y, r: pareR },
       measure: (m) => m.looseRemain[LOOSE.ULCER], goal: 0.1,
       done: (m) => m.looseRemain[LOOSE.ULCER] < 0.1,
     },

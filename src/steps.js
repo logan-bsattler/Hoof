@@ -48,7 +48,7 @@ export const STEPS = [
   },
   {
     id: 'step4', label: '4 · Open the ulcer, block the sound claw', tool: 'knife',
-    tip: 'Pare the loose horn off the ulcer with the knife: open it, don’t carve it. Then glue the block on the SOUND claw.',
+    tip: 'Work the knife across the ulcer’s cap until it gives, then pare back the loose edges. Don’t carve into the open ulcer. Then glue the block on the SOUND claw.',
     done: (m, s, hoof) => m.looseRemain[LOOSE.ULCER] < 0.1 && hoof.block === soundClaw(hoof.caseDef),
   },
   // White-line abscess: step 4 is following the track to the pus, then the block.

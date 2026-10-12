@@ -115,6 +115,7 @@ function saveBest(r) {
 
 function newCase() {
   game.hoof = new Hoof(caseDef);
+  game.preparing = true;
   game.session = newSession();
   game.metrics = game.hoof.metrics();
   game.steps = evaluateSteps(game.metrics, game.session, game.hoof, 0);
@@ -170,7 +171,9 @@ async function showIntro() {
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
     // The guided run teaches the hind foot (inner claw first).
-    caseDef.condition === 'ulcer' && caseDef.foot !== 'front'
+    // On the road, only until you've done an ulcer once.
+    caseDef.condition === 'ulcer' && caseDef.foot !== 'front' &&
+      !(v && route.history.some((h) => h.condition === 'ulcer'))
       ? [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }]
       : [{ id: 'start', label: 'Lift the foot', primary: true }],
   );
@@ -457,6 +460,42 @@ function releasePressure(msg) {
   ui.toast(msg, 'good', 3200);
 }
 
+// The closed cap holding under the knife: it creaks and she shifts as it's worked toward giving.
+function strainCap(strain, x, y) {
+  if ((game.lastWarn.capCreak ?? -99) + 0.35 > game.time) return;
+  game.lastWarn.capCreak = game.time;
+  Sound.creak(strain);
+  buzz(6 + Math.round(strain * 10));
+  jolt(0.6 + strain * 1.4);
+  particles.spawn('flake', x, y, '#d9c79c', 1);
+  warnOnce('capFirm', 'The cap’s firm. Keep working the knife across it: it’ll give.', 'info', 30);
+}
+
+// The cap gives: horn and core come away in one piece and the pocket floods. The knife comes
+// off with it, so a sawing stroke can't run on into the raw core underneath.
+function popCap(x, y) {
+  const L = caseDef.lesion;
+  releaseHold();
+  Sound.crack();
+  jolt(5);
+  particles.spawn('flake', L.x, L.y, '#d9c79c', 14);
+  particles.spawn('flake', x, y, '#cdb98c', 6);
+  renderer.weep(L.x, L.y, 4, 'pus');
+  releasePressure('It gave! Pus out, pressure off: you can almost hear her sigh. Now pare the loose edge from outside the ring.');
+}
+
+// Knife into the opened ulcer: it's raw tissue now, and she lets you know.
+function carveOpenUlcer(x, y) {
+  if ((game.lastWarn.rawCut ?? -99) + 1.2 > game.time) return;
+  game.lastWarn.rawCut = game.time;
+  jolt(5);
+  buzz([30, 40, 30]);
+  Sound.moo(true);
+  const L = caseDef.lesion;
+  renderer.weep(L.x + (x - L.x) * 0.4, L.y + (y - L.y) * 0.4, 1.5, 'blood');
+  warnOnce('lesion', 'She felt that! It’s open: that’s raw tissue. Pare the rim, not the ulcer.', 'warn', 4);
+}
+
 // A flinch or shift, scaled by how lively this cow is.
 function jolt(amount) {
   game.shake = Math.max(game.shake, amount * game.temper.shake);
@@ -524,7 +563,9 @@ function handle(ev, x, y) {
     s.grinderLesion = true;
     warnOnce('grindLesion', `Not the grinder near the ${caseDef.noun}! Use the knife there.`);
   }
-  if (ev.lesionCut) warnOnce('lesion', 'Easy. That’s the ulcer itself. Open it, don’t carve it.');
+  if (ev.capStrain && !ev.capPop) strainCap(ev.capStrain, x, y);
+  if (ev.capPop) popCap(x, y);
+  if (ev.lesionCut) carveOpenUlcer(x, y);
   else if (ev.thin) warnOnce('thin', 'Sole’s getting thin here. Ease off.');
   // She flinches as a blade nears the living sole: a lively cow sooner and harder.
   if (ev.minLive < game.temper.flinchAt && (game.lastWarn.flinch ?? -99) + 2.5 <= game.time) {
@@ -806,6 +847,14 @@ function frame(now) {
   // No case is dealt until the title card is tapped, and the road map covers the canvas between visits.
   // The first visit card also comes up before any cow is in the crush.
   if (game.state === 'title' || game.state === 'route' || !game.session) { requestAnimationFrame(frame); return; }
+  // A new foot's textures take seconds on a phone: build them a slice a frame behind the case
+  // card's loading bar, so the card is up at once and the game never locks.
+  if (game.preparing) {
+    const p = renderer.prepare(game.hoof, 24);
+    ui.setLoading(p);
+    if (p < 1) { requestAnimationFrame(frame); return; }
+    game.preparing = false;
+  }
 
   if (game.state === 'play') {
     const ptr = game.ptr;
@@ -862,10 +911,6 @@ function frame(now) {
         const c = game.steps.current;
         if (c >= 0) ui.toast(stepTip(stepsFor(caseDef)[c], caseDef), 'good', 4500);
         else ui.toast('Every step done. Release her and watch her walk.', 'good', 4500);
-      }
-      // The pressure-release beat: first time the ulcer is opened.
-      if (caseDef.lesion?.type === 'ulcer' && game.metrics.looseRemain[LOOSE.ULCER] < 0.6) {
-        releasePressure('Pressure released. You can almost hear her sigh.');
       }
       ui.setSteps(game.steps, caseDef);
     }

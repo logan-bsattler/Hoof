@@ -9,7 +9,7 @@ import { CFG } from '../src/config.js';
 import { Hoof, CLAW, LOOSE, GEOM, clawBox, dishRect, firstClaw, secondClaw, soundClaw } from '../src/hoof.js';
 import { CASE_B, dealMods, makeCase } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
-import { applyGrind, applyWrap } from '../src/tools.js';
+import { KNIFE_FLAT, applyGrind, applyWrap } from '../src/tools.js';
 import { evaluateSteps, trimFinished } from '../src/steps.js';
 import { newSession, scoreCase } from '../src/scoring.js';
 import { makePlayer } from './player.js';
@@ -20,7 +20,7 @@ function playthrough(cd, quiet = false) {
   const hoof = new Hoof(cd);
   const side = hoof.side;
   const s = newSession();
-  let bloodAt = null;
+  let bloodAt = null, coreCutAt = null;
   // Session bookkeeping, as main.js handle() does it.
   const p = makePlayer(hoof, {
     onEvent(ev, tool, x, y) {
@@ -29,6 +29,8 @@ function playthrough(cd, quiet = false) {
       if (ev.grinderLesion) s.grinderLesion = true;
       if (ev.cleftCut) s.cleftCuts++;
       if (ev.blood && !bloodAt) bloodAt = `${tool} at ${x.toFixed(0)},${y.toFixed(0)}`;
+      // Any cut into the opened core is a moo and a slip in the game: the careful hand never does it.
+      if (ev.lesionCut && !coreCutAt) coreCutAt = `${tool} at ${x.toFixed(0)},${y.toFixed(0)}`;
     },
   });
   let now = 0;
@@ -42,7 +44,10 @@ function playthrough(cd, quiet = false) {
     assert.ok(done(id), `${id} not done: inner ${c(CLAW.INNER)} · outer ${c(CLAW.OUTER)} · ` +
       `level ${m.levelDiff.toFixed(2)} · rough ${m.roughMean.toFixed(2)} · loose ${JSON.stringify(m.looseRemain)}`);
     assert.equal(bloodAt, null, `blood during ${id}: ${bloodAt}`);
+    assert.equal(coreCutAt, null, `cut into the open ulcer during ${id}: ${coreCutAt}`);
   };
+  // Where the flat of the knife reaches from its centre.
+  const flat = CFG.tools.knife.radius * Math.sqrt(1 - KNIFE_FLAT);
 
   // Clean.
   until('clean', () => p.brushAll());
@@ -70,14 +75,12 @@ function playthrough(cd, quiet = false) {
   assert.equal(s.firstCutClaw, firstClaw(cd), 'trimmed the right claw first');
   until('step2', () => p.grind(secondClaw(cd), 270, 580, 1));
 
-  // Step 3: knife the dish channel along each axial wall, clear of the ulcer.
+  // Step 3: knife the dish channel along each axial wall, around the ulcer's ringed cap, as the
+  // guided run says: split each column where the flat of the blade would reach the cap.
   const dishX = (c) => { const d = dishRect(c, side); return [0, 10, 20, 30].map((k) => d.x + 4 + k); };
-  p.avoidCore = true;
   until('step3', () => {
     for (const c of [CLAW.INNER, CLAW.OUTER]) {
-      // Around the ulcer core, not through it: split each column where the blade would reach
-      // the core. Grazing the loose cap only starts opening it, which step 4 does anyway.
-      const R = (L?.r ?? 0) + CFG.tools.knife.radius * 0.5;
+      const R = (L?.r ?? 0) * 1.75 + flat + 1;
       for (const x of dishX(c)) {
         // DD sits up in the cleft, clear of the dish: nothing to steer round.
         const sole = L && L.type !== 'dd';
@@ -89,8 +92,7 @@ function playthrough(cd, quiet = false) {
       }
     }
   });
-
-  p.avoidCore = false;
+  if (L?.type === 'ulcer') assert.equal(hoof.capOpen, false, 'the cap is still closed after dishing');
 
   // Rasp both soles before the block covers one.
   until('finish', () => {
@@ -109,14 +111,14 @@ function playthrough(cd, quiet = false) {
     s.blockAttempts.push(hoof.block);
     until('drain', () => {});
   } else if (cd.requires.open) {
-    // Step 4: pare the loose horn off the ulcer, then block the sound claw.
-    for (let k = 0; k < 8 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) {
-      for (let a = 0; a < 6 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; a++) {
-        const r = 6 + a * 3;
-        p.drag('knife', [[L.x - r, L.y - r], [L.x + r * 0.5, L.y + r]], 90);
-        p.drag('knife', [[L.x + r, L.y - r], [L.x - r * 0.5, L.y + r]], 90);
-      }
-    }
+    // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
+    // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.
+    for (let k = 0; k < 40 && !hoof.capOpen; k++) p.drag('knife', [[L.x - L.r, L.y], [L.x + L.r, L.y], [L.x - L.r, L.y]], 160);
+    assert.ok(hoof.capOpen, 'cap gave');
+    const ring = L.r + flat + 3;
+    const orbit = [];
+    for (let a = 0; a <= 48; a++) orbit.push([L.x + ring * Math.cos((a / 48) * 2 * Math.PI), L.y + ring * Math.sin((a / 48) * 2 * Math.PI)]);
+    for (let k = 0; k < 6 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) p.drag('knife', orbit, 90);
     assert.ok(hoof.metrics().looseRemain[LOOSE.ULCER] < 0.1, 'ulcer opened');
     hoof.block = soundClaw(cd);
     s.blockAttempts.push(hoof.block);

@@ -269,6 +269,12 @@ button.primary[hidden] { display: none; }
   background: var(--panel-2);
 }
 .buttons button.primary { border: none; background: var(--brass); }
+.buttons button:disabled { opacity: 0.45; cursor: progress; }
+
+/* While the foot's textures build behind the case card. */
+.loadbar { margin-top: 14px; font-size: 12px; color: var(--muted); }
+.loadbar .track { height: 6px; margin-top: 6px; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+.loadbar i { display: block; height: 100%; width: 0; background: var(--brass); transition: width 0.15s linear; }
 
 .grade.gold { color: #f0c860; }
 .grade.silver { color: #d9d9d9; }

@@ -128,11 +128,18 @@ export class Renderer {
     if (this.scenery) c.drawImage(this.scenery, -BLEED, 0, W + 2 * BLEED, H);
   }
 
+  // Created on first use: the first resize can fire before layout gives the canvas a size.
+  material() {
+    if (!this.art) this.art = new HoofArt(this.k >= 2.2 ? 3 : 2);
+    return this.art;
+  }
+
+  // Up to `ms` of the work of getting a new foot ready to draw. Returns progress 0..1.
+  prepare(hoof, ms) { return this.material().prepareFor(hoof, ms); }
+
   hoof(hoof, diagnosed, m) {
     const c = this.ctx;
-    // Created on first draw: the first resize can fire before layout gives the canvas a size.
-    if (!this.art) this.art = new HoofArt(this.k >= 2.2 ? 3 : 2);
-    this.art.sync(hoof);
+    this.material().sync(hoof);
     // Contact shadows give each claw weight against the chute.
     const shadows = this.shadows && this.shadowsFor(hoof.side);
     for (const claw of CLAWS) {
@@ -183,7 +190,7 @@ export class Renderer {
     c.restore();
   }
 
-  weep(x, y, amount) { this.art?.weep(x, y, amount); }
+  weep(x, y, amount, kind) { this.art?.weep(x, y, amount, kind); }
   sprayDecal(x, y, r, dt) { this.art?.spray(x, y, r, dt); }
 
   // Guided run: a pulsing brass outline around where to work, plus a progress arc on rings.
@@ -216,6 +223,16 @@ export class Renderer {
         c.arc(target.x, target.y, target.r + 8, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
         c.stroke();
       }
+    }
+    // A keep-out ring: work round it, not over it.
+    if (target.avoid) {
+      const a = target.avoid;
+      c.setLineDash([4, 4]);
+      c.lineWidth = 2;
+      c.strokeStyle = `rgba(226,92,72,${0.55 + 0.45 * pulse})`;
+      c.beginPath();
+      c.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+      c.stroke();
     }
     c.restore();
   }

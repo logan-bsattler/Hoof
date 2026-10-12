@@ -221,6 +221,9 @@ export class Hoof {
     this.noise = new Float32Array(n);
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
     this.drained = false;           // the abscess pocket has been opened and has drained
+    // A sole ulcer's cap holds firm under the knife until it's been worked enough, then gives.
+    this.capWork = 0;               // knife travel over the closed cap so far (logical px)
+    this.capOpen = false;
     // How caked the foot is: muck covers it fully from 1 up, and past 1 it's packed harder,
     // so the brush shifts it more slowly (tools.js).
     const mud = caseDef.mud ?? 1;
@@ -336,15 +339,24 @@ export class Hoof {
       // Digital dermatitis is skin, not loose horn: the raw patch sits on the cleft.
       if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.DD;
     });
-    else if (L) this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
-      if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw) return;
-      this.zone[i] &= ~Z.DISH;
-      this.loose[i] = this.looseInit[i] = LOOSE.ULCER;
-      if (d <= L.r) {
-        this.zone[i] |= Z.ULCER;
-        this.thick[i] = 2.0;
-      }
-    });
+    else if (L) {
+      // The dish goes round the cap, not through it: it stops where the flat of the knife would
+      // start working the cap.
+      const K = CFG.tools.knife;
+      this.stampExact(L.x, L.y, L.r * 1.75 + K.radius * Math.sqrt(1 - K.flat), (i) => {
+        if (this.claw[i] !== L.claw || !(this.zone[i] & Z.DISH)) return;
+        this.zone[i] &= ~Z.DISH;
+        this.tgt[i] = CFG.sole.target;
+      });
+      this.stampExact(L.x, L.y, L.r * 1.75, (i, d) => {
+        if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw) return;
+        this.loose[i] = this.looseInit[i] = LOOSE.ULCER;
+        if (d <= L.r) {
+          this.zone[i] |= Z.ULCER;
+          this.thick[i] = 2.0;
+        }
+      });
+    }
 
     // A curl of loose, undermined heel horn for step 5.
     const H = cd.looseHorn;

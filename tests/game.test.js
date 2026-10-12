@@ -101,12 +101,48 @@ test('nippers work tip first: a deep bite takes nothing, tip-to-hoof bites clear
   assert.ok(deadLeft() < start * 0.1, `dead left: ${deadLeft()} of ${start}`);
 });
 
-test('knife opening the ulcer clears loose horn first', () => {
+test('the ulcer cap holds under the knife, then gives in one go', () => {
   const h = new Hoof(CASE_B);
   const L = CASE_B.lesion;
-  const ev = applyStroke(h, 'knife', L.x, L.y, 3);
-  assert.ok(ev.loose[LOOSE.ULCER] > 0);
+  const capped = () => { let k = 0; for (let i = 0; i < h.n; i++) if (h.looseInit[i] === LOOSE.ULCER && h.loose[i]) k++; return k; };
+  const start = capped();
+  // The first stroke only strains it: nothing lifts, nothing is cut.
+  let ev = applyStroke(h, 'knife', L.x, L.y, 3);
+  assert.ok(ev.capStrain > 0 && !ev.capPop);
+  assert.equal(capped(), start);
+  // Keep working it and it gives: the core and the horn round the blade lift together.
+  let strokes = 1;
+  while (!ev.capPop && strokes < 200) { ev = applyStroke(h, 'knife', L.x + (strokes % 2 ? 6 : -6), L.y, 3); strokes++; }
+  assert.ok(ev.capPop, 'cap gave');
+  assert.ok(h.capOpen);
+  assert.ok(ev.loose[LOOSE.ULCER] > start * 0.25, `lifted ${ev.loose[LOOSE.ULCER]} of ${start}`);
+  assert.ok(capped() > 0, 'an undermined rim is left to pare back');
   assert.equal(ev.blood, false);
+});
+
+test('once open, the core answers only to the flat of the knife, not its feathered edge', () => {
+  const h = new Hoof(CASE_B);
+  const L = CASE_B.lesion;
+  let ev, k = 0;
+  do ev = applyStroke(h, 'knife', L.x + (k++ % 2 ? 6 : -6), L.y, 3); while (!ev.capPop && k < 200);
+  assert.ok(h.capOpen);
+  const K = CFG.tools.knife;
+  const flat = K.radius * Math.sqrt(1 - K.flat);
+  // Blade centred just past where its flat would reach the core: the edge rides over it.
+  const edge = applyStroke(h, 'knife', L.x + L.r + flat + 1, L.y, 3);
+  assert.equal(edge.lesionCut, false);
+  // Bring the flat onto it and she feels it.
+  assert.equal(applyStroke(h, 'knife', L.x + L.r + flat - 3, L.y, 3).lesionCut, true);
+});
+
+test('the grinder skates over a closed ulcer cap', () => {
+  const h = new Hoof(CASE_B);
+  const L = CASE_B.lesion;
+  let ev;
+  for (let k = 0; k < 30; k++) ev = applyGrind(h, L.x, L.y, 1 / 60);
+  assert.ok(ev.grinderLesion);
+  assert.equal(h.capOpen, false);
+  assert.equal(ev.loose[LOOSE.ULCER], 0);
 });
 
 test('an ideal trim completes every step and grades Textbook', () => {

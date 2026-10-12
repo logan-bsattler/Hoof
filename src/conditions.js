@@ -7,7 +7,9 @@
 //   size    0..1, where the lesion's size falls in its band (undefined: random)
 //   at      0..1, where its position falls in its band (undefined: random)
 //   decoys  how many decoys (undefined: the condition's usual 1-2); kinds: which kinds to use
-// Every random draw happens whatever `v` says, so a variation only changes what it names.
+// Every random draw happens whatever `v` says, so a variation only changes what it names. The
+// one exception is the decoy count: each decoy takes its own draws, so changing the count also
+// rerolls the excess horn makeCase draws after placement.
 
 import { CLAW, CLAW_NAME, GEOM, clawSide, clawSpan, insideClaw, soundClaw } from './hoof.js';
 

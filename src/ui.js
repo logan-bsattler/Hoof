@@ -215,4 +215,28 @@ export class UI {
   }
 
   closeModal() { $('modal').classList.add('hidden'); }
+
+  // A loading bar on the open card while the foot gets ready (p: 0..1). Its buttons wait for it.
+  setLoading(p) {
+    const card = $('modalCard');
+    const done = p >= 1;
+    let bar = card.querySelector('.loadbar');
+    if (!bar && !done) {
+      bar = document.createElement('div');
+      bar.className = 'loadbar';
+      bar.setAttribute('role', 'progressbar');
+      bar.innerHTML = '<span>Lifting her foot…</span><div class="track"><i></i></div>';
+      const row = card.querySelector('.buttons');
+      if (row) row.before(bar); else card.append(bar);
+    }
+    if (bar) {
+      bar.setAttribute('aria-valuenow', String(Math.round(p * 100)));
+      bar.querySelector('i').style.width = `${Math.round(p * 100)}%`;
+      if (done) bar.remove();
+    }
+    const buttons = card.querySelectorAll('.buttons button');
+    const was = buttons[0]?.disabled;
+    buttons.forEach((b) => { b.disabled = !done; });
+    if (done && was) buttons[0].focus();
+  }
 }

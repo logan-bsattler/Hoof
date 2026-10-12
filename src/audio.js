@@ -266,6 +266,18 @@ export const Sound = {
     tone({ freq: 320, to: 170, dur: 0.45, gain: 0.07 });
   },
   flake() { burst({ dur: 0.05, freq: 5000, q: 2, gain: 0.12 }); },
+  // A closed ulcer cap under the knife: a dry creak, lower and louder as it nears giving.
+  creak(strain = 0) {
+    tone({ freq: 210 - 70 * strain, to: 160 - 50 * strain, dur: 0.09, type: 'sawtooth', gain: 0.03 + 0.04 * strain, lp: 900 });
+    burst({ dur: 0.06, freq: 1400 - 500 * strain, q: 3, gain: 0.08 + 0.08 * strain });
+  },
+  // The cap gives: a sharp crack of horn, a soft thump as the pressure lets go, a wet splutter.
+  crack() {
+    burst({ dur: 0.035, freq: 3200, q: 0.9, gain: 0.4 });
+    burst({ dur: 0.05, freq: 1800, q: 1.2, gain: 0.25, delay: 0.025 });
+    tone({ freq: 120, to: 60, dur: 0.18, gain: 0.3, delay: 0.02 });
+    for (let k = 0; k < 4; k++) burst({ dur: 0.05, freq: 600 + Math.random() * 500, q: 2, type: 'lowpass', gain: 0.1, delay: 0.12 + k * 0.06 });
+  },
   step() {
     tone({ freq: 880, dur: 0.18, gain: 0.06 });
     tone({ freq: 1320, dur: 0.22, gain: 0.04, delay: 0.08 });

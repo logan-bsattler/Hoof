@@ -7,7 +7,7 @@ import { CASE_B } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { CFG } from '../src/config.js';
 import {
-  FARMS, HOUSING, POINTS, HERD_BONUS, farmMods, visitCases, cowSeed, cowPoints,
+  FARMS, HOUSING, POINTS, HERD_BONUS, farmMods, herdDeck, visitCases, cowSeed, cowPoints,
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
   farmCows, healedBack, backLine, TIERS, tierFor, tierMods,
 } from '../src/route.js';
@@ -54,6 +54,20 @@ test('a visit deals the farm’s fixed number of cows, the same herd every time,
     assert.notDeepEqual(visitCases(f, 1).map(tag), visitCases(f, 2).map(tag), `${f.name}: a new visit, new cows`);
   }
   assert.notEqual(cowSeed(FARMS[1], 1, 0), cowSeed(FARMS[2], 1, 0));
+});
+
+test('a first visit deals the farm’s mix as a deck, not a streak', () => {
+  const count = (list) => list.reduce((m, c) => ({ ...m, [c]: (m[c] ?? 0) + 1 }), {});
+  assert.deepEqual(count(herdDeck(FARMS[0])), { routine: 2, ulcer: 1 }, 'Willow Bank: one ulcer, two routine');
+  assert.deepEqual(count(herdDeck(FARMS[1])), { routine: 2, whiteline: 1, ulcer: 1 }, 'Hollins brings its white line');
+  for (const f of FARMS) {
+    const deck = herdDeck(f);
+    assert.equal(deck.length, f.cows);
+    assert.ok(Object.keys(f.mix).every((id) => deck.includes(id)), `${f.name}: every condition in the deck`);
+    for (const visit of [1, 2, 3]) {
+      assert.deepEqual(count(visitCases(f, visit).map((cd) => cd.condition)), count(deck), `${f.name} visit ${visit} deals the deck`);
+    }
+  }
 });
 
 test('farm cows follow the farm: its conditions, and mods inside its ranges', () => {

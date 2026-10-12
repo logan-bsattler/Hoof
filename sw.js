@@ -1,7 +1,7 @@
 // Service worker: precaches the app shell so TRUE HOOF installs and plays offline.
 // Network-first, so a reachable server always wins and dev edits show up on reload;
 // the cache is the fallback when offline or slow. Bump VERSION when the asset list changes.
-const VERSION = 'true-hoof-v15';
+const VERSION = 'true-hoof-v16';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
@@ -37,13 +37,14 @@ const cached = (req) => caches.match(req, { ignoreSearch: true })
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  const net = fetch(req).then((res) => {
-    if (res.ok) {
-      const copy = res.clone();
-      e.waitUntil(caches.open(VERSION).then((c) => c.put(req, copy)));
-    }
-    return res;
-  });
+  const net = fetch(req);
+  // Registered now, while the event is live: on the timeout path the network answer lands after
+  // respondWith has settled, and a waitUntil called that late is dropped.
+  e.waitUntil(net.then((res) => {
+    if (!res.ok) return undefined;
+    const copy = res.clone();
+    return caches.open(VERSION).then((c) => c.put(req, copy));
+  }).catch(() => {}));
   const slow = new Promise((resolve) => setTimeout(resolve, NETWORK_TIMEOUT)).then(() => cached(req));
   e.respondWith(new Promise((resolve, reject) => {
     let settled = false;

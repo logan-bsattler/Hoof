@@ -61,6 +61,8 @@ function newEvents() {
     // White-line abscess: drain fires once, when the pared track reaches the pocket of pus.
     // offTrack: the knife dug at the pocket's sole without following the track there.
     drain: false, offTrack: false,
+    // Sole ulcer: how far the closed cap has been worked toward giving (0..1), and the stamp it gave.
+    capStrain: 0, capPop: false,
     // A blade (knife, grinder, nippers) bit into the skin of the heel cleft.
     cleftCut: false,
     // Thinnest living sole a tool cut into this stamp (mm): the cow's flinch reads it.
@@ -136,6 +138,28 @@ function clearLoose(hoof, i, ev) {
   return true;
 }
 
+// Where the knife cuts at full depth (stamp falloff f >= this): the flat of the blade.
+export const KNIFE_FLAT = CFG.tools.knife.flat;
+
+// A sole ulcer's cap of loose horn, not yet given way.
+const closedCap = (hoof, i) => !hoof.capOpen && hoof.loose[i] && hoof.looseInit[i] === LOOSE.ULCER;
+
+// The knife working a closed cap: it holds, then gives all at once. The core lifts out with
+// the horn round the blade; the undermined rim is left to pare back cell by cell.
+function workCap(hoof, x, y, amount, ev) {
+  const give = CFG.tools.knife.capGive;
+  hoof.capWork += amount;
+  ev.capStrain = Math.min(1, hoof.capWork / give);
+  if (hoof.capWork < give) return;
+  hoof.capOpen = true;
+  ev.capPop = true;
+  const lift = CFG.tools.knife.capLift * hoof.caseDef.lesion.r;
+  for (let i = 0; i < hoof.n; i++) {
+    if (hoof.looseInit[i] !== LOOSE.ULCER || !hoof.loose[i]) continue;
+    if ((hoof.zone[i] & Z.ULCER) || Math.hypot(hoof.cellX(i) - x, hoof.cellY(i) - y) < lift) clearLoose(hoof, i, ev);
+  }
+}
+
 // How far below its trim target the pared-out track and the opened pocket sit (mm).
 const GROOVE = { [TRACT.ENTRY]: 1.5, [TRACT.TRACK]: 1.5, [TRACT.POCKET]: 2.5 };
 
@@ -168,18 +192,23 @@ export function applyStroke(hoof, tool, x, y, dist) {
       ev.mud += a;
     });
   } else if (tool === 'knife') {
+    let onCap = 0;
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
       // Fresh cuts expose untreated tissue: the flush has to be repeated.
       hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * dist * f);
+      // The cap and the open core answer only to the flat of the blade; its feathered edge rides over them.
+      if (closedCap(hoof, i)) { if (f >= KNIFE_FLAT) onCap++; return; }
+      if ((hoof.zone[i] & Z.ULCER) && f < KNIFE_FLAT) return;
       if (pareTract(hoof, i, ev)) return;
       if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
       // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
-      const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f * 2.5), ev, cfg.resist);
+      const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist);
       // A clean knife pass leaves a smooth surface.
       hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
     });
+    if (onCap) workCap(hoof, x, y, dist * Math.min(1, onCap / 6), ev);
   } else if (tool === 'rasp') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       // The rasp has no edge to bite skin: it just rides over the cleft.
@@ -208,6 +237,8 @@ export function applyGrind(hoof, x, y, dt) {
     }
     hoof.mud[i] = Math.max(0, hoof.mud[i] - 2 * dt * f);
     if (hoof.zone[i] & Z.ULCER) ev.grinderLesion = true;
+    // The disc can't open the cap: it just skates over it. That's knife work.
+    if (closedCap(hoof, i)) { ev.grinderLesion = true; return; }
     // The disc levels over the white-line track but can't follow it: that's knife work.
     if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) {
       hoof.rough[i] = 0.8;

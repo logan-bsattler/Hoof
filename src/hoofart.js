@@ -54,6 +54,12 @@ const RAMP = (() => {
   return lut;
 })();
 
+const WEEP = {
+  serum: { rgb: [150, 118, 78], a: 0.1, w: 1 },
+  pus: { rgb: [178, 164, 104], a: 0.22, w: 1.5 },
+  blood: { rgb: [150, 30, 32], a: 0.28, w: 1.1 },
+};
+
 const ANG_N = 256;
 const COS = new Float32Array(ANG_N), SIN = new Float32Array(ANG_N);
 for (let a = 0; a < ANG_N; a++) {
@@ -87,18 +93,20 @@ export class HoofArt {
 
   // ------------------------------------------------------------ static build
 
-  build(hoof) {
+  // Everything that depends only on which way round the foot is, in slices: yields its
+  // progress 0..1 so a new foot can come up behind a loading bar instead of freezing the game.
+  *buildSteps(hoof) {
+    this.built = false;
     const { S, w, h, X0, Y0 } = this;
     const n = w * h;
-    const g = CFG.grid;
-
-    // Cell class: 1/2 live outer/inner, 3/4 overgrown (dead) outer/inner.
-    const cc = new Uint8Array(hoof.n);
-    for (let i = 0; i < hoof.n; i++) {
-      const c = hoof.claw[i];
-      cc[i] = c ? c + (hoof.zone[i] & Z.DEAD ? 2 : 0) : 0;
-    }
-    this.cellCls = cc;
+    // Rows per slice: each per-pixel pass hands control back this often.
+    const B = 16;
+    const bands = function* (lo, hi, pass) {
+      for (let y = 0; y < h; y += B) {
+        pass(y * w, Math.min(h, y + B) * w);
+        yield lo + ((hi - lo) * Math.min(h, y + B)) / h;
+      }
+    };
 
     // Rounded outlines: the model's polygons are coarse, and their corners would facet the rim.
     const polys = {
@@ -109,33 +117,23 @@ export class HoofArt {
     const cls = new Uint8Array(n);
     for (const c of [1, 2, 3, 4]) fillPoly(cls, w, h, S, X0, Y0, polys[c], c);
     this.cls = cls;
+    yield 0.04;
 
     // Distance to the outline, per pixel.
     const edge = new Float32Array(n);
     const dome = new Float32Array(n);
+    for (const f of outlineDistance(edge, cls, w, h, S, X0, Y0, polys)) yield 0.04 + 0.26 * f;
     for (let p = 0; p < n; p++) {
-      const c = cls[p];
-      if (!c) continue;
-      const lx = X0 + ((p % w) + 0.5) / S, ly = Y0 + (Math.floor(p / w) + 0.5) / S;
-      const pts = polys[c];
-      let best = Infinity;
-      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-        const [ax, ay] = pts[j], [qx, qy] = pts[i];
-        const ex = qx - ax, ey = qy - ay;
-        const t = Math.max(0, Math.min(1, ((lx - ax) * ex + (ly - ay) * ey) / (ex * ex + ey * ey)));
-        const d = (lx - ax - t * ex) ** 2 + (ly - ay - t * ey) ** 2;
-        if (d < best) best = d;
-      }
-      const d = Math.sqrt(best);
-      edge[p] = d;
+      if (!cls[p]) continue;
       // Dome profile: rises from the rim and flattens over the sole.
-      const e = Math.min(1, d / DOME_R);
+      const e = Math.min(1, edge[p] / DOME_R);
       dome[p] = DOME_H * (1 - (1 - e) * (1 - e));
     }
     // Blur the height so the distance field's medial creases don't show in the light,
     // then keep its slope (height per logical px) as each pixel's base normal.
     const br = Math.max(1, Math.round(1.5 * S));
-    boxBlur(dome, w, h, br); boxBlur(dome, w, h, br);
+    boxBlur(dome, w, h, br); yield 0.33;
+    boxBlur(dome, w, h, br); yield 0.36;
     const sx0 = new Float32Array(n), sy0 = new Float32Array(n);
     for (let p = 0; p < n; p++) {
       if (!cls[p]) continue;
@@ -148,65 +146,44 @@ export class HoofArt {
     this.edge = edge; this.sx0 = sx0; this.sy0 = sy0;
     const dnx = new Float32Array(n), dny = new Float32Array(n);
     for (let p = 0; p < n; p++) { dnx[p] = -sx0[p]; dny[p] = -sy0[p]; }
+    yield 0.4;
 
-    // Static noise fields (logical-space frequencies, so they scale with S).
-    const rand = mulberry32(9137);
-    const N1 = valueNoise(rand), N2 = valueNoise(rand), N3 = valueNoise(rand);
-    const N4 = valueNoise(rand), N5 = valueNoise(rand), N6 = valueNoise(rand);
-    const nMudThr = new Uint8Array(n), nStain = new Uint8Array(n), nCav = new Uint8Array(n);
-    const nGrain = new Uint8Array(n), nStreak = new Uint8Array(n), nIsle = new Uint8Array(n);
-    const lump = new Float32Array(n), wet = new Float32Array(n), glint = new Float32Array(n);
-    const nTone = new Uint8Array(n), nFleck = new Uint8Array(n);
-    const N7 = valueNoise(rand), N8 = valueNoise(rand);
-    for (let p = 0; p < n; p++) {
-      if (!cls[p]) continue;
-      const lx = X0 + ((p % w) + 0.5) / S, ly = Y0 + (Math.floor(p / w) + 0.5) / S;
-      // Manure clings thickest toward the heel and in the interdigital gap.
-      const heelness = smoothstep(300, 195, ly);
-      const gapness = smoothstep(26, 6, Math.abs(lx - GEOM.midX) - 7);
-      const thr = Math.max(0.18, 0.12 + 0.8 * fbm(N1, lx / 13, ly / 13, 4) - 0.16 * (heelness + gapness));
-      nMudThr[p] = clamp255(thr * 255);
-      nStain[p] = clamp255(fbm(N2, lx / 21, ly / 21, 4) * 255);
-      nIsle[p] = clamp255(fbm(N6, lx / 15, ly / 26, 3) * 255);
-      nCav[p] = clamp255(fbm(N3, lx / 4.5, ly / 4.5, 3) * 255);
-      nGrain[p] = clamp255((N4(lx * 1.3, ly * 1.3) * 0.55 + rand() * 0.45) * 255);
-      nStreak[p] = clamp255(fbm(N5, lx / 1.4, ly / 10, 3) * 255);
-      lump[p] = fbm(N5, lx / 2.4 + 91, ly / 2.4, 3);
-      wet[p] = fbm(N3, lx / 3.2 + 40, ly / 3.2, 2);
-      // Fine wet bumps on the manure: each crest throws a small sharp glint.
-      glint[p] = fbm(N8, lx / 0.9, ly / 0.9, 2);
-      // Broad peach/cream mottling in the horn, as in a waxy, translucent material.
-      nTone[p] = clamp255(fbm(N7, lx / 34, ly / 40, 3) * 255);
-      // Sparse dark flecks of grit pressed into the sole.
-      nFleck[p] = clamp255(N7(lx * 1.9 + 300, ly * 1.9) * 255);
-    }
+    // Static noise fields, read through the claw mask (outside it stays 0 for the rim gradients).
+    const nz = noiseFields(S, w, h, X0, Y0, cls);
+    for (const f of nz.steps) yield 0.4 + 0.25 * f;
+    const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, lump, wet, glint, nTone, nFleck } = maskFields(nz.fields, cls);
+    yield 0.66;
     // Wet specular from micro-normals (pixel gradients) on top of the dome normal.
     const mudSpec = new Uint8Array(n), wetSpec = new Uint8Array(n);
-    for (let p = 0; p < n; p++) {
-      if (!cls[p]) continue;
-      const x = p % w, y = (p / w) | 0;
-      const pl = x > 0 ? p - 1 : p, pr = x < w - 1 ? p + 1 : p;
-      const pu = y > 0 ? p - w : p, pd = y < h - 1 ? p + w : p;
-      const broad = specFrom(dnx[p], dny[p], (lump[pr] - lump[pl]) * S * 6, (lump[pd] - lump[pu]) * S * 6, 30);
-      const sharp = specFrom(dnx[p], dny[p], (glint[pr] - glint[pl]) * S * 5, (glint[pd] - glint[pu]) * S * 5, 140);
-      mudSpec[p] = Math.min(255, broad * 0.3 + sharp * 0.5);
-      wetSpec[p] = specFrom(dnx[p], dny[p], (wet[pr] - wet[pl]) * S * 4, (wet[pd] - wet[pu]) * S * 4, 60);
-    }
+    yield* bands(0.66, 0.84, (a, b) => {
+      for (let p = a; p < b; p++) {
+        if (!cls[p]) continue;
+        const x = p % w, y = (p / w) | 0;
+        const pl = x > 0 ? p - 1 : p, pr = x < w - 1 ? p + 1 : p;
+        const pu = y > 0 ? p - w : p, pd = y < h - 1 ? p + w : p;
+        const broad = specFrom(dnx[p], dny[p], (lump[pr] - lump[pl]) * S * 6, (lump[pd] - lump[pu]) * S * 6, 30);
+        const sharp = specFrom(dnx[p], dny[p], (glint[pr] - glint[pl]) * S * 5, (glint[pd] - glint[pu]) * S * 5, 140);
+        mudSpec[p] = Math.min(255, broad * 0.3 + sharp * 0.5);
+        wetSpec[p] = specFrom(dnx[p], dny[p], (wet[pr] - wet[pl]) * S * 4, (wet[pd] - wet[pu]) * S * 4, 60);
+      }
+    });
     // Manure relief: lumps at two scales plus fine wet ripples. Its slope tilts the normal,
     // so the lamp itself picks out the clumps and throws glints off their wet crests.
     const mudX = new Float32Array(n), mudY = new Float32Array(n);
-    for (let p = 0; p < n; p++) {
-      if (!cls[p]) continue;
-      const x = p % w, y = (p / w) | 0;
-      const pl = x > 0 ? p - 1 : p, pr = x < w - 1 ? p + 1 : p;
-      const pu = y > 0 ? p - w : p, pd = y < h - 1 ? p + w : p;
-      // Some stretches are slick and smooth, others clumpy.
-      const clumpy = 0.25 + 1.1 * smoothstep(0.35, 0.7, nStain[p] / 255);
-      const hx = (lump[pr] - lump[pl]) * 1.4 * clumpy + (glint[pr] - glint[pl]) * 0.35 + (wet[pr] - wet[pl]) * 1.8;
-      const hy = (lump[pd] - lump[pu]) * 1.4 * clumpy + (glint[pd] - glint[pu]) * 0.35 + (wet[pd] - wet[pu]) * 1.8;
-      mudX[p] = (hx * S) / (pr - pl || 1);
-      mudY[p] = (hy * S) / ((pd - pu) / w || 1);
-    }
+    yield* bands(0.84, 0.9, (a, b) => {
+      for (let p = a; p < b; p++) {
+        if (!cls[p]) continue;
+        const x = p % w, y = (p / w) | 0;
+        const pl = x > 0 ? p - 1 : p, pr = x < w - 1 ? p + 1 : p;
+        const pu = y > 0 ? p - w : p, pd = y < h - 1 ? p + w : p;
+        // Some stretches are slick and smooth, others clumpy.
+        const clumpy = 0.25 + 1.1 * smoothstep(0.35, 0.7, nStain[p] / 255);
+        const hx = (lump[pr] - lump[pl]) * 1.4 * clumpy + (glint[pr] - glint[pl]) * 0.35 + (wet[pr] - wet[pl]) * 1.8;
+        const hy = (lump[pd] - lump[pu]) * 1.4 * clumpy + (glint[pd] - glint[pu]) * 0.35 + (wet[pd] - wet[pu]) * 1.8;
+        mudX[p] = (hx * S) / (pr - pl || 1);
+        mudY[p] = (hy * S) / ((pd - pu) / w || 1);
+      }
+    });
     this.mudX = mudX; this.mudY = mudY;
     const nLump = new Uint8Array(n);
     for (let p = 0; p < n; p++) nLump[p] = clamp255(lump[p] * 255);
@@ -214,6 +191,7 @@ export class HoofArt {
 
     // Straw and fibre strands embedded in the manure.
     this.straw = paintStraw(this, mulberry32(4411));
+    yield 0.95;
 
     // Groove pattern for tool striations: mostly fine lines, the odd deeper score.
     const r2 = mulberry32(77);
@@ -223,8 +201,37 @@ export class HoofArt {
       this.hash[k] = v < 0.1 ? -1 : (v - 0.5) * 0.7;
     }
 
+    // Claw silhouette mask, used to keep decals on the horn.
+    this.mask = makeCanvas(w, h);
+    const mctx = this.mask.getContext('2d');
+    const md = mctx.createImageData(w, h);
+    for (let p = 0; p < n; p++) if (cls[p]) md.data[p * 4 + 3] = 255;
+    mctx.putImageData(md, 0, 0);
+
+    this.markT = new Uint8Array(n);
+    this.markA = new Uint8Array(n);
+    // Grinder marks are arcs of the disc rim: each pixel keeps the arc's centre (render px).
+    this.arcX = new Int16Array(n);
+    this.arcY = new Int16Array(n);
+    this.built = true;
+    this.builtSide = hoof.side;
+    yield 1;
+  }
+
+  // Take on a new foot: its cell classes (overgrowth varies cow to cow), fresh state and a
+  // full compose, in slices. Yields progress 0..1.
+  *adoptSteps(hoof) {
+    const { S, w, h, X0, Y0, cls } = this;
+    const n = w * h, g = CFG.grid;
+    // Cell class: 1/2 live outer/inner, 3/4 overgrown (dead) outer/inner.
+    const cc = new Uint8Array(hoof.n);
+    for (let i = 0; i < hoof.n; i++) {
+      const c = hoof.claw[i];
+      cc[i] = c ? c + (hoof.zone[i] & Z.DEAD ? 2 : 0) : 0;
+    }
+    this.cellCls = cc;
     // Bilinear neighbours: fallback cell for pixels with no same-class neighbour.
-    this.fallback = new Int32Array(n).fill(-1);
+    const fallback = new Int32Array(n).fill(-1);
     for (let p = 0; p < n; p++) {
       const c = cls[p];
       if (!c) continue;
@@ -242,68 +249,76 @@ export class HoofArt {
         for (let cx = ix - 3; cx <= ix + 4; cx++) {
           if (cx < 0 || cy < 0 || cx >= g.cols || cy >= g.rows || cc[cy * g.cols + cx] !== c) continue;
           const d = (cx - fx) ** 2 + (cy - fy) ** 2;
-          if (d < bestD) { bestD = d; this.fallback[p] = cy * g.cols + cx; }
+          if (d < bestD) { bestD = d; fallback[p] = cy * g.cols + cx; }
         }
       }
     }
+    this.fallback = fallback;
+    yield 0.12;
 
-    // Claw silhouette mask, used to keep decals on the horn.
-    this.mask = makeCanvas(w, h);
-    const mctx = this.mask.getContext('2d');
-    const md = mctx.createImageData(w, h);
-    for (let p = 0; p < n; p++) if (cls[p]) md.data[p * 4 + 3] = 255;
-    mctx.putImageData(md, 0, 0);
+    this.hoof = hoof;
+    this.snap = {
+      thick: Float32Array.from(hoof.thick), mud: Float32Array.from(hoof.mud),
+      rough: Float32Array.from(hoof.rough), loose: Uint8Array.from(hoof.loose),
+      blood: Uint8Array.from(hoof.blood), tint: Float32Array.from(hoof.tint),
+    };
+    this.looseF = new Float32Array(hoof.n);
+    this.bloodF = new Float32Array(hoof.n);
+    // Where the ulcer's cap of loose horn started: the pocket can only open inside it.
+    this.ulcerF = new Float32Array(hoof.n);
+    // Likewise the white-line track's under-run horn: the groove can only open along it.
+    this.tractF = new Float32Array(hoof.n);
+    // The heel cleft's skin, and the DD patch on it.
+    this.cleftF = new Float32Array(hoof.n);
+    this.ddF = new Float32Array(hoof.n);
+    for (let i = 0; i < hoof.n; i++) {
+      this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i];
+      this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
+      this.tractF[i] = hoof.looseInit[i] === LOOSE.TRACT ? 1 : 0;
+      this.cleftF[i] = hoof.zone[i] & Z.CLEFT ? 1 : 0;
+      this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
+    }
+    this.markT.fill(0);
+    this.octx.save();
+    this.octx.setTransform(1, 0, 0, 1, 0, 0);
+    this.octx.clearRect(0, 0, this.w, this.h);
+    this.octx.restore();
+    this.drips = [];
+    this.bubbles = [];
+    this.dirty = null;
+    this.rg = null;
+    for (let y = 0; y < h; y += 8) {
+      this.compose(0, y, w, Math.min(h, y + 8));
+      yield 0.12 + (0.88 * Math.min(h, y + 8)) / h;
+    }
+  }
 
-    this.markT = new Uint8Array(n);
-    this.markA = new Uint8Array(n);
-    // Grinder marks are arcs of the disc rim: each pixel keeps the arc's centre (render px).
-    this.arcX = new Int16Array(n);
-    this.arcY = new Int16Array(n);
-    this.built = true;
-    this.builtSide = hoof.side;
+  // The whole of getting a new foot ready to draw. Yields progress 0..1.
+  *prepare(hoof) {
+    const split = !this.built || this.builtSide !== hoof.side ? 0.7 : 0;
+    if (split) for (const f of this.buildSteps(hoof)) yield f * split;
+    for (const f of this.adoptSteps(hoof)) yield split + f * (1 - split);
+  }
+
+  // Work toward having `hoof` ready for at most `ms`. Returns progress 0..1; 1 is ready.
+  prepareFor(hoof, ms = Infinity) {
+    if (hoof === this.hoof && !this.job) return 1;
+    if (!this.job || this.jobHoof !== hoof) { this.job = this.prepare(hoof); this.jobHoof = hoof; this.jobP = 0; }
+    const end = performance.now() + ms;
+    for (;;) {
+      const r = this.job.next();
+      if (r.done) { this.job = null; return 1; }
+      this.jobP = r.value;
+      if (performance.now() >= end) return this.jobP;
+    }
   }
 
   // ------------------------------------------------------------- per frame
 
   // Bring the buffers in line with the simulation; recompose what changed.
   sync(hoof) {
-    // The outline buffers depend on which way round the foot is.
-    if (!this.built || this.builtSide !== hoof.side) this.build(hoof);
-    if (hoof !== this.hoof) {
-      this.hoof = hoof;
-      this.snap = {
-        thick: Float32Array.from(hoof.thick), mud: Float32Array.from(hoof.mud),
-        rough: Float32Array.from(hoof.rough), loose: Uint8Array.from(hoof.loose),
-        blood: Uint8Array.from(hoof.blood), tint: Float32Array.from(hoof.tint),
-      };
-      this.looseF = new Float32Array(hoof.n);
-      this.bloodF = new Float32Array(hoof.n);
-      // Where the ulcer's cap of loose horn started: the pocket can only open inside it.
-      this.ulcerF = new Float32Array(hoof.n);
-      // Likewise the white-line track's under-run horn: the groove can only open along it.
-      this.tractF = new Float32Array(hoof.n);
-      // The heel cleft's skin, and the DD patch on it.
-      this.cleftF = new Float32Array(hoof.n);
-      this.ddF = new Float32Array(hoof.n);
-      for (let i = 0; i < hoof.n; i++) {
-        this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i];
-        this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
-        this.tractF[i] = hoof.looseInit[i] === LOOSE.TRACT ? 1 : 0;
-        this.cleftF[i] = hoof.zone[i] & Z.CLEFT ? 1 : 0;
-        this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
-      }
-      this.markT.fill(0);
-      this.octx.save();
-      this.octx.setTransform(1, 0, 0, 1, 0, 0);
-      this.octx.clearRect(0, 0, this.w, this.h);
-      this.octx.restore();
-      this.drips = [];
-      this.bubbles = [];
-      this.dirty = null;
-      this.rg = null;
-      this.compose(0, 0, this.w, this.h);
-      return;
-    }
+    // A new foot (or one still loading) is finished here in one go if nobody sliced it up.
+    if (hoof !== this.hoof || this.job) { this.prepareFor(hoof); return; }
     const g = CFG.grid, sn = this.snap;
     let c0 = Infinity, c1 = -1, r0 = Infinity, r1 = -1;
     for (let i = 0; i < hoof.n; i++) {
@@ -710,21 +725,23 @@ export class HoofArt {
             const open = smoothstep(thr + 0.08, thr - 0.08, lf) * smoothstep(ut - 0.06, ut + 0.06, uf);
             if (open > 0) {
               const u = dL / Lr;
-              // Loose layers: wet, translucent pale-yellow horn, greyer where it sits deeper, with
-              // dark crevices between flaps. Noise contours, not rings, so no two flaps match.
+              // Nothing like the pared sole round it: raw, wet tissue, angry red at the centre and
+              // bruised brown toward the rim, where flaps of undermined horn still hang over.
+              // Noise contours, not rings, so no two pockets match.
               const ls = nStreak[p] / 255;
-              const flap = smoothstep(0.46, 0.6, ncv * 0.7 + ls * 0.3);
-              const deep = smoothstep(1.4, 0.4, u) * (1 - flap);
-              let cr = 192 + 26 * flap - 46 * deep, cg = 184 + 22 * flap - 44 * deep, cb = 146 + 20 * flap - 30 * deep;
-              // Crevices only in the deepest noise troughs, so they stay small and scattered.
-              const pit = smoothstep(0.26, 0.15, ncv) * 0.9;
-              cr += (66 - cr) * pit; cg += (42 - cg) * pit; cb += (44 - cb) * pit;
-              // Flap edges catch a bright rim.
-              const fe = smoothstep(0.4, 0.5, ncv * 0.7 + ls * 0.3) * (1 - flap);
-              cr += 40 * fe; cg += 36 * fe; cb += 30 * fe;
-              // The corium shows pink-red at the very centre.
-              const core = smoothstep(0.45, 0.2, u + (ncv - 0.5) * 0.4);
-              cr += (176 - 40 * ngr - cr) * core; cg += (78 - 30 * ngr - cg) * core; cb += (84 - 28 * ngr - cb) * core;
+              const raw = smoothstep(1.35, 0.35, u + (ncv - 0.5) * 0.45);
+              let cr = 112 + 64 * raw - 22 * ngr, cg = 58 - 4 * raw - 14 * ngr, cb = 48 - 12 * ngr;
+              // Granulation: pebbly knots of brighter red over the core.
+              const knot = smoothstep(0.62, 0.78, ngr) * raw;
+              cr += 46 * knot; cg += 10 * knot; cb += 8 * knot;
+              // Yellow-grey pus pooled in the low spots, thinning toward the centre.
+              const pus = smoothstep(0.32, 0.18, ncv) * (1 - 0.6 * raw);
+              cr += (198 - cr) * pus * 0.85; cg += (182 - cg) * pus * 0.85; cb += (112 - cb) * pus * 0.85;
+              // Undermined horn at the rim: pale flaps with dark gaps under them.
+              const flap = smoothstep(0.5, 0.62, ncv * 0.7 + ls * 0.3) * smoothstep(0.75, 1.3, u);
+              cr += (218 - cr) * flap * 0.75; cg += (196 - cg) * flap * 0.75; cb += (160 - cb) * flap * 0.75;
+              const gap = smoothstep(0.42, 0.5, ncv * 0.7 + ls * 0.3) * (1 - flap) * smoothstep(0.8, 1.3, u);
+              cr *= 1 - 0.45 * gap; cg *= 1 - 0.5 * gap; cb *= 1 - 0.5 * gap;
               // Walls: the rim of horn on the lamp side overhangs the hole and shades it,
               // while the far wall faces the lamp and shows a band of pale cut horn.
               const sh = looseAt(lx - 1.7, ly - 2.4);
@@ -885,8 +902,10 @@ export class HoofArt {
 
   // -------------------------------------------------------------- live fx
 
-  // The weeping hole: fluid runs toward the toe and bubbles froth at the opening.
-  weep(x, y, amount = 1) {
+  // The weeping hole: fluid runs toward the toe and bubbles froth at the opening. `kind` sets
+  // the fluid: the serous weep, thick yellow-grey pus as the cap gives, or blood from raw tissue.
+  weep(x, y, amount = 1, kind = 'serum') {
+    const col = WEEP[kind] ?? WEEP.serum;
     for (let k = 0; k < Math.round(6 * amount); k++) {
       this.bubbles.push({
         x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 5,
@@ -896,7 +915,7 @@ export class HoofArt {
     for (let k = 0; k < Math.max(1, Math.round(1.5 * amount)); k++) {
       this.drips.push({
         x: x + (Math.random() - 0.5) * 4, y, vx: (Math.random() - 0.5) * 4, vy: 18 + Math.random() * 20,
-        life: 2.5 + Math.random() * 2, w: 1.2 + Math.random() * 1.6, col: [150, 118, 78], a: 0.1,
+        life: 2.5 + Math.random() * 2, w: (1.2 + Math.random() * 1.6) * col.w, col: col.rgb, a: col.a,
       });
     }
   }
@@ -1016,6 +1035,136 @@ function smoothPoly(pts, rounds = 3) {
     pts = out;
   }
   return pts;
+}
+
+// The static noise fields don't depend on the foot, only on where the pixels are, so they're
+// kept for the session and filled in as claw pixels first need them: a foot on the other side
+// only pays for the pixels the last one didn't cover. Logical-space frequencies, so they
+// scale with S.
+let NOISE = null;
+function noiseFields(S, w, h, X0, Y0, cls) {
+  const n = w * h;
+  if (!NOISE || NOISE.S !== S || NOISE.w !== w || NOISE.h !== h) {
+    const rand = mulberry32(9137);
+    const N1 = valueNoise(rand), N2 = valueNoise(rand), N3 = valueNoise(rand);
+    const N4 = valueNoise(rand), N5 = valueNoise(rand), N6 = valueNoise(rand);
+    const N7 = valueNoise(rand), N8 = valueNoise(rand);
+    NOISE = {
+      S, w, h, N: [N1, N2, N3, N4, N5, N6, N7, N8], done: new Uint8Array(n),
+      f: {
+        nMudThr: new Uint8Array(n), nStain: new Uint8Array(n), nCav: new Uint8Array(n),
+        nGrain: new Uint8Array(n), nStreak: new Uint8Array(n), nIsle: new Uint8Array(n),
+        lump: new Float32Array(n), wet: new Float32Array(n), glint: new Float32Array(n),
+        nTone: new Uint8Array(n), nFleck: new Uint8Array(n),
+      },
+    };
+  }
+  const { done, f } = NOISE;
+  const [N1, N2, N3, N4, N5, N6, N7, N8] = NOISE.N;
+  // The fields come back at once; `steps` fills them in, a band of rows per step (0..1).
+  const steps = function* () {
+    for (let y0 = 0; y0 < h; y0 += 16) {
+      const p1 = Math.min(h, y0 + 16) * w;
+      for (let p = y0 * w; p < p1; p++) {
+        if (!cls[p] || done[p]) continue;
+        done[p] = 1;
+        const lx = X0 + ((p % w) + 0.5) / S, ly = Y0 + (Math.floor(p / w) + 0.5) / S;
+        // Manure clings thickest toward the heel and in the interdigital gap.
+        const heelness = smoothstep(300, 195, ly);
+        const gapness = smoothstep(26, 6, Math.abs(lx - GEOM.midX) - 7);
+        const thr = Math.max(0.18, 0.12 + 0.8 * fbm(N1, lx / 13, ly / 13, 4) - 0.16 * (heelness + gapness));
+        f.nMudThr[p] = clamp255(thr * 255);
+        f.nStain[p] = clamp255(fbm(N2, lx / 21, ly / 21, 4) * 255);
+        f.nIsle[p] = clamp255(fbm(N6, lx / 15, ly / 26, 3) * 255);
+        f.nCav[p] = clamp255(fbm(N3, lx / 4.5, ly / 4.5, 3) * 255);
+        f.nGrain[p] = clamp255((N4(lx * 1.3, ly * 1.3) * 0.55 + hash01(p) * 0.45) * 255);
+        f.nStreak[p] = clamp255(fbm(N5, lx / 1.4, ly / 10, 3) * 255);
+        f.lump[p] = fbm(N5, lx / 2.4 + 91, ly / 2.4, 3);
+        f.wet[p] = fbm(N3, lx / 3.2 + 40, ly / 3.2, 2);
+        // Fine wet bumps on the manure: each crest throws a small sharp glint.
+        f.glint[p] = fbm(N8, lx / 0.9, ly / 0.9, 2);
+        // Broad peach/cream mottling in the horn, as in a waxy, translucent material.
+        f.nTone[p] = clamp255(fbm(N7, lx / 34, ly / 40, 3) * 255);
+        // Sparse dark flecks of grit pressed into the sole.
+        f.nFleck[p] = clamp255(N7(lx * 1.9 + 300, ly * 1.9) * 255);
+      }
+      yield p1 / n;
+    }
+  };
+  return { fields: f, steps: steps() };
+}
+
+// Copies of the fields with everything off the claws zeroed.
+function maskFields(f, cls) {
+  const out = {};
+  for (const [k, src] of Object.entries(f)) {
+    const a = new src.constructor(src.length);
+    for (let p = 0; p < src.length; p++) if (cls[p]) a[p] = src[p];
+    out[k] = a;
+  }
+  return out;
+}
+
+// Per-pixel white noise in 0..1, the same for a pixel whichever foot is drawn.
+function hash01(p) {
+  let x = Math.imul(p ^ 0x9e3779b9, 0x85ebca6b);
+  x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
+}
+
+// Distance (logical px) from each classed pixel to its own claw's outline. Brute force is
+// every pixel against every segment, seconds on a phone, so pixels are taken in tiles: a
+// segment further from the tile centre than the nearest one plus the tile's diameter can't be
+// nearest to any pixel in it. Same per-segment maths as the brute force, so the same result.
+const TILE = 8;
+function* outlineDistance(edge, cls, w, h, S, X0, Y0, polys) {
+  // Segments as flat arrays: start, direction, 1/|dir|².
+  const segs = {};
+  for (const c of [1, 2, 3, 4]) {
+    const pts = polys[c], m = pts.length;
+    const s = { m, ax: new Float64Array(m), ay: new Float64Array(m), ex: new Float64Array(m), ey: new Float64Array(m), d: new Float64Array(m), near: new Int32Array(m) };
+    for (let i = 0, j = m - 1; i < m; j = i++) {
+      const [ax, ay] = pts[j], [qx, qy] = pts[i];
+      s.ax[i] = ax; s.ay[i] = ay; s.ex[i] = qx - ax; s.ey[i] = qy - ay;
+    }
+    segs[c] = s;
+  }
+  const segDist2 = (s, i, lx, ly) => {
+    const ax = s.ax[i], ay = s.ay[i], ex = s.ex[i], ey = s.ey[i];
+    const t = Math.max(0, Math.min(1, ((lx - ax) * ex + (ly - ay) * ey) / (ex * ex + ey * ey)));
+    return (lx - ax - t * ex) ** 2 + (ly - ay - t * ey) ** 2;
+  };
+  const r = (TILE * Math.SQRT1_2) / S; // tile centre to corner pixel centre, logical px (generous)
+  for (let ty = 0; ty < h; ty += TILE) {
+    for (let tx = 0; tx < w; tx += TILE) {
+      const x1 = Math.min(w, tx + TILE), y1 = Math.min(h, ty + TILE);
+      const cx = X0 + (tx + x1) / 2 / S, cy = Y0 + (ty + y1) / 2 / S;
+      for (const c of [1, 2, 3, 4]) {
+        // Only claws with a pixel in this tile.
+        let any = false;
+        for (let y = ty; y < y1 && !any; y++) for (let x = tx; x < x1; x++) if (cls[y * w + x] === c) { any = true; break; }
+        if (!any) continue;
+        const s = segs[c];
+        let dmin = Infinity;
+        for (let i = 0; i < s.m; i++) { s.d[i] = Math.sqrt(segDist2(s, i, cx, cy)); if (s.d[i] < dmin) dmin = s.d[i]; }
+        const cut = dmin + 2 * r + 1e-6;
+        let k = 0;
+        for (let i = 0; i < s.m; i++) if (s.d[i] <= cut) s.near[k++] = i;
+        for (let y = ty; y < y1; y++) {
+          const ly = Y0 + (y + 0.5) / S;
+          for (let x = tx; x < x1; x++) {
+            const p = y * w + x;
+            if (cls[p] !== c) continue;
+            const lx = X0 + (x + 0.5) / S;
+            let best = Infinity;
+            for (let q = 0; q < k; q++) { const d = segDist2(s, s.near[q], lx, ly); if (d < best) best = d; }
+            edge[p] = Math.sqrt(best);
+          }
+        }
+      }
+    }
+    yield Math.min(h, ty + TILE) / h;
+  }
 }
 
 // In-place separable box blur.
