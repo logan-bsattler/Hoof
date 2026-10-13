@@ -65,13 +65,23 @@ export class UI {
   // Paint each dock icon from the in-hand tool art, at the icon's CSS size x DPR.
   drawIcons() {
     const dpr = devicePixelRatio || 1;
+    this.iconKind ??= {};
+    this.iconDrawn ??= {};
     for (const [id, b] of Object.entries(this.toolButtons)) {
       const cv = b.querySelector('canvas.icon');
       const px = Math.round((cv.clientWidth || 28) * dpr);
-      if (cv.width === px) continue;
+      const kind = this.iconKind[id] ?? '';
+      if (cv.width === px && this.iconDrawn[id] === kind) continue;
       cv.width = cv.height = px;
-      drawToolIcon(cv.getContext('2d'), id, px);
+      drawToolIcon(cv.getContext('2d'), id, px, kind);
+      this.iconDrawn[id] = kind;
     }
+  }
+
+  // Show a variant on a tool's dock icon (the wood block).
+  setIconKind(id, kind) {
+    (this.iconKind ??= {})[id] = kind;
+    this.drawIcons();
   }
 
   setTool(id) {

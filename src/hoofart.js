@@ -271,6 +271,8 @@ export class HoofArt {
     this.ulcerF = new Float32Array(hoof.n);
     // Likewise the white-line track's under-run horn: the groove can only open along it.
     this.tractF = new Float32Array(hoof.n);
+    // And the toe necrosis's dead horn: the pared pit can only open inside it.
+    this.necroF = new Float32Array(hoof.n);
     // The heel cleft's skin, and the DD patch on it.
     this.cleftF = new Float32Array(hoof.n);
     this.ddF = new Float32Array(hoof.n);
@@ -278,6 +280,7 @@ export class HoofArt {
       this.looseF[i] = hoof.loose[i] ? 1 : 0; this.bloodF[i] = hoof.blood[i];
       this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
       this.tractF[i] = hoof.looseInit[i] === LOOSE.TRACT ? 1 : 0;
+      this.necroF[i] = hoof.looseInit[i] === LOOSE.NECRO ? 1 : 0;
       this.cleftF[i] = hoof.zone[i] & Z.CLEFT ? 1 : 0;
       this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
     }
@@ -463,6 +466,7 @@ export class HoofArt {
     // The white-line track's box: pixels outside it skip the per-pixel path distance.
     const T = L?.type === 'whiteline' ? L : null;
     const PU = L?.type === 'foreign' ? L : null;
+    const NE = L?.type === 'toenecrosis' ? L : null, necroF = this.necroF;
     let tb = null;
     if (T) {
       const K = T.pocket, m = T.w * 2.2, xs = T.path.map((q) => q[0]), ys = T.path.map((q) => q[1]);
@@ -795,6 +799,46 @@ export class HoofArt {
               cr += (78 - cr) * pus; cg += (74 - cg) * pus; cb += (64 - cb) * pus;
               R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
               wetness = Math.max(wetness, open * (0.3 + 0.6 * pus));
+            }
+          }
+
+          // Toe necrosis: black, crumbling dead horn at the toe tip, cracked and flaking at its
+          // ragged edge; pared out, a pit of clean pale horn, shadowed where it steps down.
+          if (c === lesionC && NE && Math.abs(lx - NE.x) < NE.r * 1.6 && Math.abs(ly - NE.y) < NE.r * 1.6) {
+            // Read the loose field against the patch's own footprint, warped so its edge is ragged.
+            const wx = (nIsle[p] / 255 - 0.5) * 6, wy = (nStain[p] / 255 - 0.5) * 6;
+            const nf = fieldAt(necroF, lx + wx, ly + wy);
+            const lf = Math.min(1, fieldAt(looseF, lx + wx, ly + wy) / Math.max(0.05, nf));
+            const inside = smoothstep(0.3 + 0.2 * ncv, 0.6 + 0.2 * ncv, nf);
+            const dead = inside * smoothstep(0.35, 0.65, lf);
+            if (dead > 0) {
+              // Near-black, a little green-grey where it crumbles, with paler flecks of dry crust.
+              const crumb = smoothstep(0.55, 0.8, ngr);
+              let cr = 30 + 18 * crumb, cg = 28 + 18 * crumb, cb = 24 + 12 * crumb;
+              const fleck = smoothstep(0.93, 0.98, ngr) * smoothstep(0.4, 0.7, ncv);
+              cr += (112 - cr) * fleck; cg += (104 - cg) * fleck; cb += (86 - cb) * fleck;
+              // Cracks run through it on the noise contours.
+              const crack = smoothstep(0.03, 0, Math.abs(ncv - 0.5)) * 0.8;
+              cr *= 1 - crack; cg *= 1 - crack; cb *= 1 - crack;
+              // A dark, damp rim where the rot meets sound horn.
+              const rim = smoothstep(0.55, 0.3, nf) * 0.5;
+              cr *= 1 - rim; cg *= 1 - rim; cb *= 1 - rim;
+              R += (cr - R) * dead; G += (cg - G) * dead; B += (cb - B) * dead;
+              wetness = Math.max(wetness, dead * 0.25 * (1 - crumb));
+              crust = Math.max(crust, dead * 0.6);
+            }
+            const open = inside * smoothstep(0.65, 0.35, lf);
+            if (open > 0) {
+              // Healthy horn underneath: pale and clean, darker toward the pit's walls on the lamp side.
+              let cr = 226 - 14 * ngr, cg = 204 - 12 * ngr, cb = 164 - 10 * ngr;
+              const sh = (1 - smoothstep(0.3, 0.7, fieldAt(necroF, lx - 1.7, ly - 2.4))) * 0.35;
+              const wall = smoothstep(0.75, 0.45, nf) * 0.3;
+              const k = 1 - sh - wall;
+              cr *= k; cg *= k; cb *= k;
+              // A few grey specks of dead horn left in the grain.
+              const left = smoothstep(0.95, 0.99, ngr) * 0.6;
+              cr += (60 - cr) * left; cg += (56 - cg) * left; cb += (50 - cb) * left;
+              R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
             }
           }
 

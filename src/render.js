@@ -176,7 +176,7 @@ export class Renderer {
         c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
         c.stroke();
         c.setLineDash([]);
-        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼', foreign: 'puncture ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
+        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼', foreign: 'puncture ▼', toenecrosis: 'toe necrosis ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
       }
       c.restore();
     }
@@ -309,11 +309,12 @@ export class Renderer {
     c.restore();
   }
 
-  block(hoof, ghostClaw = 0) {
+  // ghostKind: which block the aim ghost shows (the one in hand, not yet glued).
+  block(hoof, ghostClaw = 0, ghostKind = 'rubber') {
     const c = this.ctx;
     const press = Math.min(1, (this.time - this.placed.block) / 0.25);
-    if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block, false, hoof.side), 1, press);
-    if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw, false, hoof.side), 0.4, 1);
+    if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block, false, hoof.side), 1, press, hoof.blockKind);
+    if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw, false, hoof.side), 0.4, 1, ghostKind);
   }
 
   // Pad and pink wrap over the treated claw (plus a ghost pad while aiming).

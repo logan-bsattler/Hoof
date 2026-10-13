@@ -311,6 +311,7 @@ const ICON_DRAW = {
   knife: (c) => { c.scale(1.45, 1.45); drawKnife(c, 11, 11, Q); },
   rasp: (c) => { c.translate(64, 64); c.rotate(Q); c.scale(1.22, 1.22); drawRasp(c, -18, 0, 0); },
   block: (c) => miniBlock(c),
+  'block:wood': (c) => miniWood(c),
   spray: (c) => { c.scale(1.12, 1.12); drawSpray(c, 108, 8, false, 0, 74, 44); },
   wrap: (c) => { c.translate(64, 64); c.rotate(-0.35); c.scale(2.1, 2.1); drawWrapRoll(c, -2, -2, 0, 0); },
 };
@@ -342,11 +343,21 @@ function miniBlock(c) {
   }
 }
 
+// The wood block on its own: a tilted tan block with grain and a lit bevel.
+function miniWood(c) {
+  c.translate(64, 66);
+  c.rotate(-0.5);
+  const rand = mulberry32(5);
+  woodFace(c, { cx: 0, cy: 0, rx: 34, ry: 50 }, rand);
+}
+
 const iconCache = new Map();
 
 // Draw the dock icon for tool `id` into a `size` px square at (0, 0). Rendered once at full
-// scale and then shrunk, so the drop shadows shrink with the tool.
-export function drawToolIcon(c, id, size) {
+// scale and then shrunk, so the drop shadows shrink with the tool. `kind` picks a variant
+// ('wood' for the block).
+export function drawToolIcon(c, id, size, kind = '') {
+  if (kind && ICON_DRAW[`${id}:${kind}`]) id = `${id}:${kind}`;
   let img = iconCache.get(id);
   if (!img) {
     img = document.createElement('canvas');
@@ -396,7 +407,8 @@ function blockFrame(clawPts) {
 
 // Black rubber block, tread out: a raised rim, circular lugs and diagonal bars,
 // with glue squeezing out at the edge. `press` 0..1 animates it being pressed on.
-export function drawBlock(c, claw, clawPts, alpha = 1, press = 1) {
+// kind 'wood' draws the taller wood block instead (WP8.4).
+export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber') {
   const f = blockFrame(clawPts);
   const s = 1.06 - 0.06 * press;
   c.save();
@@ -419,6 +431,12 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1) {
   c.save();
   polyPath(c, clawPts);
   c.clip();
+  if (kind === 'wood') {
+    woodFace(c, f, rand);
+    c.restore();
+    c.restore();
+    return;
+  }
   dropShadow(c, 10, 3, 6, 0.6);
   superellipse(c, f.cx, f.cy, f.rx, f.ry);
   c.fillStyle = '#1b1b1d';
@@ -461,6 +479,52 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1) {
   }
   c.restore();
   c.restore();
+}
+
+// The wood block's face: squarer than the rubber one, tan with grain running heel to toe,
+// a bevelled edge lit from the upper left, and scuffs of trimmings.
+function woodFace(c, f, rand) {
+  const rx = f.rx, ry = f.ry;
+  dropShadow(c, 12, 4, 8, 0.65);
+  superellipse(c, f.cx, f.cy, rx, ry, 4);
+  c.fillStyle = lin(c, f.cx - rx, f.cy - ry, f.cx + rx, f.cy + ry, [[0, '#d2a46a'], [0.55, '#b98a52'], [1, '#93683a']]);
+  c.fill();
+  c.shadowColor = 'transparent';
+  c.save();
+  superellipse(c, f.cx, f.cy, rx, ry, 4);
+  c.clip();
+  // Grain: long wavering lines, a darker late-wood band now and then.
+  for (let k = -16; k <= 16; k++) {
+    const x0 = f.cx + k * rx / 15 + (rand() - 0.5) * 3;
+    const late = rand() < 0.3;
+    c.strokeStyle = late ? 'rgba(110,70,32,0.45)' : 'rgba(120,80,40,0.22)';
+    c.lineWidth = late ? 1.6 + rand() : 0.7 + rand() * 0.6;
+    const amp = 1.5 + rand() * 2.5, ph = rand() * TAU, fq = 0.025 + rand() * 0.02;
+    c.beginPath();
+    for (let y = f.cy - ry; y <= f.cy + ry; y += 4) {
+      const x = x0 + amp * Math.sin(ph + y * fq);
+      y === f.cy - ry ? c.moveTo(x, y) : c.lineTo(x, y);
+    }
+    c.stroke();
+  }
+  // A knot, off centre.
+  const kx = f.cx + (rand() - 0.5) * rx * 0.8, ky = f.cy + (rand() - 0.2) * ry * 0.6;
+  for (let r = 7; r > 0; r -= 2.2) {
+    c.strokeStyle = `rgba(96,58,26,${0.25 + (7 - r) * 0.06})`;
+    c.lineWidth = 1.2;
+    c.beginPath(); c.ellipse(kx, ky, r * 0.8, r * 1.4, 0, 0, TAU); c.stroke();
+  }
+  // Scuffs of trimmings.
+  for (let k = 0; k < 30; k++) {
+    c.fillStyle = `rgba(235,215,170,${0.1 + rand() * 0.2})`;
+    c.fillRect(f.cx + (rand() - 0.5) * rx * 1.6, f.cy + (rand() - 0.5) * ry * 1.6, 1 + rand(), 1 + rand());
+  }
+  c.restore();
+  // Bevelled edge: light on the upper left, dark on the lower right.
+  superellipse(c, f.cx, f.cy, rx - 2.5, ry - 2.5, 4);
+  c.strokeStyle = lin(c, f.cx - rx, f.cy - ry, f.cx + rx, f.cy + ry, [[0, 'rgba(250,224,170,0.85)'], [0.5, 'rgba(180,130,80,0.3)'], [1, 'rgba(70,42,18,0.85)']]);
+  c.lineWidth = 5;
+  c.stroke();
 }
 
 function lug(c, x, y, r) {

@@ -7,7 +7,7 @@ import { CASE_B, dealCase, makeCase, temperament } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
-import { CALLS } from './conditions.js';
+import { CALLS, CONDITIONS } from './conditions.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
 import { fitCamera, toScene } from './view.js';
@@ -136,6 +136,7 @@ function newCase() {
   game.result = null;
   game.weepT = 0;
   game.blockKind = 'rubber';
+  ui.setIconKind('block', '');
   // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
   renderer.tol = tolOf(caseDef);
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
@@ -218,10 +219,14 @@ function stopHoldSounds() {
   Sound.spray(false);
 }
 
+// The wood block comes with the farm that brings toe necrosis (or free play).
+const woodOK = () => freePlay || route.rep >= farmById('ridgeway').rep;
+
 // The player picking a tool. Picking the block again swaps rubber for wood (WP8.4) and back.
 function pickTool(id) {
-  if (id === 'block' && game.tool === 'block' && game.state === 'play') {
+  if (id === 'block' && game.tool === 'block' && game.state === 'play' && woodOK()) {
     game.blockKind = game.blockKind === 'wood' ? 'rubber' : 'wood';
+    ui.setIconKind('block', game.blockKind === 'wood' ? 'wood' : '');
     ui.toast(game.blockKind === 'wood' ? 'Wood block: taller, for a claw that has to stay right off the floor.' : 'Rubber block: the usual one.', 'info', 2600);
     return;
   }
@@ -791,13 +796,17 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const back = visitCases(farm, n, route.history).filter((cd) => cd.back);
   const tags = (list) => list.map((cd) => `<b>${cd.subtitle.split(' · ')[0].replace('Holstein ', '')}</b>`).join(', ');
   const rechecks = back.filter((cd) => cd.back.outcome === 'recheck');
+  // A black toe is due back whatever happened (WP8.4); the rest came back lame.
+  const toes = rechecks.filter((cd) => CONDITIONS[cd.back.was]?.recheck);
+  const lame = rechecks.filter((cd) => !CONDITIONS[cd.back.was]?.recheck);
   const healed = back.length - rechecks.length;
   const pick = await ui.modal(
     `<div class="eyebrow">${HOUSING[farm.housing]} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
      <h1>${farm.name}</h1>
      <p class="sub">${farmer} · ${farm.cows} cows waiting${back.length ? ` · ${back.length} you’ve trimmed before` : ''}</p>
      <p>${farm.intro}</p>
-     ${rechecks.length ? `<p class="back recheck">${farmer} wants a second look at ${tags(rechecks)}: lame after last time.</p>` : ''}
+     ${lame.length ? `<p class="back recheck">${farmer} wants a second look at ${tags(lame)}: lame after last time.</p>` : ''}
+     ${toes.length ? `<p class="back recheck">${tags(toes)} ${toes.length === 1 ? 'is' : 'are'} due back for the toe recheck: a black toe is never done in one visit.</p>` : ''}
      ${healed ? `<p class="back healed">${healed === 1 ? 'One cow' : `${healed} cows`} from last time ${healed === 1 ? 'is' : 'are'} back for ${healed === 1 ? 'her' : 'their'} next trim.</p>` : ''}`,
     fromMap
       ? [{ id: 'go', label: 'Start the day', primary: true }, { id: 'back', label: 'Back to the road' }]
@@ -1021,7 +1030,7 @@ function draw() {
   renderer.background();
   renderer.hoof(hoof, !!game.session.diagnosis, game.metrics);
   const aim = game.ptr.over && game.state === 'play' ? hoof.claw[hoof.cellAt(game.ptr.x, game.ptr.y)] ?? 0 : 0;
-  renderer.block(hoof, game.tool === 'block' ? aim : 0);
+  renderer.block(hoof, game.tool === 'block' ? aim : 0, game.blockKind);
   renderer.dressing(hoof, game.tool === 'wrap' ? aim : 0);
   renderer.setGuides(game.guides && game.state === 'play' ? guideStep() : null);
   renderer.guides(hoof);

@@ -53,6 +53,11 @@ const STAGES = Q.has('cond') ? [
     for (let k = 0; k < 6 && !s.hoof.drained; k++) s.funnel();
     return s;
   }]] : []),
+  ...(L?.type === 'toenecrosis' ? [['Ground, black toe pared', () => {
+    const s = session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
+    for (let k = 0; k < 4; k++) s.necro();
+    return s;
+  }]] : []),
 ] : [
   ['Dirty (0:15)', () => session()],
   ['Brushed, first grinder passes (0:35)', () => session().brushAll().nip().grind(CLAW.OUTER, 330, 470, 1)],
