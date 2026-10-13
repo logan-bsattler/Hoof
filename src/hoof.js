@@ -218,6 +218,8 @@ export class Hoof {
     this.tint = new Float32Array(n); // antiseptic spray soaked into the tissue, 0..1
     this.edge = new Float32Array(n);
     this.tgt = new Float32Array(n); // per-cell trim target (mm), feathered across zone edges
+    // Sole the grinder is kept off (round an ulcer's cap): left out of the claw's depth reading.
+    this.keepOut = new Uint8Array(n);
     this.noise = new Float32Array(n);
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
     this.drained = false;           // the abscess pocket has been opened and has drained
@@ -344,7 +346,9 @@ export class Hoof {
       // start working the cap.
       const K = CFG.tools.knife;
       this.stampExact(L.x, L.y, L.r * 1.75 + K.radius * Math.sqrt(1 - K.flat), (i) => {
-        if (this.claw[i] !== L.claw || !(this.zone[i] & Z.DISH)) return;
+        if (this.claw[i] !== L.claw) return;
+        this.keepOut[i] = 1;
+        if (!(this.zone[i] & Z.DISH)) return;
         this.zone[i] &= ~Z.DISH;
         this.tgt[i] = CFG.sole.target;
       });
@@ -527,12 +531,14 @@ export class Hoof {
         m.dishN++;
         if (t < D - 1.25) m.overDish++;
       } else if (!lg) {
-        k.wbSum += t; k.wbN++;
-        m.wbN++;
-        if (t < T - 1.25) m.overWB++;
+        // The toe triangle is left alone, so it's judged on its own (triCut), not in the claw's depth.
         if (z & Z.TRI) {
           m.triN++;
           if (t < T - 0.75) m.triCut++;
+        } else if (!this.keepOut[i]) {
+          k.wbSum += t; k.wbN++;
+          m.wbN++;
+          if (t < T - 1.25) m.overWB++;
         }
       }
     }

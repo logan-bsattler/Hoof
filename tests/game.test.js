@@ -765,3 +765,25 @@ test('a wider band (the apprentice tier) counts a claw at 7.9 mm as levelled', (
   assert.equal(step1.done(m(7.9), null, { caseDef: CASE_B }), false);
   assert.equal(step1.done(m(7.9), null, { caseDef: wide }), true);
 });
+
+test('the depth reading is the sole you may grind: the toe triangle and the cap keep-out are left out', () => {
+  const h = new Hoof(CASE_B);
+  for (let i = 0; i < h.n; i++) {
+    const z = h.zone[i];
+    if ((z & Z.LIVE) && !(z & (Z.TRI | Z.DISH | Z.HEEL | Z.ULCER)) && !h.loose[i] && !h.keepOut[i]) h.thick[i] = CFG.sole.target;
+  }
+  const m = h.metrics();
+  for (const c of [CLAW.OUTER, CLAW.INNER]) assert.ok(Math.abs(m.claws[c].wbMean - CFG.sole.target) < 0.01, `claw ${c}: ${m.claws[c].wbMean}`);
+});
+
+test('steps 1 and 2 flag the nippers while that claw\'s toe is long, then the grinder', async () => {
+  const { suggestedTool } = await import('../src/steps.js');
+  const long = { claws: { [CLAW.INNER]: { deadRemain: 0.5 }, [CLAW.OUTER]: { deadRemain: 0.5 } } };
+  const nipped = { claws: { [CLAW.INNER]: { deadRemain: 0 }, [CLAW.OUTER]: { deadRemain: 0 } } };
+  const i1 = stepsFor(CASE_B).findIndex((s) => s.id === 'step1'), i2 = i1 + 1;
+  assert.equal(suggestedTool(i1, long, CASE_B), 'nippers');
+  assert.equal(suggestedTool(i1, nipped, CASE_B), 'grinder');
+  assert.equal(suggestedTool(i2, long, CASE_B), 'nippers');
+  assert.equal(suggestedTool(i2, nipped, CASE_B), 'grinder');
+  assert.equal(suggestedTool(-1, nipped, CASE_B), null);
+});

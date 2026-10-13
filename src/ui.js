@@ -89,7 +89,8 @@ export class UI {
     $(id).setAttribute('aria-pressed', on);
   }
 
-  setSteps({ status, current }, caseDef) {
+  // hintTool: the tool button to flag with a dot (null: none, e.g. with the guides off).
+  setSteps({ status, current }, caseDef, hintTool = null) {
     const steps = stepsFor(caseDef);
     // Rebuild the checklist when the case brings a different step list.
     if (this.stepsOf !== steps.map((s) => s.id).join()) {
@@ -112,7 +113,6 @@ export class UI {
       $('stepBarLabel').textContent = label;
       $('stepBarTip').textContent = tip;
     }
-    const hintTool = current < 0 ? null : steps[current].tool;
     for (const [k, b] of Object.entries(this.toolButtons)) b.classList.toggle('suggested', k === hintTool);
   }
 

@@ -5,7 +5,7 @@ import { CFG, touchAngle, tolOf } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_B, dealCase, makeCase, temperament } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
-import { stepsFor, evaluateSteps, trimFinished, stepTip } from './steps.js';
+import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
@@ -81,6 +81,13 @@ const ui = new UI({
 function setGuides(on) {
   game.guides = on;
   ui.setToggle('btnGuides', on);
+  if (game.steps && game.hoof) showSteps();
+}
+
+// The step list, with the next tool flagged only while the guides are on.
+function showSteps() {
+  const hint = game.guides ? suggestedTool(game.steps.current, game.metrics ?? game.hoof.metrics(), caseDef) : null;
+  ui.setSteps(game.steps, caseDef, hint);
 }
 
 // A slip with this cow: at the 'mistake' tier the guides come on for the rest of her trim.
@@ -139,7 +146,7 @@ function newCase() {
   document.body.classList.remove('tutorial');
   ui.setCoach(null);
   particles.list = [];
-  ui.setSteps(game.steps, caseDef);
+  showSteps();
   ui.setReadable(false);
   const v = route.visit;
   document.getElementById('caseTitle').textContent = v
@@ -912,7 +919,7 @@ function frame(now) {
         if (c >= 0) ui.toast(stepTip(stepsFor(caseDef)[c], caseDef), 'good', 4500);
         else ui.toast('Every step done. Release her and watch her walk.', 'good', 4500);
       }
-      ui.setSteps(game.steps, caseDef);
+      showSteps();
     }
   } else {
     Sound.scrub('brush', 0);

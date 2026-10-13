@@ -109,3 +109,13 @@ export function evaluateSteps(m, session, hoof, now) {
   const current = status.findIndex((s) => !s.done);
   return { status, current };
 }
+
+// The tool to flag for the current step. Steps 1 and 2 each take two tools: the nippers while
+// that claw's toe is still long, then the grinder.
+export function suggestedTool(current, m, caseDef) {
+  if (current < 0) return null;
+  const s = stepsFor(caseDef)[current];
+  if (s.id !== 'step1' && s.id !== 'step2') return s.tool;
+  const k = m.claws[s.id === 'step1' ? firstClaw(caseDef) : secondClaw(caseDef)];
+  return k.deadRemain >= 0.12 ? 'nippers' : 'grinder';
+}
