@@ -413,6 +413,140 @@ Ben took all five defaults on 2026-10-10.
 ### Review fixes (2026-10-12)
 A code review of everything since the plan found that the reworked ulcer cap let the moves the game asks for cut into the open core, and that the bot dodged exactly those moves. Fixed: the knife comes off when the cap gives (`popCap` calls `releaseHold`); the cap and the open core answer only to the flat of the blade (`CFG.tools.knife.flat`, stamp falloff ≥ 0.4); `capLift` is 1.75 × the ulcer radius; the guided paring ring sits at r + the flat's reach + 3, so circling it never touches the core; the dish zone stops at the cap plus the flat's reach. Tutorial targets carry an `avoid` keep-out ring (red, round the cap) on the grind step for the ulcer's claw and on the dish step. The bot no longer steers its blade round an opened core: it saws until the cap gives, circles the guided ring, dishes round the cap, and fails on any `lesionCut`. Also: `parseRound` rejects history rows with an unknown condition, side, foot or visit (a return visit would have thrown); the conditions.js note on decoys; `sw.js` registers the background cache refresh while the fetch event is live. `sw.js` v16. Tests 98/98.
 
+## WP8: more scenarios: new conditions (large; scoped 2026-10-13 at `266e6d7`)
+
+Sources: `docs/NOTES-NATE-AMA.md` and the full caption file Ben saved this morning (`reference/nate-hoof-guy-ama-4paUJHxQS70.txt`, git-ignored), checked against the AHDB field guide and Shearer ch. 4.
+
+Ben's calls (2026-10-13):
+- **First batch:** new conditions. Judgment cases and farm traits come after (see the end of this section).
+- **"This isn't a trim" calls:** a separate action the player has to think of, not an answer on the read card.
+- **Scoring a correct call:** full points. Trimming a cow you should have left costs Restraint.
+- **D14–D21:** defaults taken (D19–D21 came out of the reference check below).
+
+Each new condition follows the 7.2 recipe: a `CONDITIONS` entry with `place`/`copy`, its `FINDING`, HoofArt, a bot path in `tests/player.js`, a `howto` hint for its first appearance, the sweep (50 seeds) and a playthrough on all four foot × claw layouts. It then joins the farm mixes (8.6). Build order: 8.1 → 8.2 → 8.3 → 8.4 → 8.5 → 8.6, shipping after each step.
+
+### What the references changed
+- **Axial fissure is out of WP8.** Shearer treats a wall crack by grooving its edges into a V along the whole length of the crack, on the wall face. The game only shows the sole, so just the crack's bottom end would be visible, and the real job would happen off-screen. It comes back if the game ever gets a wall view. **D20** proposes double sole in its place.
+- **Toe necrosis is partly vet work.** The AHDB field guide says proper treatment needs a vet, surgery and anaesthetic. It lists the cues as walking back on her heels, no swelling, very painful, and often linked to DD. Nate trims these cows repeatedly with a wood block, and the bone damage is permanent. So in the game the trimmer's part is to clear the crumbly horn, block on wood and **refer her**. That ties 8.4 to 8.1 (**D19**).
+- **Foot rot isn't "touch nothing".** The field guide's steps are: clean the split skin between the claws, pick out stones, spray it, then the vet gives antibiotics. Its cues are sudden lameness, broken skin between the claws, swelling and heat on both sides of the foot, and the smell. Swelling is what separates it from DD (no swelling) and from toe necrosis (no swelling either). Shearer adds that swelling confined to one claw points to a claw problem, not foot rot.
+- **Puncture is treated like an ulcer.** Shearer's example record treats a sole puncture with a block and corrective trimming, then a recheck.
+
+### Fact checks (done 2026-10-13, by reading the code)
+| Check | Finding | Action |
+|---|---|---|
+| Wall harder than the sole? | **No.** `cut()` in tools.js never looks at `Z.WALL`, so wall cells cut at the sole's rate toward the same target. | Small fix (D21): a `CFG.tools.<tool>.wall` multiplier (about 0.5 for the knife, 0.7 for the grinder) applied in `cut()` to `Z.WALL` cells. Re-run the bot sweep, since step 1 grinds across the wall. |
+| Does the white line move as the sole is pared? | **No.** HoofArt paints it at a fixed distance from the claw's edge (`e < wallW + 1.4`). | Optional art tweak: let it creep a pixel or two inward with `removed` at the toe. Low value, so park it in WP5. |
+| Toe length fixed vs foot size? | **Moot.** The game has no foot-size variation. Every foot has the same geometry. | Nothing to do unless foot size becomes a mod. |
+| DD copy implying tetracycline? | **No.** No antibiotic, tetracycline or powder anywhere in `src/`. The spray is unnamed. | Nothing. Keep it unnamed. |
+
+### 8.1 Vet / leave-her: a second way to end a cow (required before foot rot)
+Today a cow ends in exactly one way, the **Release** button (`requestRelease()` in main.js, `btnRelease` and `btnReleaseBar` in index.html). 8.1 adds a second, always-visible button beside it: **"Vet / leave…"**. It opens a sheet with *Hospital pen, call the vet*, *Leave her till dry-off* and *Back*. Choosing one ends the cow with whatever has been done so far, so a referral can come after treatment (toe necrosis) or instead of it (foot rot).
+- **Data:** each condition declares `call: 'vet' | 'leave' | null` (null = release her as usual). The session records `session.call`.
+- **Scoring** (`scoreCase` gains an early branch, like the blood branch):
+  - Right call on a `call: 'vet'` cow: the parts are scored as usual on what she needed done before referral (see each condition). Releasing her instead costs Correctness −25 ("This one needs the vet").
+  - A call on a `call: null` cow is the over-cautious mistake: grade Needs work, gait "sent to the pen", with a note on what the foot actually needed.
+  - Trimming strokes a `call` cow didn't need cost Restraint, each condition's own rule.
+- **Ticket and gait:** a referred cow doesn't walk off. The ticket shows "In the hospital pen for the vet" in place of the walk-off, mobility n/a. Her points follow her grade (POINTS), and she isn't flagged lame.
+- **History:** rows gain `call`. A referred cow comes back on the next visit as a recheck of her condition only when the condition says so (toe necrosis does, foot rot doesn't: the vet has her). A cow left till dry-off comes back on the next visit as an ordinary case.
+- **Save:** `parseRound` accepts the new conditions automatically (it checks `CONDITIONS`). `call` is optional on old rows, and the save version stays 1.
+- **Tests:** a call on a routine cow scores Needs work; release on a `vet` cow loses the Correctness; the bot path presses the button and picks the call; and history/return-visit rules hold for `call` rows.
+
+### 8.2 Foot rot (call: vet)
+- **Look:** the whole foot is swollen and warm, the claws are spread, and the skin between the claws is split, grey and moist. The read card says "it smells; she went lame overnight". The swelling shows on both claws evenly, which is the tell against a claw lesion.
+- **Probe:** sore anywhere above the coronet. The horn of both soles is firm.
+- **Job:** clean, spray the split skin, then *Hospital pen, call the vet*. No trim: any blade stroke on the sole costs Restraint −15 (capped at −30). A blade in the cleft is the existing cleft-cut penalty.
+- **Read card:** foot rot is right. DD gets the feedback "DD is a neat raw patch with no swelling; this whole foot is swollen and split".
+- **Model:** reuse `Z.CLEFT` with a new `Z.ROT` mark along the cleft's length (Uint16 has room: bit 1024). The spray soaks it like DD. Swelling is art only: in HoofArt, puff the heel bulbs and coronet and widen the gap between the claws by a few px. The grid doesn't change.
+- **Steps:** `clean`, `diagnose`, `dress` (spray only: the wrap isn't required) and a new `refer` step whose `done` is `session.call === 'vet'`. Dropping the trim steps is the whole lesson.
+- **Cost:** small to medium. Mostly art and the step list.
+
+### 8.3 Puncture (foreign body; call: null)
+- **Look:** a mark in mid-sole that is *too regular*: a perfect small circle or a short straight line (Nate 1:24:05). It sits among stain and bruise decoys that stay irregular, so shape is the tell. Placement is mid-sole, away from the usual lesion sites.
+- **Probe:** a sharp, pinpoint flinch on the mark only. Unlike the white line, it doesn't flinch along a track.
+- **Job:** the five-step trim, then pare a narrow funnel straight down until it drains, block the sound claw on rubber, flush and wrap. The mistake is opening a wide crater around it.
+- **Model:** reuse the tract machinery with depth in place of distance. ENTRY = the mark (2–3 cells), POCKET = the cells around it a little wider, with `tractOpenable` letting the knife widen only from the open centre. The groove depths follow `GROOVE`. The "hunting" check becomes a per-lesion `huntRadius` (white line: track + 14 px, puncture: pocket + 10 px).
+- **Read card:** the existing "Foreign body" option becomes the right answer here. On the other cases it stays wrong, with fresh feedback ("a puncture is a regular hole or line; this is…").
+- **Art:** a crisp-edged dark circle or a ruled dark line with a faint metallic glint, then a pale funnel with grey pus at the bottom once opened. The regular shape has to read at phone size, so it is the art check for this case.
+- **Cost:** medium.
+
+### 8.4 Toe necrosis (call: vet; wood block)
+- **Look:** the toe tip of one claw is black and crumbly, in the white line at the toe, past the trim line. There's no swelling. The read card says she is walking back on her heels and that the toe smells.
+- **Probe:** very sore at the toe. The crumbly horn gives under the testers.
+- **Job:** trim, then nip and knife the necrotic toe horn back until healthy horn shows, glue a **wood** block on the sound claw, then *Hospital pen, call the vet*.
+- **Model:**
+  - A `Z.NECRO` region at the toe of the lesion claw that overlaps `Z.TRI` and the toe line, carried by `LOOSE.NECRO`. The nippers and knife clear it. The `triCut` penalty skips necrotic cells, so clearing them isn't punished.
+  - Healthy horn beyond the necrotic region behaves as usual: thin = pink, and through = blood.
+  - Finish counts `LOOSE.NECRO` left behind.
+- **Block types:** `placeBlock` gains `kind: 'rubber' | 'wood'`, with a two-state toggle on the block tool (one tap flips it, and the dock icon shows which). `requires.block` can be `'wood'`. The wrong kind costs Correctness −15 ("she rocks back on her heels: she needs a wood block for stability"). Everywhere else rubber is right and wood costs the same −15 the other way. That keeps the toggle a real choice, not decoration.
+- **Comes back every time (D18):** history rows gain `recheck: true` for toe necrosis whatever the grade, and `returningCows` brings back `lame || recheck`. A Textbook trim brings her back at `lesionSize: 0.2`, and a poorer one at 1.
+- **Cost:** large: a new zone, the triangle exception, block kinds, art and the recheck rule.
+
+### 8.5 Double sole (proposed in place of the axial fissure, D20)
+- **What it is (Shearer):** horn growth was interrupted (usually laminitis), so a loose false sole lies over a new sole underneath. Cows are usually not lame, and it's often found at routine trimming. The treatment is to pare the overlying layer away. A block only goes on if she's lame.
+- **Look:** a large patch of one claw's sole with a visible edge, a lifted lip where the old layer has separated. The probe shows it hollow but not sore.
+- **Job:** pare the loose layer off with the knife back to the new sole, which is thinner and paler underneath. Don't grind it, because the grinder can't tell the layers apart and takes the new sole too. **No block.** Blocking is the mistake, as on a DD foot.
+- **Why it fits:** it plays entirely in the sole view on existing systems (a big `LOOSE` region, as on the heel), and it's a second restraint lesson after routine: a dramatic-looking foot that needs paring, not a block. A decoy-heavy variant suits later farms.
+- **Cost:** small to medium.
+
+### 8.6 Farms
+- Puncture joins Top Lane and Greystone (tracks and stones). Foot rot joins Marsh End and Coldharbour (wet yards). Double sole joins Brackenford and later. Each mix is re-balanced so routine stays at least 0.2.
+- **A new eighth farm** after Coldharbour, at about rep 640, invented per D13: a big herd (6) with a little of everything, and the first place toe necrosis and the wood block appear. Pacing test: re-run the "all-Textbook opens the road in N days" check, and the target is still under about 14 days.
+- Free-play `dealCase` weights get the new conditions at low weights, so `?cond=` and "Trim another" can deal them.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D14 | Conditions and order | **Taken (2026-10-13):** Vet/leave + foot rot, puncture, toe necrosis, then the fourth if the view works. |
+| D15 | Where new conditions appear | **Taken:** foot rot and puncture in the later farms' mixes, and a new farm after Coldharbour for toe necrosis and the wood block. |
+| D16 | Block types | **Taken:** wood arrives with toe necrosis, via a toggle. Rubber is right everywhere else. |
+| D17 | Vet/leave button from the start | **Taken:** yes, from the first farm. |
+| D18 | Toe necrosis always returns | **Taken:** yes, smaller if trimmed well. |
+| D19 | Toe necrosis: trim, wood block **and** refer to the vet (per AHDB), or trim and block only (closer to how Nate describes his visits)? | **Taken (2026-10-13):** Trim, wood block and refer. It's what the guide says and it gives the vet button a second use. |
+| D20 | Drop the axial fissure (no wall view) and build double sole in its place? | **Taken (2026-10-13):** Yes |
+| D21 | Wall hardness fix (fact check 1): fold it into WP8 before 8.3, or leave it in WP5? | **Taken (2026-10-13):** Fold it in before 8.3. Puncture and toe necrosis both cut near the wall, so tune once. |
+
+### Next batches (not scoped yet)
+- **Judgment cases:** scoped as WP9.
+- **Farm traits:** footbath none/poor/good driving the DD share; a sand farm where the knife dulls; a known kicker on the visit card; cows remember (temperament shifts on return).
+- **Later conditions:** the axial fissure (needs a wall view); deep digital sepsis (a second vet case, with swelling on one claw only, which plays off foot rot's swelling on both); a thin-soled cow.
+
+## WP9: judgment cases (medium; scoped 2026-10-13, builds on WP8.1)
+
+Cases where the right answer is a call, not a cut. They depend on 8.1's end-of-cow sheet; J2 also uses 8.4's block kinds when they exist (rubber-only until then). Ben took D22–D26 defaults on 2026-10-13. Build order: J1 → J2 → J3, each with its bot path and a seed sweep.
+
+**Change to 8.1 first (D22):** split the sheet into three calls: *Hospital pen* (soft bedding near the parlour, no vet), *Call the vet*, and *Leave her till dry-off*. Foot rot and toe necrosis are `call: 'vet'`; both-claws-bad is `call: 'pen'`. Picking the pen when she needs the vet (or the reverse) is a near miss: Correctness −15, not the full wrong-call penalty.
+
+### J1 Close to calving (call: leave; small)
+- **Source:** Nate 1:29:04: don't trim a cow close to calving; trim her at dry-off.
+- **Cue:** the farmer's line on the visit card names her ("#418's due in ten days"), and her intro repeats it. No special art (D24). The foot itself is an ordinary routine foot with decoys, so the trap is to trim it because it's there.
+- **Right play:** read the intro, maybe clean and look, then *Leave her till dry-off*. Full points (Ben's call). Any trim stroke past cleaning costs Restraint −10 per claw worked (capped −30); a full trim and release is Needs work with the note "She was due any day: she'd have waited for dry-off."
+- **Return:** she comes back on the next visit as an ordinary (dry) cow, intro "fresh now; time for that trim".
+- **Model:** a `mods.calving: true` flag any condition can carry (only dealt on routine feet at first), `call` read from the case, not only the condition. `farmMods` deals it at a low per-farm share (0 on Willow Bank, about 1 cow in 8 after Brackenford).
+
+### J2 Recheck still wearing last visit's block (call: null; medium)
+- **Source:** Nate 38:42: taking the old block off is often the main reason for a recheck; Shearer: blocks still on after 3–6 weeks come off and are replaced only if she still needs relief.
+- **Setup:** a returning cow whose last visit glued a block arrives with it still on (`hoof.block` and its kind preset, worn art). A new first step, **"Take the old block off"**: tap the block with the knife (pry it off; two or three taps, a cracking sound). Blades can't reach the claw under it until then (the existing `blocked()` rule).
+- **Then the read:** healed (she walked off sound last time) = a routine trim, no new block; still sore (a recheck) = treat as her condition says, block again. Re-blocking a healed claw is the existing needless-block penalty; leaving the old block on is Correctness −20 ("an old block left on overloads her: it should have come off by now").
+- **Model:** history rows already know the condition; add `blocked: kind | null` to the row; `returnCase` sets `hoof.oldBlock`. Steps gain `unblock` at the front when it's set.
+
+### J3 Both claws bad (call: pen; medium–large)
+- **Source:** Nate 10:37, 1:15:39: a lesion on both claws means no block (it loads the other sore claw). Wrap, and send her to a soft hospital pen.
+- **Setup:** two lesions, one per claw: ulcer + ulcer, or ulcer + white line (D23). Both test sore.
+- **Right play:** trim, open both, flush both, pad and wrap both claws, no block, then *Hospital pen*.
+- **Scoring:** any block = Correctness −30 and gait lame ("the block put her whole weight on the other sore claw"); one lesion left unopened = the usual −20; releasing her instead of the pen = Correctness −15.
+- **Model (the cost):** `caseDef.lesion` becomes `lesions[]` with `lesion` kept as `lesions[0]` so existing code keeps working; probe, art, `lesionOpened`, `lesionTint` and the walk-off loop over the list; `wrapClaw` becomes a set. Sweep every existing condition to prove one-lesion cases come out byte-identical.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D22 | Split 8.1's sheet into Hospital pen / Call the vet / Leave her? | **Taken (2026-10-13):** Yes, three calls; pen-vs-vet mix-ups are a near miss |
+| D23 | Both-claws pairs | **Taken (2026-10-13):** Ulcer + ulcer and ulcer + white line; no DD pairs |
+| D24 | How loud is the calving cue? | **Taken (2026-10-13):** Visit card + intro text only, no art |
+| D25 | Old block removal | **Taken (2026-10-13):** Tap the block with the knife, 2–3 taps |
+| D26 | Add a "lame, but nothing in the foot" cow (Shearer's non-foot lameness: refer to the vet)? | **Taken (2026-10-13):** Not now; later, after J3, since it can feel like a trick |
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
