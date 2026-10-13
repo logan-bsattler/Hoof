@@ -607,6 +607,14 @@ The case start is already sliced behind the loading bar (24 ms a frame; noise fi
 
 Dropped: the straight knife-dish shadows. They come from the art lab's ruler-straight scripted strokes, not from play.
 
+## WP11: playtester feedback (2026-10-13)
+
+### 11.1 Guided run: don't swap tools under the finger (done 2026-10-13)
+- A playtester: finishing a beat switched straight to the next tool, which started cutting in the wrong place at once. Now only the first beat hands over its tool; after that the next beat's tool button pulses (still on the green "suggested" dot, steady under reduced motion) and the player picks it. Not yet played in the browser.
+
+### 11.2 A guide book (to scope)
+- A playtester asked for a manual: what each tool does, and the conditions you'll meet. To decide: open from the title and from a button in play (pause); one page per tool (from `TOOLS` name/hint plus a drawn icon from toolart) and per condition (title, look and feel from `FINDING`, the right call, with art-lab style crops). Unlock conditions as they're met on the route, or show them all? Kept short, no spoilers on reads the player hasn't made?
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.

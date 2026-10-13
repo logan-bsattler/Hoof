@@ -205,6 +205,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .tool kbd { position: absolute; top: 3px; right: 5px; font-size: 9px; color: var(--muted); font-family: inherit; }
 .tool.active { border-color: var(--brass); background: #4a3826; box-shadow: 0 0 0 1px var(--brass) inset; }
 .tool.active .name { color: var(--text); }
+/* Guided run: the next beat's tool pulses until it's picked. */
+.tutorial .tool.suggested:not(.active) { animation: nudge 1.1s ease-in-out infinite; }
+@keyframes nudge { 50% { border-color: var(--sound); box-shadow: 0 0 0 2px var(--sound) inset; } }
+@media (prefers-reduced-motion: reduce) { .tutorial .tool.suggested:not(.active) { animation: none; border-color: var(--sound); } }
 .tool.suggested:not(.active)::after {
   content: "";
   position: absolute;

@@ -90,7 +90,9 @@ function setGuides(on) {
 
 // The step list, with the next tool flagged only while the guides are on.
 function showSteps() {
-  const hint = game.guides ? suggestedTool(game.steps.current, game.metrics ?? game.hoof.metrics(), caseDef) : null;
+  // The guided run flags its own beat's tool instead.
+  const hint = game.tutorial ? game.tutorial.beat?.tool ?? null
+    : game.guides ? suggestedTool(game.steps.current, game.metrics ?? game.hoof.metrics(), caseDef) : null;
   ui.setSteps(game.steps, caseDef, hint);
 }
 
@@ -208,9 +210,12 @@ function updateCoach() {
   if (changed) {
     const b = t.beat;
     if (b) {
+      // Only the first beat hands over its tool. After that the player picks the next one
+      // (its button pulses): switching under a finger still on the hoof cut in the wrong place.
       if (t.index > 0) { Sound.step(); particles.spawn('spark', game.ptr.x, game.ptr.y, '#7bbf6a', 8); }
-      selectTool(b.tool);
+      else selectTool(b.tool);
     }
+    if (game.steps && game.hoof) showSteps();
   }
   ui.setCoach(t);
 }
