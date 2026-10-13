@@ -61,8 +61,10 @@ function playthrough(cd, quiet = false) {
   // Read: test the dark patch (or, on a sound foot, the marks), then commit the read (main.js diagnose()).
   const L = cd.lesion;
   if (L) {
-    assert.equal(hoof.probe(hoof.cellAt(L.x, L.y), false).kind, 'lesion');
-    s.probes.push(L.type);
+    for (const l of hoof.lesions()) {
+      assert.equal(hoof.probe(hoof.cellAt(l.x, l.y), false).kind, 'lesion');
+      s.probes.push(l.type);
+    }
   } else {
     for (const f of cd.findings) {
       const r = hoof.probe(hoof.cellAt(f.x, f.y), false);
@@ -100,6 +102,8 @@ function playthrough(cd, quiet = false) {
   const dishX = (c) => { const d = dishRect(c, side); return [0, 10, 20, 30].map((k) => d.x + 4 + k); };
   until('step3', () => {
     for (const c of [CLAW.INNER, CLAW.OUTER]) {
+      // The lesion on this claw (both claws carry one on a J3 pair).
+      const L = hoof.lesionOn(c) ?? cd.lesion;
       const R = (L?.r ?? 0) * 1.75 + flat + 1;
       for (const x of dishX(c)) {
         // DD sits up in the cleft, clear of the dish: nothing to steer round.
@@ -123,7 +127,16 @@ function playthrough(cd, quiet = false) {
     }
   }, 20);
 
-  if (L?.type === 'whiteline') {
+  if (hoof.lesions().length > 1) {
+    // Both claws sore (J3): open each, the ulcer's cap or the abscess track. No block.
+    for (const l of hoof.lesions()) {
+      if (l.type === 'whiteline') {
+        for (let k = 0; k < 6 && !hoof.drained; k++) p.followTrack(l);
+        assert.ok(hoof.drained, 'abscess drained');
+      } else openUlcer(l, () => hoof.metrics().looseRemainAt[l.claw]);
+    }
+    until('openBoth', () => {});
+  } else if (L?.type === 'whiteline') {
     // Step 4: follow the track to the pocket until it drains, then block the sound claw.
     for (let k = 0; k < 6 && !hoof.drained; k++) p.followTrack();
     assert.ok(hoof.drained, `abscess drained (track ${(hoof.metrics().looseRemain[LOOSE.TRACT] * 100).toFixed(0)}% closed)`);
@@ -148,15 +161,7 @@ function playthrough(cd, quiet = false) {
   } else if (L?.type === 'doublesole') {
     // Pared before the trim: nothing to open now, and no block.
   } else if (cd.requires.open) {
-    // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
-    // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.
-    for (let k = 0; k < 40 && !hoof.capOpen; k++) p.drag('knife', [[L.x - L.r, L.y], [L.x + L.r, L.y], [L.x - L.r, L.y]], 160);
-    assert.ok(hoof.capOpen, 'cap gave');
-    const ring = L.r + flat + 3;
-    const orbit = [];
-    for (let a = 0; a <= 48; a++) orbit.push([L.x + ring * Math.cos((a / 48) * 2 * Math.PI), L.y + ring * Math.sin((a / 48) * 2 * Math.PI)]);
-    for (let k = 0; k < 6 && hoof.metrics().looseRemain[LOOSE.ULCER] >= 0.1; k++) p.drag('knife', orbit, 90);
-    assert.ok(hoof.metrics().looseRemain[LOOSE.ULCER] < 0.1, 'ulcer opened');
+    openUlcer(L, () => hoof.metrics().looseRemain[LOOSE.ULCER]);
     hoof.block = soundClaw(cd);
     s.blockAttempts.push(hoof.block);
     until('step4', () => {});
@@ -171,7 +176,25 @@ function playthrough(cd, quiet = false) {
 
   if (cd.call) { s.call = cd.call; until('refer', () => {}); }
 
-  if (cd.requires.treat) {
+  if (cd.requires.treat && hoof.lesions().length > 1) {
+    // Treat both (J3): flush each opened lesion, then pad and wrap each claw.
+    const spot = (l) => l.pocket ?? l;
+    until('treatBoth', () => {
+      for (const l of hoof.lesions()) {
+        const W = spot(l);
+        if (l.type === 'whiteline') p.drag('spray', [...l.path, [W.x, W.y]], 30);
+        else p.drag('spray', [[W.x - 10, W.y], [W.x + 10, W.y], [W.x - 10, W.y]], 20);
+      }
+      const m = hoof.metrics();
+      for (const l of hoof.lesions()) {
+        if (m.lesionTintAt[l.claw] < CFG.treat.tintMin) continue;
+        for (let k = 0; k < 2; k++) {
+          const r = applyWrap(hoof, l.claw, hoof.metrics(), trimFinished(steps()));
+          assert.ok(r.ok || r.reason === 'other' || r.reason === 'done', `wrap refused: ${r.reason}`);
+        }
+      }
+    });
+  } else if (cd.requires.treat) {
     // Treat: flush the opened ulcer (or spray the DD patch), then pad and wrap it.
     until(L.type === 'dd' ? 'dress' : 'treat', () => {
       p.drag('spray', [[L.x - 10, L.y], [L.x + 10, L.y], [L.x - 10, L.y]], 20);
@@ -186,6 +209,18 @@ function playthrough(cd, quiet = false) {
   }
 
   return verdict();
+
+  // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
+  // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.
+  function openUlcer(U, remain) {
+    for (let k = 0; k < 40 && !hoof.capOpenAt[U.claw]; k++) p.drag('knife', [[U.x - U.r, U.y], [U.x + U.r, U.y], [U.x - U.r, U.y]], 160);
+    assert.ok(hoof.capOpenAt[U.claw], 'cap gave');
+    const ring = U.r + flat + 3;
+    const orbit = [];
+    for (let a = 0; a <= 48; a++) orbit.push([U.x + ring * Math.cos((a / 48) * 2 * Math.PI), U.y + ring * Math.sin((a / 48) * 2 * Math.PI)]);
+    for (let k = 0; k < 6 && remain() >= 0.1; k++) p.drag('knife', orbit, 90);
+    assert.ok(remain() < 0.1, 'ulcer opened');
+  }
 
   function verdict() {
   const m = hoof.metrics();

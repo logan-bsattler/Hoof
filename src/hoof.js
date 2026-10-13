@@ -144,9 +144,15 @@ export function distToPath(x, y, path) {
   return { d: best, u: at };
 }
 
+// A case's lesions: `lesions` when it has more than one (WP9 J3, one per claw), else its lesion.
+export function lesionsOf(caseDef) {
+  return caseDef?.lesions ?? (caseDef?.lesion ? [caseDef.lesion] : []);
+}
+
 // The claw without the lesion: it carries the block.
 export function soundClaw(caseDef) {
   if (!caseDef.lesion) return CLAW.NONE; // a sound foot: both claws are sound, neither needs a block
+  if (lesionsOf(caseDef).length > 1) return CLAW.NONE; // both claws sore: neither can take a block
   return caseDef.lesion.claw === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
 }
 
@@ -230,8 +236,10 @@ export class Hoof {
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
     this.drained = false;           // the abscess pocket has been opened and has drained
     // A sole ulcer's cap holds firm under the knife until it's been worked enough, then gives.
-    this.capWork = 0;               // knife travel over the closed cap so far (logical px)
-    this.capOpen = false;
+    // Per claw, since both claws can carry one (J3): knife travel over the closed cap so far
+    // (logical px), and whether it has given.
+    this.capWorkAt = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
+    this.capOpenAt = { [CLAW.OUTER]: false, [CLAW.INNER]: false };
     // How caked the foot is: muck covers it fully from 1 up, and past 1 it's packed harder,
     // so the brush shifts it more slowly (tools.js).
     const mud = caseDef.mud ?? 1;
@@ -246,11 +254,28 @@ export class Hoof {
     if (ob) { this.block = ob.claw; this.blockKind = ob.kind; }
     this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
     this.wrapClaw = CLAW.NONE;
+    // With a lesion on each claw (J3) each claw is padded and wrapped on its own: wrapAt holds
+    // the stage per claw, and wrap/wrapClaw stay unused.
+    this.wrapAt = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
     this.rand = mulberry32(seed);
     this.build();
     // No muck got under the old block: the sole it covers comes off clean.
     if (ob) for (let i = 0; i < this.n; i++) if (this.claw[i] === ob.claw && (this.zone[i] & Z.LIVE) && !(this.zone[i] & Z.HEEL)) this.mud[i] = 0;
   }
+
+  // Every ulcer's cap has given (both, when both claws have one).
+  get capOpen() {
+    const ul = lesionsOf(this.caseDef).filter((L) => LESION_LOOSE[L.type] === LOOSE.ULCER);
+    return ul.length ? ul.every((L) => this.capOpenAt[L.claw]) : false;
+  }
+
+  lesions() { return lesionsOf(this.caseDef); }
+  // The lesion on `claw`, if any.
+  lesionOn(claw) { return this.lesions().find((L) => L.claw === claw) ?? null; }
+  // How far claw c is padded and wrapped: 0 bare, 1 padded, 2 wrapped.
+  wrappedOn(c) { return this.wrapClaw === c && this.wrap ? this.wrap : this.wrapAt[c]; }
+  // Every lesion claw padded and wrapped.
+  get wrapped() { return this.lesions().length > 1 ? this.lesions().every((L) => this.wrapAt[L.claw] >= 2) : this.wrap >= 2; }
 
   cellX(i) { return this.g.x0 + ((i % this.g.cols) + 0.5) * this.g.cell; }
   cellY(i) { return this.g.y0 + (Math.floor(i / this.g.cols) + 0.5) * this.g.cell; }
@@ -348,8 +373,20 @@ export class Hoof {
       }
     }
 
-    // Lesion: a core of exposed corium hidden under a cap of loose horn.
-    const L = cd.lesion;
+    for (const L of lesionsOf(cd)) this.buildLesion(L);
+
+    // A curl of loose, undermined heel horn for step 5.
+    const H = cd.looseHorn;
+    this.stampExact(H.x, H.y, H.r, (i) => {
+      if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== H.claw) return;
+      this.loose[i] = this.looseInit[i] = LOOSE.HEEL;
+    });
+
+    this.init.set(this.thick);
+  }
+
+  // Lay one lesion into the grid. A sole ulcer is a core of exposed corium hidden under a cap of loose horn.
+  buildLesion(L) {
     if (L?.type === 'whiteline') this.buildTract(L);
     else if (L?.type === 'foreign') this.buildPuncture(L);
     else if (L?.type === 'dd') this.stampExact(L.x, L.y, L.r, (i) => {
@@ -392,15 +429,6 @@ export class Hoof {
         }
       });
     }
-
-    // A curl of loose, undermined heel horn for step 5.
-    const H = cd.looseHorn;
-    this.stampExact(H.x, H.y, H.r, (i) => {
-      if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== H.claw) return;
-      this.loose[i] = this.looseInit[i] = LOOSE.HEEL;
-    });
-
-    this.init.set(this.thick);
   }
 
   // White-line abscess: under-run horn along the white line from where it opens at the wall
@@ -454,11 +482,21 @@ export class Hoof {
     return this.tgt[i] || CFG.sole.target;
   }
 
+  // Is finding f one of the lesions (not a decoy)?
+  isLesionFinding(f) {
+    return this.lesions().some((L) => L.type === f.kind && L.claw === f.claw);
+  }
+
+  // The finding for lesion L.
+  lesionFinding(L) {
+    return this.caseDef.findings?.find((f) => f.kind === L.type && f.claw === L.claw) ?? null;
+  }
+
   // The tester-readable mark (ulcer or decoy) covering cell i, if any.
   findingAt(i) {
     const x = this.cellX(i), y = this.cellY(i);
     return (this.caseDef.findings ?? []).find((f) =>
-      f.claw === this.claw[i] && Math.hypot(x - f.x, y - f.y) <= f.r * (f.kind === this.caseDef.lesion?.type ? 1.75 : 1.3)) ?? null;
+      f.claw === this.claw[i] && Math.hypot(x - f.x, y - f.y) <= f.r * (this.isLesionFinding(f) ? 1.75 : 1.3)) ?? null;
   }
 
   // What the hoof testers report at cell i. `finding` is the mark it read, if any.
@@ -473,16 +511,19 @@ export class Hoof {
       return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
     }
     if (z & Z.CLEFT) return { kind: 'cleft', text: 'Heel cleft: skin, not horn. Keep the blades out of it.' };
-    if (L && this.looseInit[i] === LESION_LOOSE[L.type]) {
-      const finding = this.caseDef.findings?.find((f) => f.kind === L.type) ?? null;
-      if (this.drained) return { kind: 'firm', text: 'Drained. The pressure’s off: keep weight off this claw.' };
+    // The lesion whose loose horn this is, on this cell's claw.
+    const LL = this.lesions().find((l) => l.claw === this.claw[i] && LESION_LOOSE[l.type] === this.looseInit[i]);
+    if (LL) {
+      const L = LL;
+      const finding = this.lesionFinding(L);
+      if (this.drained && LESION_LOOSE[L.type] === LOOSE.TRACT) return { kind: 'firm', text: 'Drained. The pressure’s off: keep weight off this claw.' };
       if (L.type === 'toenecrosis' && !this.loose[i]) return { kind: 'firm', text: 'Pared back to healthy horn. What’s under it is the bone: that’s the vet’s.' };
       if (L.type === 'doublesole' && !this.loose[i]) return { kind: 'firm', text: `New sole underneath: thinner, but firm and sound. ${this.thick[i].toFixed(1)} mm.` };
       return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
     }
     // Decoys sit in the surface horn: once it's trimmed away there is nothing left to read.
     const f = this.findingAt(i);
-    if (f && f.kind !== this.caseDef.lesion?.type && this.init[i] - this.thick[i] < DECOY_DEPTH[f.kind]) {
+    if (f && !this.isLesionFinding(f) && this.init[i] - this.thick[i] < DECOY_DEPTH[f.kind]) {
       return { kind: f.kind, finding: f, text: f.probeText };
     }
     if (this.looseInit[i] === LOOSE.HEEL && this.loose[i]) {
@@ -620,8 +661,28 @@ export class Hoof {
     // How well the opened ulcer (or the DD patch, or the foot-rot split) has been flushed with the spray (0..1).
     m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER]
       : m.looseN[LOOSE.TRACT] ? m.tractTint / m.looseN[LOOSE.TRACT] : 0;
+    if (this.lesions().length > 1) this.perClaw(m);
     m.levelDiff = claws[CLAW.INNER].wbMean - claws[CLAW.OUTER].wbMean;
     m.heelRemovedMean = m.heelN ? m.heelRemoved / m.heelN : 0;
     return m;
+  }
+
+  // With a lesion on each claw (J3), each is judged on its own: how much of each lesion's loose
+  // horn is left (looseRemainAt), and how well each lesion is flushed (lesionTintAt). The pair
+  // counts as flushed only as well as its worse claw.
+  perClaw(m) {
+    const n = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 }, left = { ...n }, tint = { ...n };
+    for (let i = 0; i < this.n; i++) {
+      const lg = this.looseInit[i], c = this.claw[i];
+      if (lg !== LOOSE.ULCER && lg !== LOOSE.TRACT) continue;
+      n[c]++; tint[c] += this.tint[i];
+      if (this.loose[i]) left[c]++;
+    }
+    m.looseRemainAt = {}; m.lesionTintAt = {};
+    for (const c of [CLAW.OUTER, CLAW.INNER]) {
+      m.looseRemainAt[c] = n[c] ? left[c] / n[c] : 0;
+      m.lesionTintAt[c] = n[c] ? tint[c] / n[c] : 0;
+    }
+    m.lesionTint = Math.min(...this.lesions().map((L) => m.lesionTintAt[L.claw]));
   }
 }

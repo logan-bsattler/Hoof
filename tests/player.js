@@ -16,8 +16,8 @@ export function makePlayer(hoof, opts = {}) {
   const emit = (ev, tool, x, y) => { if (onEvent) onEvent(ev, tool, x, y); return ev; };
 
   // A careful hand keeps the grinder disc off the ulcer: that's knife work.
-  const discTouchesUlcer = (x, y) => L?.type === 'ulcer' &&
-    Math.hypot(x - L.x, y - L.y) < L.r * 1.75 + CFG.tools.grinder.radius;
+  const discTouchesUlcer = (x, y) => hoof.lesions().some((U) => U.type === 'ulcer' &&
+    Math.hypot(x - U.x, y - U.y) < U.r * 1.75 + CFG.tools.grinder.radius);
 
   const p = {
     hoof,
@@ -88,8 +88,8 @@ export function makePlayer(hoof, opts = {}) {
     },
     // White-line abscess: pare along the dark line from where it meets the wall, in short pulls,
     // then work round the pocket at its end until it drains.
-    followTrack() {
-      const P = L.path, K = L.pocket;
+    followTrack(T = L) {
+      const P = T.path, K = T.pocket;
       p.drag('knife', P, 60);
       p.drag('knife', [P[P.length - 1], [K.x, K.y]], 60);
       for (let a = 0; a < 12; a++) {

@@ -69,7 +69,7 @@ export const FARMS = [
   {
     id: 'ridgeway', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
     intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
-    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, puncture: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5,
+    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, twoclaw: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5,
     decoys: [1, 3],
   },
 ];

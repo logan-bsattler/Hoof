@@ -113,7 +113,7 @@ export function resistAt(t, tgt, resist) {
 
 function blocked(hoof, i, ev) {
   const c = hoof.claw[i];
-  const covered = (hoof.block && c === hoof.block) || (hoof.wrap && c === hoof.wrapClaw);
+  const covered = (hoof.block && c === hoof.block) || hoof.wrappedOn(c) > 0;
   // The block and wrap cover the sole; the heel bulb behind them stays workable.
   if (covered && (hoof.zone[i] & Z.LIVE) && !(hoof.zone[i] & Z.HEEL)) {
     ev.blockedSkip = true;
@@ -144,20 +144,20 @@ function clearLoose(hoof, i, ev) {
 export const KNIFE_FLAT = CFG.tools.knife.flat;
 
 // A sole ulcer's cap of loose horn, not yet given way.
-const closedCap = (hoof, i) => !hoof.capOpen && hoof.loose[i] && hoof.looseInit[i] === LOOSE.ULCER;
+const closedCap = (hoof, i) => !hoof.capOpenAt[hoof.claw[i]] && hoof.loose[i] && hoof.looseInit[i] === LOOSE.ULCER;
 
-// The knife working a closed cap: it holds, then gives all at once. The core lifts out with
-// the horn round the blade; the undermined rim is left to pare back cell by cell.
-function workCap(hoof, x, y, amount, ev) {
+// The knife working the closed cap on `claw`: it holds, then gives all at once. The core lifts
+// out with the horn round the blade; the undermined rim is left to pare back cell by cell.
+function workCap(hoof, claw, x, y, amount, ev) {
   const give = CFG.tools.knife.capGive;
-  hoof.capWork += amount;
-  ev.capStrain = Math.min(1, hoof.capWork / give);
-  if (hoof.capWork < give) return;
-  hoof.capOpen = true;
+  hoof.capWorkAt[claw] += amount;
+  ev.capStrain = Math.max(ev.capStrain, Math.min(1, hoof.capWorkAt[claw] / give));
+  if (hoof.capWorkAt[claw] < give) return;
+  hoof.capOpenAt[claw] = true;
   ev.capPop = true;
-  const lift = CFG.tools.knife.capLift * hoof.caseDef.lesion.r;
+  const lift = CFG.tools.knife.capLift * hoof.lesionOn(claw).r;
   for (let i = 0; i < hoof.n; i++) {
-    if (hoof.looseInit[i] !== LOOSE.ULCER || !hoof.loose[i]) continue;
+    if (hoof.looseInit[i] !== LOOSE.ULCER || !hoof.loose[i] || hoof.claw[i] !== claw) continue;
     if ((hoof.zone[i] & Z.ULCER) || Math.hypot(hoof.cellX(i) - x, hoof.cellY(i) - y) < lift) clearLoose(hoof, i, ev);
   }
 }
@@ -176,7 +176,7 @@ function pareTract(hoof, i, ev) {
     return false;
   }
   clearLoose(hoof, i, ev);
-  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - (hoof.caseDef.lesion.type === 'foreign' ? FUNNEL : GROOVE)[hoof.tract[i]]);
+  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - (hoof.lesionOn(hoof.claw[i]).type === 'foreign' ? FUNNEL : GROOVE)[hoof.tract[i]]);
   if (!hoof.drained && hoof.tract[i] === TRACT.POCKET) {
     let n = 0, open = 0;
     for (let j = 0; j < hoof.n; j++) if (hoof.tract[j] === TRACT.POCKET) { n++; if (!hoof.loose[j]) open++; }
@@ -228,14 +228,15 @@ export function applyStroke(hoof, tool, x, y, dist) {
       ev.mud += a;
     });
   } else if (tool === 'knife') {
-    let onCap = 0;
+    // Flat-of-blade cells on a closed cap, per claw.
+    const onCap = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
       // Fresh cuts expose untreated tissue: the flush has to be repeated.
       hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * dist * f);
       // The cap and the open core answer only to the flat of the blade; its feathered edge rides over them.
-      if (closedCap(hoof, i)) { if (f >= KNIFE_FLAT) onCap++; return; }
+      if (closedCap(hoof, i)) { if (f >= KNIFE_FLAT) onCap[hoof.claw[i]]++; return; }
       if ((hoof.zone[i] & Z.ULCER) && f < KNIFE_FLAT) return;
       if (pareTract(hoof, i, ev) || pareNecro(hoof, i, ev) || pareDouble(hoof, i, ev)) return;
       if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
@@ -244,7 +245,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
       // A clean knife pass leaves a smooth surface.
       hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
     });
-    if (onCap) workCap(hoof, x, y, dist * Math.min(1, onCap / 6), ev);
+    for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, x, y, dist * Math.min(1, onCap[c] / 6), ev);
   } else if (tool === 'rasp') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       // The rasp has no edge to bite skin: it just rides over the cleft.
@@ -374,6 +375,7 @@ export function applyWrap(hoof, claw, m, ready) {
   if (hoof.caseDef.requires?.treat === false) return { ok: false, reason: 'untreated' };
   if (hoof.caseDef.requires?.wrap === false) return { ok: false, reason: 'nowrap' };
   if (!claw) return { ok: false, reason: 'miss' };
+  if (hoof.lesions().length > 1) return wrapPair(hoof, claw, m, ready);
   if (claw !== L.claw) return { ok: false, reason: 'sound' };
   if (hoof.wrap >= 2) return { ok: false, reason: 'done' };
   if (L.type === 'ulcer' && m.looseRemain[LOOSE.ULCER] > 0.1) return { ok: false, reason: 'closed' };
@@ -383,4 +385,18 @@ export function applyWrap(hoof, claw, m, ready) {
   hoof.wrapClaw = claw;
   hoof.wrap++;
   return { ok: true, stage: hoof.wrap };
+}
+
+// A lesion on each claw (J3): each claw is padded and wrapped on its own, once its own lesion
+// is open and flushed.
+function wrapPair(hoof, claw, m, ready) {
+  const L = hoof.lesionOn(claw);
+  if (!L) return { ok: false, reason: 'miss' };
+  if (hoof.wrapAt[claw] >= 2) return { ok: false, reason: hoof.wrapped ? 'done' : 'other' };
+  if (L.type === 'ulcer' && m.looseRemainAt[claw] > 0.1) return { ok: false, reason: 'closed' };
+  if (L.type === 'whiteline' && !hoof.drained) return { ok: false, reason: 'closed' };
+  if (m.lesionTintAt[claw] < CFG.treat.tintMin) return { ok: false, reason: 'unflushed' };
+  if (!ready) return { ok: false, reason: 'early' };
+  hoof.wrapAt[claw]++;
+  return { ok: true, stage: hoof.wrapAt[claw], claw };
 }

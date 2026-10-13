@@ -6,6 +6,7 @@
 import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, firstClaw, secondClaw, soundClaw } from './hoof.js';
 import { CALLS } from './conditions.js';
+import { lesionOpened } from './scoring.js';
 
 const { target: T, dishTarget: D } = CFG.sole;
 
@@ -82,6 +83,12 @@ export const STEPS = [
     tip: 'Pare the black, crumbling horn off the toe tip with the knife until it’s healthy horn all round. Then the block: tap the block tool again for the taller wood one, and glue it on the SOUND claw.',
     done: (m, s, hoof) => m.looseRemain[LOOSE.NECRO] < 0.1 && hoof.block === soundClaw(hoof.caseDef) && hoof.blockKind === 'wood',
   },
+  // Both claws sore (J3): open each lesion, and no block on either claw.
+  {
+    id: 'openBoth', label: '4 · Open both lesions, no block', tool: 'knife',
+    tip: 'Open the lesion on each claw with the knife: work each ulcer’s cap until it gives, or follow the dark line to the pus. No block: with both claws sore it would load the other one.',
+    done: (m, s, hoof) => lesionOpened(m, hoof) && !hoof.block,
+  },
   {
     id: 'step5', label: '5 · Remove loose heel horn', tool: 'knife',
     tip: (cd) => `There’s a curl of loose horn at the ${CLAW_NAME[cd.looseHorn.claw]} heel. Flick it off with the knife and leave the heel itself alone.`,
@@ -91,6 +98,12 @@ export const STEPS = [
     id: 'treat', label: 'Treat: flush, pad and wrap the ulcer', tool: 'spray',
     tip: 'Flush the opened ulcer with the spray bottle, then tap it with the pad + wrap: white pad first, then the pink wrap.',
     done: (m, s, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin,
+  },
+  // Both claws sore (J3): each claw flushed, padded and wrapped on its own.
+  {
+    id: 'treatBoth', label: 'Treat: flush, pad and wrap both claws', tool: 'spray',
+    tip: 'Flush each opened lesion with the spray, then pad and wrap each claw: tap one claw twice, then the other.',
+    done: (m, s, hoof) => hoof.wrapped && m.lesionTint >= CFG.treat.tintMin,
   },
   // Digital dermatitis: no blade, just treatment of the skin in the cleft.
   {
@@ -107,13 +120,14 @@ export const STEPS = [
   // A cow who leaves the crush by a call (WP8.1): done when that call is made.
   {
     id: 'refer', label: (cd) => `Send her: ${CALLS[cd.call].label.toLowerCase()}`, tool: null,
-    tip: 'This one isn’t yours to fix. Tap Vet / leave… beside Release and make the call.',
+    tip: (cd) => cd.call === 'pen' ? 'She needs soft bedding while both claws heal. Tap Vet / leave… beside Release and send her to the hospital pen.'
+      : 'This one isn’t yours to fix. Tap Vet / leave… beside Release and make the call.',
     done: (m, s, hoof) => s.call === hoof.caseDef.call,
   },
 ];
 
 // The treatment steps: the wrap goes on last, after everything else.
-const TREAT = new Set(['treat', 'dress']);
+const TREAT = new Set(['treat', 'dress', 'treatBoth']);
 
 // The steps this case needs, in the condition's order. Cases without a list run them all.
 export function stepsFor(caseDef) {

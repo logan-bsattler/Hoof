@@ -34,11 +34,14 @@ function traitsLine({ temper, mud, growth, foot }) {
 }
 
 // Everything a case needs, written out from where things are on the foot.
-function buildCase(condition, { seed, side, foot, excess, lesion, looseHorn, decoys, temper, mud, growth }) {
+function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth }) {
   const C = CONDITIONS[condition];
   const cow = 100 + (((seed - 100) % 900) + 900) % 900; // ear tag #100–#999; seed 214 is #214
   const leg = side === 'RH' ? 'right' : 'left';
   const limb = `${leg} ${foot}`;
+  // A lesion on each claw (J3): each carries its own type; `lesion` is the first of them.
+  const all = lesions ? lesions.map((l) => ({ ...l })) : lesion ? [{ type: C.diagnosis, ...lesion }] : [];
+  const L = all[0] ?? null;
   return {
     id: C.caseId,
     condition,
@@ -65,16 +68,17 @@ function buildCase(condition, { seed, side, foot, excess, lesion, looseHorn, dec
     traits: traitsLine({ temper, mud, growth, foot }),
 
     // The hidden lesion, its kind named by the condition's diagnosis (null on a sound foot).
-    lesion: lesion && { type: C.diagnosis, ...lesion },
+    lesion: L,
+    ...(lesions ? { lesions: all } : {}),
 
     // A curl of loose heel horn for step 5, on the sound claw.
     looseHorn,
 
     // Marks the testers can read: the lesion and the decoys that only look like trouble.
-    findings: [...(lesion ? [{ kind: C.diagnosis, ...lesion }] : []), ...decoys].map((f) => ({ ...f, ...FINDING[f.kind] })),
+    findings: [...all.map(({ type, ...l }) => ({ kind: type, ...l })), ...decoys].map((f) => ({ ...f, ...FINDING[f.kind] })),
 
     diagnosis: C.diagnosis,
-    ...C.copy({ cow, leg, limb, lesion }),
+    ...C.copy({ cow, leg, limb, lesion, lesions }),
   };
 }
 

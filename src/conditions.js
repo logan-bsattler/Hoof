@@ -51,6 +51,11 @@ export const FINDING = {
     probeText: 'It sounds hollow under the testers, and she doesn’t mind. A layer of old sole has lifted off the one underneath.',
     diagnosedText: 'A double sole. Get the knife under the lifted edge and pare the false sole off.',
   },
+  twoclaw: {
+    look: 'sore spots on both claws', feel: 'sore on both claws',
+    probeText: 'Sore on both claws.',
+    diagnosedText: 'Both claws are bad. Open both, wrap both, no block, and the hospital pen.',
+  },
   stain: {
     look: 'dark patch', feel: 'firm',
     probeText: 'Dark is just staining. Firm underneath.',
@@ -168,6 +173,12 @@ function placeCleft(rand, side, claw, v = {}) {
   const y = band(rand, GEOM.cleftY0 + 12, GEOM.cleftY1 - 8, v.at);
   const [l, r] = clawSpan(claw, y, side);
   return { claw, x: (s > 0 ? l : r) + s * between(6, 8), y, r: band(rand, 10, 12, v.size) };
+}
+
+// A sole ulcer on `claw` at the sole/heel junction, as the ulcer case places it.
+function placeUlcer(rand, at, claw, v = {}) {
+  const between = (a, b) => a + rand() * (b - a);
+  return { type: 'ulcer', claw, x: at(claw, between(22, 36)), y: band(rand, 275, 305, v.at), r: band(rand, 10, 14, v.size) };
 }
 
 export const CONDITIONS = {
@@ -508,6 +519,66 @@ export const CONDITIONS = {
         howto: '<li><b>Hollow, not sore?</b> A false sole. Pare it off with the knife before you trim: the grinder tears into the thin new sole under it.</li>',
         misreadNote: 'Misread the mark. A patch with a lifted edge that sounds hollow and doesn’t hurt is a double sole.',
         plan: `Plan: pare the false sole off the ${claw} claw with the knife, then the functional trim (steps 1–3), rasp and the loose heel horn. No block, no wrap.`,
+      };
+    },
+  },
+
+  // Case I "Two Sore Claws" (WP9 J3): a lesion on each claw, an ulcer on the big one and an
+  // ulcer or a white-line abscess on the other (D23). No block: it would put her whole weight on
+  // the other sore claw. Open both, wrap both, and send her to the hospital pen.
+  twoclaw: {
+    caseId: 'I',
+    title: 'Two Sore Claws',
+    noun: 'lesions',
+    weight: 0.1,
+    steps: [...TRIM, 'openBoth', 'step5', 'treatBoth', 'refer'],
+    requires: { open: true, block: false, treat: true },
+    call: 'pen',
+    diagnosis: 'twoclaw',
+
+    // `lesion` is the big claw's ulcer; `lesions` holds both, one per claw, each with its own type.
+    place(rand, side, v = {}) {
+      const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
+      const big = v.big ?? CLAW.OUTER, other = otherClaw(big);
+      const first = placeUlcer(rand, at, big, v);
+      const second = rand() < 0.5 ? placeUlcer(rand, at, other, v) : { type: 'whiteline', ...placeTract(rand, side, other, v) };
+      const looseHorn = placeHeelHorn(rand, at, rand() < 0.5 ? CLAW.OUTER : CLAW.INNER);
+      const avoid = [first, second, looseHorn];
+      if (second.path) avoid.push(second.pocket, { x: second.path[second.path.length >> 1][0], y: second.path[second.path.length >> 1][1] });
+      const decoys = placeDecoys(rand, at, side, avoid, v);
+      return { lesion: first, lesions: [first, second], looseHorn, decoys };
+    },
+
+    copy({ cow, limb, lesions }) {
+      const [a, b] = lesions;
+      const what = b.type === 'ulcer' ? 'an ulcer on each claw' : `an ulcer on the ${CLAW_NAME[a.claw]} claw and a white-line abscess on the ${CLAW_NAME[b.claw]}`;
+      return {
+        intro:
+          `#${cow} is hobbling on the ${limb}, rocking from one claw to the other and never settling. ` +
+          'Lift the foot and test both claws.',
+        diagnosisPrompt: 'She won’t stand on either claw. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'twoclaw', label: 'Lesions on both claws',
+            feedback: `Right. There’s ${what}: both claws are sore, so neither can carry a block.`,
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: `There is an ulcer, but the other claw is sore too: ${what}.`,
+          },
+          {
+            id: 'whiteline', label: 'White-line abscess',
+            feedback: `Not only that: both claws tested sore. There’s ${what}.`,
+          },
+          {
+            id: 'bruise', label: 'Sole bruise',
+            feedback: `A bruise stays firm. Both claws gave under the testers: ${what}.`,
+          },
+        ],
+        howto: '<li><b>Both claws sore?</b> No block: it would load the other sore claw. Wrap each one, and send her to the hospital pen.</li>',
+        misreadNote: 'Misread the foot. Both claws tested sore: a lesion on each, and no sound claw to block.',
+        callNote: 'With both claws sore she needed soft bedding in the hospital pen, not the yard.',
+        plan: 'Plan: functional trim (steps 1–3), rasp, open both lesions, then flush, pad and wrap each claw. No block: it would load the other sore claw. Then send her to the hospital pen.',
       };
     },
   },

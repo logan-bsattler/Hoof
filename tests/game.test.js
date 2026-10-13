@@ -39,15 +39,17 @@ function idealTrim(hoof) {
     // puncture as a funnel, deepest on the mark, and flushed.
     const funnel = hoof.caseDef.lesion?.type === 'foreign';
     if (hoof.looseInit[i] === LOOSE.TRACT) hoof.thick[i] = hoof.zoneTarget(i) - ((hoof.tract[i] === TRACT.POCKET) !== funnel ? 2.5 : 1.5);
-    if (funnel && hoof.looseInit[i] === LOOSE.TRACT) hoof.tint[i] = 1;
+    // A pair's (J3) white-line abscess is flushed and wrapped like its ulcer.
+    if ((funnel || hoof.lesions().length > 1) && hoof.looseInit[i] === LOOSE.TRACT) hoof.tint[i] = 1;
     if (hoof.looseInit[i] === LOOSE.NECRO) hoof.thick[i] = hoof.zoneTarget(i) - 1.5;
   }
   // DD needs no block; a case without a requires list (the hand-built ones) is an ulcer.
   if (hoof.caseDef.requires?.block ?? true) hoof.block = soundClaw(hoof.caseDef);
   if (hoof.caseDef.requires?.block === 'wood') hoof.blockKind = 'wood';
   if (!hoof.caseDef.lesion) return; // a sound foot gets no block and no wrap
-  hoof.drained = ['whiteline', 'foreign'].includes(hoof.caseDef.lesion.type);
+  hoof.drained = hoof.lesions().some((L) => ['whiteline', 'foreign'].includes(L.type));
   if (!hoof.caseDef.requires.treat) return; // a drained abscess stays open to the air
+  if (hoof.lesions().length > 1) { for (const L of hoof.lesions()) hoof.wrapAt[L.claw] = 2; return; }
   hoof.wrap = 2;
   hoof.wrapClaw = hoof.caseDef.lesion.claw;
 }
@@ -61,7 +63,7 @@ function findCell(hoof, pred) {
 function idealSession(cd = CASE_B) {
   return {
     ...newSession(), diagnosis: cd.diagnosis, diagnosisCorrect: true,
-    probes: cd.lesion ? [cd.lesion.type] : cd.findings.map((f) => f.kind),
+    probes: cd.lesion ? (cd.lesions ?? [cd.lesion]).map((l) => l.type) : cd.findings.map((f) => f.kind),
     firstCutClaw: CLAW.INNER, blockAttempts: cd.lesion ? [soundClaw(cd)] : [],
   };
 }

@@ -2,7 +2,7 @@
 // Speed is deliberately absent. Pure function of metrics + session log.
 
 import { CFG, tolOf } from './config.js';
-import { CLAW, CLAW_NAME, LOOSE, Z, distToPath, firstClaw, secondClaw, soundClaw } from './hoof.js';
+import { CLAW, CLAW_NAME, LOOSE, Z, distToPath, firstClaw, lesionsOf, secondClaw, soundClaw } from './hoof.js';
 import { CALLS } from './conditions.js';
 
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
@@ -39,7 +39,7 @@ export function judgeBlood(session, cells) {
 function decoysDug(hoof, caseDef) {
   let n = 0;
   for (const f of caseDef.findings ?? []) {
-    if (f.kind === caseDef.lesion?.type) continue;
+    if (lesionsOf(caseDef).some((L) => L.type === f.kind && L.claw === f.claw)) continue;
     let sum = 0, k = 0;
     hoof.stampExact(f.x, f.y, f.r, (i) => {
       if (hoof.claw[i] !== f.claw) return;
@@ -68,6 +68,7 @@ function soleDugBesideTrack(hoof, L) {
 
 // Is the lesion opened up the way its condition needs?
 export function lesionOpened(m, hoof) {
+  if (hoof.lesions().length > 1) return hoof.lesions().every((L) => opened(m, hoof, L));
   const L = hoof.caseDef.lesion;
   // Digital dermatitis is skin: there is nothing to open.
   if (!L || L.type === 'dd') return true;
@@ -76,11 +77,23 @@ export function lesionOpened(m, hoof) {
   return L.type === 'whiteline' || L.type === 'foreign' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
 
+// One of a pair of lesions (J3) opened: an ulcer's loose horn off its claw, or the abscess drained.
+function opened(m, hoof, L) {
+  return L.type === 'whiteline' ? hoof.drained : m.looseRemainAt[L.claw] <= 0.1;
+}
+
+// What's left shut on a pair (J3): the ulcer, or the abscess, on the claw not yet opened.
+function pairOpenNote(m, hoof) {
+  const shut = hoof.lesions().find((L) => !opened(m, hoof, L));
+  return shut.type === 'whiteline' ? `The track on the ${CLAW_NAME[shut.claw]} claw was never pared out to the pus. Open both before she goes.`
+    : `Loose horn left over the ulcer on the ${CLAW_NAME[shut.claw]} claw. Open both before she goes.`;
+}
+
 // The block she leaves the crush wearing, for her record (J2): { claw, kind } or null.
 export const blockOn = (hoof) => (hoof.block ? { claw: hoof.block, kind: hoof.blockKind } : null);
 
 // Flushed, padded and wrapped (sprayed only, where the condition wants no wrap: foot rot).
-const treated = (m, hoof) => (hoof.caseDef.requires?.wrap === false || hoof.wrap >= 2) && m.lesionTint >= CFG.treat.tintMin;
+const treated = (m, hoof) => (hoof.caseDef.requires?.wrap === false || hoof.wrapped) && m.lesionTint >= CFG.treat.tintMin;
 
 export function scoreCase(m, session, hoof, caseDef) {
   const T = CFG.sole.target, D = CFG.sole.dishTarget;
@@ -131,20 +144,26 @@ export function scoreCase(m, session, hoof, caseDef) {
   let correctness = 100;
   // Committing a read without testing the lesion itself counts as no read at all.
   const L = caseDef.lesion;
-  if (!session.diagnosis || (L ? !session.probes.includes(L.type) : !session.probes.length)) {
-    correctness -= 25; notes.push(L ? 'You never tested the sore spot itself. Read before you cut.' : 'You never tested the marks. Read before you cut.');
+  // With a lesion on each claw, both must have been tested.
+  const pair = lesionsOf(caseDef).length > 1;
+  const tested = (type) => session.probes.filter((k) => k === type).length >= lesionsOf(caseDef).filter((l) => l.type === type).length;
+  if (!session.diagnosis || (L ? !lesionsOf(caseDef).every((l) => tested(l.type)) : !session.probes.length)) {
+    correctness -= 25; notes.push(!L ? 'You never tested the marks. Read before you cut.'
+      : pair && session.probes.includes(L.type) ? 'You only tested one sore claw. Test both before you cut.' : 'You never tested the sore spot itself. Read before you cut.');
   } else if (!session.diagnosisCorrect) { correctness -= 15; notes.push(caseDef.misreadNote); }
   const need = caseDef.requires ?? { open: true, block: true, treat: true };
   // Last visit's block still on (J2): that's the fault, not a needless new one.
   const oldOn = !!hoof.oldBlock?.on;
   if (oldOn) { correctness -= 20; notes.push('An old block left on overloads her: it should have come off by now.'); }
   else if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
+  // Both claws sore (J3): a block puts her whole weight on the other sore one.
+  else if (pair && hoof.block) { correctness -= 30; notes.push('The block put her whole weight on the other sore claw. With both claws bad, no block: wrap both and pen her.'); }
   else if (L && !need.block && hoof.block) {
     correctness -= 20;
     notes.push(L.type === 'doublesole' ? 'No block needed: the new sole is sound, just thin. A block only tips her onto one claw.'
       : 'No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.');
   }
-  if (L && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
+  if (L && !pair && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
   if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${caseDef.noun ?? 'ulcer'} is still carrying weight.`); }
   // Toe necrosis wants the taller wood block; everything else the rubber one.
   const kind = need.block === 'wood' ? 'wood' : 'rubber';
@@ -158,7 +177,8 @@ export function scoreCase(m, session, hoof, caseDef) {
     notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' :
       L.type === 'toenecrosis' ? 'Black, dead horn left at the toe. Pare it back to healthy horn before she goes.' :
       L.type === 'doublesole' ? 'False sole left on. Pare the old layer off so the new sole underneath can harden.' :
-      L.type === 'foreign' ? 'The puncture was never pared down to the pus. It’s still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
+      L.type === 'foreign' ? 'The puncture was never pared down to the pus. It’s still under pressure.' :
+      pair ? pairOpenNote(m, hoof) : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
   if (trim && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
   if (trim && session.firstCutClaw === secondClaw(caseDef)) {
@@ -169,7 +189,8 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (need.treat && !treated(m, hoof)) {
     correctness -= 10;
     notes.push(L.type === 'footrot' ? 'The split skin went out unsprayed. Clean it and soak it before she goes.'
-      : L.type === 'dd' ? 'The DD lesion went out untreated. Spray it, then pad and wrap it.' : 'The ulcer went out untreated. Flush it with the spray, then pad and wrap it.');
+      : L.type === 'dd' ? 'The DD lesion went out untreated. Spray it, then pad and wrap it.'
+      : pair ? 'Both claws need treating: flush each, then pad and wrap each.' : 'The ulcer went out untreated. Flush it with the spray, then pad and wrap it.');
   }
   // A blade in the heel cleft: skin, not horn, and on a DD foot the raw patch itself.
   if (session.cleftCuts) {
@@ -259,15 +280,16 @@ export function scoreCase(m, session, hoof, caseDef) {
     : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
   // A worn-out old block rocks her as badly as a needless one.
   const gaitScore = 0.5 * balance + 0.5 * (oldOn ? Math.min(relief, 40) : relief);
-  const blockedSore = !!L && hoof.block === L.claw;
+  const blockedSore = !!L && (pair ? !!hoof.block : hoof.block === L.claw);
   // A cow who needed the pen or the vet and was released goes on getting worse.
   const walked = blockedSore || (referral(want) && !made) ? 'lame'
     : gaitScore >= 75 ? 'sound' : gaitScore >= 50 ? 'tender' : 'lame';
   // A cow sent off the line doesn't walk off: no gait, no mobility score, and she isn't lame.
-  const gait = made ? CALLS[made].gait : walked;
+  // Blocked with both claws sore (J3), she goes to the pen lame all the same.
+  const gait = pair && hoof.block ? 'lame' : made ? CALLS[made].gait : walked;
 
   // AHDB mobility score: a block on the sore claw is the worst case, severely impaired.
-  const mobility = made ? null : blockedSore ? CFG.mobility.blockedSore : CFG.mobility[gait];
+  const mobility = made && !(pair && hoof.block) ? null : blockedSore ? CFG.mobility.blockedSore : CFG.mobility[gait];
 
   if (!notes.length) notes.push(made ? 'Textbook. The right call, and nothing done that she didn’t need.'
     : L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
