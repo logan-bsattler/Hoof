@@ -16,7 +16,7 @@ import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
-import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
+import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
@@ -33,8 +33,10 @@ function devMods() {
 }
 const freePlay = devCase.has('cond');
 let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_B;
-// The trimmer's round (route.js), saved on this device at the end of each day (save.js).
+// The trimmer's round (route.js), saved on this device after each cow (save.js).
 const route = loadRound();
+// Free play never touches the round: a saved day in progress waits for the next normal launch.
+if (freePlay) route.visit = null;
 if (devCase.has('rep')) route.rep = Math.max(0, +devCase.get('rep') || 0);
 let herd = [];         // the cows of the visit in progress, in order
 const canvas = document.getElementById('game');
@@ -662,6 +664,7 @@ async function showResults() {
       return `<div class="bar"><span>${label} <em>${w}%</em></span><div class="track"><div style="width:${v}%"></div></div><b>${v}</b></div>`;
     }).join('');
   const earned = route.visit ? recordCow(route, caseDef, r) : null;
+  if (earned) saveRound(route);
   await ui.modal(
     `<div class="eyebrow">Trimmer’s ticket · ${route.visit ? farmById(route.visit.farm).name : `Case ${caseDef.id}`}</div>
      <h1 class="grade ${r.medal}">${r.grade}</h1>
@@ -679,6 +682,7 @@ async function showResults() {
 async function showFail() {
   game.state = 'results';
   const earned = route.visit ? recordCow(route, caseDef, { failed: true, grade: 'Failed', gait: 'lame' }) : null;
+  if (earned) saveRound(route);
   await ui.modal(
     `<div class="eyebrow">Case failed</div>
      <h1 class="grade fail">Drew blood</h1>
@@ -755,6 +759,7 @@ async function showVisit(farm, { fromMap = true } = {}) {
   );
   if (pick !== 'go') { showRoute(); return; }
   herd = startVisit(route, farm.id);
+  saveRound(route);
   caseDef = herd[0];
   showIntro();
 }
@@ -801,9 +806,11 @@ function showRoute() {
   list.querySelector('.suggest button')?.focus({ preventScroll: true });
 }
 
-// After the title: free play on a dev case, a visit to ?farm, or the first farm on the road.
+// After the title: free play on a dev case, the day left off, a visit to ?farm, or the first farm.
 function begin() {
   if (freePlay) { showIntro(); return; }
+  // A reload mid-visit picks the day up at the next cow, or its summary if every cow is done.
+  if (route.visit) { herd = visitHerd(route); nextCow({ last: route.visit.k >= herd.length }); return; }
   const dev = farmById(devCase.get('farm'));
   if (dev && isOpen(dev, route.rep)) { showVisit(dev, { fromMap: false }); return; }
   // With a saved round, the road map; the first time out, straight to the first farm.

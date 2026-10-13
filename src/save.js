@@ -1,10 +1,11 @@
 // Saving the round (WP7.7): the route state under one versioned localStorage key.
-// Saved at the end of each day, so a reload mid-visit goes back to the road map with that day
-// not yet played. Opened farms and the tier follow from the reputation, so they aren't stored.
+// Saved when a day starts, after each cow and at the end of the day, so a reload mid-visit
+// resumes that day at the next cow (the cow in the crush starts again). Opened farms and the
+// tier follow from the reputation, so they aren't stored.
 // Every read and write is wrapped: blocked or cleared storage, or a corrupt save, just means a
 // fresh round at farm 1. `storage` is passed in so the tests can use a stand-in.
 
-import { FARMS, newRoute } from './route.js';
+import { FARMS, newRoute, farmById, isOpen } from './route.js';
 import { CONDITIONS } from './conditions.js';
 
 export const SAVE_KEY = 'truehoof.round.v1';
@@ -16,15 +17,31 @@ const count = (v) => Number.isFinite(v) && v >= 0;
 const cowOk = (h) => isObj(h) && farmIds.has(h.farm) && typeof h.tag === 'string' && Number.isInteger(h.seed) &&
   Object.hasOwn(CONDITIONS, h.condition) && (h.side === 'LH' || h.side === 'RH') &&
   ['hind', 'front'].includes(h.foot ?? 'hind') && Number.isInteger(h.visit) && h.visit >= 1;
+// A day summary row, as recordCow writes it.
+const rowOk = (r) => isObj(r) && typeof r.tag === 'string' && typeof r.title === 'string' && typeof r.grade === 'string' &&
+  typeof r.gait === 'string' && count(r.points) && typeof r.lame === 'boolean' && [null, 'recheck', 'healed'].includes(r.back);
+// The day in progress: the next visit to an open farm, with one row per cow done so far.
+const visitOk = (v, d) => isObj(v) && farmIds.has(v.farm) && isOpen(farmById(v.farm), d.rep) &&
+  v.n === (d.visits[v.farm] ?? 0) + 1 && Number.isInteger(v.k) && v.k >= 0 && v.k <= farmById(v.farm).cows &&
+  Array.isArray(v.rows) && v.rows.length === v.k && v.rows.every(rowOk);
 
-// A saved round, checked field by field. Anything malformed gives null.
+// A saved round, checked field by field. Anything malformed gives null, except a broken day in
+// progress, which is dropped (with its cows) so the round goes back to the last finished day.
 export function parseRound(text) {
   let d;
   try { d = JSON.parse(text); } catch { return null; }
   if (!isObj(d) || d.v !== 1 || !count(d.rep) || !isObj(d.visits) || !isObj(d.best) || !Array.isArray(d.history)) return null;
   for (const [id, n] of [...Object.entries(d.visits), ...Object.entries(d.best)]) if (!farmIds.has(id) || !count(n)) return null;
   if (!d.history.every(cowOk)) return null;
-  return { ...newRoute(), rep: d.rep, visits: d.visits, best: d.best, history: d.history };
+  let visit = visitOk(d.visit, d) ? d.visit : null;
+  const today = (h) => visit && h.farm === visit.farm && h.visit === visit.n;
+  // Only finished days and today's cows; the history must hold exactly today's done cows.
+  let history = d.history.filter((h) => h.visit <= (d.visits[h.farm] ?? 0) || today(h));
+  if (visit && history.filter(today).length !== visit.k) {
+    visit = null;
+    history = history.filter((h) => h.visit <= (d.visits[h.farm] ?? 0));
+  }
+  return { ...newRoute(), rep: d.rep, visits: d.visits, best: d.best, history, visit };
 }
 
 export function loadRound(storage = globalThis.localStorage) {
@@ -34,11 +51,9 @@ export function loadRound(storage = globalThis.localStorage) {
   } catch { return newRoute(); }
 }
 
-// The day in progress is never saved: only finished days count.
 export function saveRound(route, storage = globalThis.localStorage) {
-  const { rep, visits, best, visit } = route;
-  const history = visit ? route.history.filter((h) => !(h.farm === visit.farm && h.visit === visit.n)) : route.history;
-  try { storage?.setItem(SAVE_KEY, JSON.stringify({ v: 1, rep, visits, best, history })); return true; } catch { return false; }
+  const { rep, visits, best, history, visit } = route;
+  try { storage?.setItem(SAVE_KEY, JSON.stringify({ v: 1, rep, visits, best, history, visit })); return true; } catch { return false; }
 }
 
 export function clearRound(storage = globalThis.localStorage) {

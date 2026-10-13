@@ -262,7 +262,16 @@ export function startVisit(route, farmId) {
   if (!farm) throw new Error(`Unknown farm: ${farmId}`);
   if (!isOpen(farm, route.rep)) throw new Error(`${farm.name} needs reputation ${farm.rep}`);
   route.visit = { farm: farmId, n: (route.visits[farmId] ?? 0) + 1, k: 0, rows: [] };
-  return visitCases(farm, route.visit.n, route.history, tierFor(route.rep));
+  return visitHerd(route);
+}
+
+// The cows of the visit in progress, dealt as they were when it started: from the history before
+// that day (its own cows left out) and the tier, which can't change until the day ends. So a
+// visit resumed after a reload gets the same herd.
+export function visitHerd(route) {
+  const { farm, n } = route.visit;
+  const before = route.history.filter((h) => !(h.farm === farm && h.visit === n));
+  return visitCases(farmById(farm), n, before, tierFor(route.rep));
 }
 
 // Record the current cow's result and move to the next. Points land at the end of the day.

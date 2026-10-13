@@ -1,9 +1,9 @@
-// WP7.7: saving the round. Save, reload, same state; anything broken falls back to a fresh round.
+// WP7.7: saving the round. Save, reload, same state, mid-day included; anything broken falls back.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FARMS, newRoute, startVisit, recordCow, endVisit, visitCases, tierFor } from '../src/route.js';
+import { FARMS, newRoute, startVisit, recordCow, endVisit, visitCases, visitHerd, tierFor } from '../src/route.js';
 import { SAVE_KEY, loadRound, saveRound, clearRound, parseRound, hasProgress } from '../src/save.js';
 
 // A stand-in for localStorage.
@@ -36,16 +36,41 @@ test('save, reload: the same round, the same return visit and the same tier', ()
   assert.deepEqual(visitCases(FARMS[0], n, back.history).map(tag), visitCases(FARMS[0], n, route.history).map(tag));
 });
 
-test('the day in progress is not saved: a reload goes back to the last finished day', () => {
+test('a day in progress is saved after each cow and resumes at the next one, with the same herd', () => {
   const store = memory();
   const route = playedRound();
-  saveRound(route, store);
   const herd = startVisit(route, FARMS[0].id);
+  saveRound(route, store);
+  assert.deepEqual(loadRound(store).visit, route.visit);
   recordCow(route, herd[0], { failed: false, grade: 'Clean', gait: 'sound' });
   saveRound(route, store);
   const back = loadRound(store);
-  assert.equal(back.visit, null);
-  assert.equal(back.history.length, route.history.length - 1);
+  assert.deepEqual(back, route);
+  assert.equal(back.visit.k, 1);
+  assert.deepEqual(visitHerd(back).map(tag), herd.map(tag));
+  // Finishing the resumed day banks the same reputation as finishing it unbroken.
+  for (const r of [route, back]) herd.slice(1).forEach((cd) => recordCow(r, cd, { failed: false, grade: 'Textbook', gait: 'sound' }));
+  assert.deepEqual(endVisit(back), endVisit(route));
+  assert.deepEqual(back, route);
+});
+
+test('a broken day in progress falls back to the last finished day, its cows dropped', () => {
+  const route = playedRound();
+  const finished = JSON.parse(JSON.stringify(route));
+  const herd = startVisit(route, FARMS[0].id);
+  recordCow(route, herd[0], { failed: false, grade: 'Clean', gait: 'sound' });
+  const good = JSON.parse(JSON.stringify(route));
+  const broken = [
+    { ...good.visit, farm: 'nowhere' }, { ...good.visit, farm: FARMS[1].id }, { ...good.visit, n: 2 },
+    { ...good.visit, k: 2 }, { ...good.visit, rows: [] }, { ...good.visit, rows: [{ tag: 'x' }] }, 'today',
+  ];
+  for (const visit of broken) {
+    const back = parseRound(JSON.stringify({ v: 1, ...good, visit }));
+    assert.deepEqual(back, finished, JSON.stringify(visit));
+  }
+  // Today's cows without the day itself (or a history that disagrees with it) are dropped too.
+  assert.deepEqual(parseRound(JSON.stringify({ v: 1, ...good, visit: null })), finished);
+  assert.deepEqual(parseRound(JSON.stringify({ v: 1, ...good, history: finished.history })), finished);
 });
 
 test('no save, a corrupted save, or blocked storage: a fresh round at farm 1, never a throw', () => {
