@@ -565,7 +565,8 @@ function handle(ev, x, y) {
     warnOnce('dirty', 'You’re cutting through muck. Clean the foot first: you can’t read what you can’t see.');
   }
   if (ev.tooDeep) warnOnce('nipDeep', 'Too much horn for one bite. Start at the tip and work back toward the hoof.', 'info');
-  if (ev.nipLive) warnOnce('nip', 'Nippers are for the overgrown toe. Too blunt for the living sole.');
+  if (ev.nipSole) warnOnce('nip', 'Nippers are for the overgrown toe. Too blunt for the living sole.');
+  else if (ev.nipLive) warnOnce('nipLine', 'That bite reached the trim line. Ease back a touch: the grinder does the rest.', 'info', 8);
   if (ev.grinderLesion) {
     s.grinderLesion = true;
     warnOnce('grindLesion', `Not the grinder near the ${caseDef.noun}! Use the knife there.`);

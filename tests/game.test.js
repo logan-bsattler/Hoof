@@ -787,3 +787,16 @@ test('steps 1 and 2 flag the nippers while that claw\'s toe is long, then the gr
   assert.equal(suggestedTool(i2, nipped, CASE_B), 'grinder');
   assert.equal(suggestedTool(-1, nipped, CASE_B), null);
 });
+
+test('nipping the sole is a mistake; a toe bite that grazes the trim line is not', () => {
+  // Work a toe column from the tip back until the jaws touch living horn: that bite is a graze.
+  const t = new Hoof(CASE_B);
+  let graze = null;
+  for (let y = 640; y >= 480 && !graze; y -= 6) { const e = applyBite(t, 250, y); if (e.nipLive) graze = e; }
+  assert.ok(graze, 'reached the trim line');
+  assert.equal(graze.nipSole, false);
+  // With the toe off, carry on up into the sole: that's the mistake.
+  for (let i = 0; i < t.n; i++) if (t.zone[i] & Z.DEAD) t.thick[i] = 0;
+  const ev = applyBite(t, 250, 400);
+  assert.ok(ev.nipLive && ev.nipSole, 'jaws on the living sole');
+});

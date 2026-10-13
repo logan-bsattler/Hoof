@@ -56,7 +56,7 @@ function newEvents() {
     removed: 0, mud: 0, dead: 0,
     loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0 },
     blood: false, bloodCells: 0, thin: false, lesionCut: false, grinderLesion: false,
-    dirtyCut: false, nipLive: false, tooDeep: false, blockedSkip: false, claws: new Set(),
+    dirtyCut: false, nipLive: false, nipSole: false, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
     // White-line abscess: drain fires once, when the pared track reaches the pocket of pus.
     // offTrack: the knife dug at the pocket's sole without following the track there.
@@ -281,6 +281,9 @@ export function applyBite(hoof, x, y) {
     for (const i of chunk[c]) if (!blocked(hoof, i, ev)) cut(hoof, i, hoof.thick[i], ev, 1);
   }
   if (ev.tooDeep && !bit) return ev;
+  // Jaws centred on living horn: that's nipping the sole, not grazing the trim line from the toe.
+  const at = hoof.cellAt(x, y);
+  const onSole = at >= 0 && hoof.claw[at] && !(hoof.zone[at] & Z.DEAD);
 
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (hoof.zone[i] & Z.DEAD) return;
@@ -290,6 +293,7 @@ export function applyBite(hoof, x, y) {
     if (inCleft(hoof, i, 1, ev)) return;
     if (hoof.looseInit[i] !== LOOSE.TRACT) clearLoose(hoof, i, ev);
     ev.nipLive = true;
+    if (onSole) ev.nipSole = true;
     cut(hoof, i, cfg.liveBite, ev, 1);
     hoof.rough[i] = 0.9;
   });
