@@ -568,6 +568,8 @@ Cases where the right answer is a call, not a cut. They depend on 8.1's end-of-c
 | D25 | Old block removal | **Taken (2026-10-13):** Tap the block with the knife, 2–3 taps |
 | D26 | Add a "lame, but nothing in the foot" cow (Shearer's non-foot lameness: refer to the vet)? | **Taken (2026-10-13):** Not now; later, after J3, since it can feel like a trick |
 
+**D26 status (2026-10-13): built.** Case J "Higher Up" (`nonfoot`, weight 0.1): no lesion, routine decoys, `call: 'vet'`, requires `trim: false` (15 a stroke off Restraint, at most 30, as for foot rot; released, she walks off lame with the call note). Ben's clues: the intro gives a swollen hock (knee on a front foot) or a dragged toe, and a farmer's hint (went down on concrete, or ridden by a bulling heifer), both picked from the ear tag. The testers read the dead toe as "worn square and scuffed", one read-card finding per claw (not in `findings`, so decoy art and scoring ignore it). The art paints a matte, dusty band at each toe tip. Steps are clean, diagnose and `decide` ("Trim her, or send her?"), so the panel doesn't name the call. Read options: nonfoot (right), sound, ulcer and bruise. Greystone's mix swaps white line for nonfoot, and a recheck has its own back line. sw v32, 130 tests. Not yet played in the game; the toe-tip art is subtle and needs Ben's eye.
+
 ## WP10: hoof art realism, follow-ups (small–medium; scoped 2026-10-13 at `cbc2c14`)
 
 Continues the realism pass (`348b521`, `e6baf32`, `cbc2c14`: wet manure, waxy sole, crusted wall, ulcer-ring fix, heel flake, stained horn). Work in `src/hoofart.js`; judge in the art lab (`dev/artlab.html?stage=N&zoom=1.3`, plus `&crop=x,y,w,h` for close-ups) against `reference/hoof-video-capture/frames`.

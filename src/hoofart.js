@@ -586,11 +586,12 @@ export class HoofArt {
           else if (e < wallW) { R *= 0.6; G *= 0.6; B *= 0.62; }
           else if (e < wallW + 1.5) { R += 26; G += 24; B += 22; }
           // Dragged along the ground, the tip wears square: dusty pale horn, scored lengthwise.
-          const scuff = smoothstep(tipY[c - 2] - 34, tipY[c - 2] - 6, ly);
+          const scuff = smoothstep(tipY[c - 2] - 20 + 8 * ns, tipY[c - 2] - 3, ly);
           if (scuff > 0) {
-            const score = 0.75 + 0.25 * Math.sin(lx * 2.3 + ngr * 4) * Math.sin(lx * 0.7 + ns * 6);
-            const k = scuff * (0.55 + 0.25 * ncv);
-            R += (172 * score - R) * k; G += (158 * score - G) * k; B += (134 * score - B) * k;
+            const score = 1 + 0.18 * (ncv - 0.5) + 0.12 * (ngr - 0.5) - (nFleck[p] > 236 ? 0.3 : 0);
+            const k = scuff * 0.85;
+            R += (196 * score - R) * k; G += (184 * score - G) * k; B += (160 * score - B) * k;
+            sheen *= 1 - 0.8 * scuff; // ground matte
           }
           // Where the jaws went through, the fresh cross-section shows paler horn.
           if (kept < 0.97) {
