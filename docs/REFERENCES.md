@@ -11,6 +11,12 @@ Use them to check facts, not as copy: paraphrase any wording that reaches game t
 | `ahdb-five-step-protocol` | *Five step protocol for hoof trimmers* (Level 3 training module, Theme 10) | ~2k words | Restraint and leg lifting, the functional trim of rear and front feet, the therapeutic trim |
 | `cramer-hoof-trimming` | Gerard Cramer (Univ. of Minnesota), *Hoof trimming: the steps to success* (conference paper) | ~3k words | Why trimming matters, the vet's role, trimming costs and cow-welfare effects. Useful for farm and route framing |
 
+## Video notes (tracked, paraphrased)
+
+| File | What it is | Best for |
+|---|---|---|
+| [`NOTES-NATE-AMA.md`](NOTES-NATE-AMA.md) | Paraphrased notes, with timestamps, from a 97-min live Q&A by Nate the Hoof Guy, a working Wisconsin trimmer | Where lesions sit and how to read them, block and wrap choices, cow behaviour, farm, route and economy flavour, and new condition ideas |
+
 ## Where to look, by plan item
 - **The five-step trim (steps.js, tutorial):** the field guide's "Trimming steps", the five-step protocol, and Shearer ch. 3.
 - **WP7.2 routine trim:** the field guide's pitfalls page, and the Shearer ch. 3 sections on over-trimming.
