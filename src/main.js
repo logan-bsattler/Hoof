@@ -73,7 +73,7 @@ const game = {
 document.getElementById('routeReset').addEventListener('click', () => restartRound());
 
 const ui = new UI({
-  onTool: (id) => selectTool(id),
+  onTool: (id) => pickTool(id),
   onRelease: () => requestRelease(),
   onCall: () => requestCall(),
   onRead: () => { if (game.state === 'play' && !game.session.diagnosis) diagnose(); },
@@ -135,6 +135,7 @@ function newCase() {
   game.walkoff = null;
   game.result = null;
   game.weepT = 0;
+  game.blockKind = 'rubber';
   // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
   renderer.tol = tolOf(caseDef);
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
@@ -215,6 +216,16 @@ function updateCoach() {
 function stopHoldSounds() {
   Sound.grinder(false);
   Sound.spray(false);
+}
+
+// The player picking a tool. Picking the block again swaps rubber for wood (WP8.4) and back.
+function pickTool(id) {
+  if (id === 'block' && game.tool === 'block' && game.state === 'play') {
+    game.blockKind = game.blockKind === 'wood' ? 'rubber' : 'wood';
+    ui.toast(game.blockKind === 'wood' ? 'Wood block: taller, for a claw that has to stay right off the floor.' : 'Rubber block: the usual one.', 'info', 2600);
+    return;
+  }
+  selectTool(id);
 }
 
 function selectTool(id) {
@@ -320,7 +331,7 @@ canvas.addEventListener('pointerleave', (e) => { if (!game.ptr.down && e.pointer
 window.addEventListener('keydown', (e) => {
   if (game.state !== 'play') return;
   const t = TOOL_ORDER.find((id) => TOOLS[id].key === e.key);
-  if (t) selectTool(t);
+  if (t) pickTool(t);
   else if (e.key === 'g' || e.key === 'G') document.getElementById('btnGuides').click();
   else if (e.key === 'm' || e.key === 'M') document.getElementById('btnSound').click();
 });
@@ -442,6 +453,7 @@ function placeBlock(claw) {
   s.blockAttempts.push(claw);
   if (!s.diagnosis) s.blockBeforeDx = true;
   hoof.block = claw;
+  hoof.blockKind = game.blockKind;
   renderer.placedNow('block');
   Sound.clunk();
   buzz(30);
@@ -452,8 +464,11 @@ function placeBlock(claw) {
     ui.toast('No block for this one: the trouble is in the skin of the cleft, not under a claw.', 'warn', 4000);
   } else if (claw === caseDef.lesion.claw) {
     ui.toast(`That’s the sore claw! The block goes on the SOUND claw so the ${caseDef.noun} can rest.`, 'warn', 4000);
+  } else if ((caseDef.requires.block === 'wood') !== (hoof.blockKind === 'wood')) {
+    ui.toast(hoof.blockKind === 'wood' ? 'Right claw, but the wood block is for a toe pared back to the bone. Rubber does here.'
+      : 'Right claw, but she needs the taller wood block. Tap the block tool again to swap, then glue it on.', 'warn', 4500);
   } else {
-    ui.toast(`Block glued to the sound ${CLAW_NAME[claw]} claw. The ${caseDef.noun} is off the ground now.`, 'good');
+    ui.toast(`${hoof.blockKind === 'wood' ? 'Wood block' : 'Block'} glued to the sound ${CLAW_NAME[claw]} claw. The ${caseDef.noun} is off the ground now.`, 'good');
     return;
   }
   slip();

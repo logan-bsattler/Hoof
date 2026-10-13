@@ -64,6 +64,12 @@ export const STEPS = [
     tip: 'Pare straight down on the mark with the knife, widening only as far as you must, until it drains. No crater. Then glue the block on the SOUND claw.',
     done: (m, s, hoof) => hoof.drained && hoof.block === soundClaw(hoof.caseDef),
   },
+  // Toe necrosis: pare the black toe back to healthy horn, then the wood block on the sound claw.
+  {
+    id: 'necro', label: '4 · Pare out the black toe, wood block on the sound claw', tool: 'knife',
+    tip: 'Pare the black, crumbling horn off the toe tip with the knife until it’s healthy horn all round. Then the block: tap the block tool again for the taller wood one, and glue it on the SOUND claw.',
+    done: (m, s, hoof) => m.looseRemain[LOOSE.NECRO] < 0.1 && hoof.block === soundClaw(hoof.caseDef) && hoof.blockKind === 'wood',
+  },
   {
     id: 'step5', label: '5 · Remove loose heel horn', tool: 'knife',
     tip: (cd) => `There’s a curl of loose horn at the ${CLAW_NAME[cd.looseHorn.claw]} heel. Flick it off with the knife and leave the heel itself alone.`,

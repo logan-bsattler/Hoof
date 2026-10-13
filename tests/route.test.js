@@ -137,7 +137,7 @@ test('reputation only goes up: a bad day earns little, a lame cow is flagged, no
   assert.equal(route.visit.n, 2);
 });
 
-test('pacing: a careful trimmer opens the whole road in a dozen days; a middling one still gets there', () => {
+test('pacing: a careful trimmer opens the whole road in a fortnight; a middling one still gets there', () => {
   const days = (grade) => {
     const route = newRoute();
     let n = 0;
@@ -152,7 +152,7 @@ test('pacing: a careful trimmer opens the whole road in a dozen days; a middling
     return n;
   };
   const best = days('Textbook'), ok = days('Sound');
-  assert.ok(best >= FARMS.length - 1 && best <= 12, `Textbook: ${best} days`);
+  assert.ok(best >= FARMS.length - 1 && best <= 14, `Textbook: ${best} days`);
   assert.ok(ok > best && ok < 60, `Sound: ${ok} days`);
   console.log(`route pacing: all farms open after ${best} days at Textbook, ${ok} at Sound`);
 });

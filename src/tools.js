@@ -54,7 +54,7 @@ export function toolRadius(id) {
 function newEvents() {
   return {
     removed: 0, mud: 0, dead: 0,
-    loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0 },
+    loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0, [LOOSE.NECRO]: 0 },
     blood: false, bloodCells: 0, thin: false, lesionCut: false, grinderLesion: false,
     dirtyCut: false, nipLive: false, nipSole: false, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
@@ -185,6 +185,14 @@ function pareTract(hoof, i, ev) {
   return true;
 }
 
+// Toe necrosis: the blade lifts the dead black horn away, down to healthy horn under it.
+function pareNecro(hoof, i, ev) {
+  if (!hoof.loose[i] || hoof.looseInit[i] !== LOOSE.NECRO) return false;
+  clearLoose(hoof, i, ev);
+  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - 1.5);
+  return true;
+}
+
 // Stroke tools: called with the distance travelled since the last stamp.
 export function applyStroke(hoof, tool, x, y, dist) {
   const ev = newEvents();
@@ -205,7 +213,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
       // The cap and the open core answer only to the flat of the blade; its feathered edge rides over them.
       if (closedCap(hoof, i)) { if (f >= KNIFE_FLAT) onCap++; return; }
       if ((hoof.zone[i] & Z.ULCER) && f < KNIFE_FLAT) return;
-      if (pareTract(hoof, i, ev)) return;
+      if (pareTract(hoof, i, ev) || pareNecro(hoof, i, ev)) return;
       if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
       // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
       const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist, cfg.resist, cfg.wall);
@@ -244,7 +252,8 @@ export function applyGrind(hoof, x, y, dt) {
     // The disc can't open the cap: it just skates over it. That's knife work.
     if (closedCap(hoof, i)) { ev.grinderLesion = true; return; }
     // The disc levels over the white-line track but can't follow it: that's knife work.
-    if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) {
+    // Nor can it tell dead black horn from live: it grinds the necrosis as horn, still black.
+    if (hoof.looseInit[i] !== LOOSE.TRACT && hoof.looseInit[i] !== LOOSE.NECRO && clearLoose(hoof, i, ev)) {
       hoof.rough[i] = 0.8;
       return;
     }
@@ -295,6 +304,8 @@ export function applyBite(hoof, x, y) {
     // Only the middle of the jaws bites living horn; the edges just graze it.
     if (f < 1 - cfg.liveCore ** 2) return;
     if (inCleft(hoof, i, 1, ev)) return;
+    // The jaws take the black toe tip off cleanly, like dead toe horn.
+    if (pareNecro(hoof, i, ev)) return;
     if (hoof.looseInit[i] !== LOOSE.TRACT) clearLoose(hoof, i, ev);
     ev.nipLive = true;
     if (onSole) ev.nipSole = true;

@@ -65,6 +65,12 @@ export const FARMS = [
     mix: { ulcer: 0.25, dd: 0.2, whiteline: 0.2, footrot: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25,
     decoys: [1, 3],
   },
+  {
+    id: 'ridgeway', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
+    intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
+    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, puncture: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2,
+    decoys: [1, 3],
+  },
 ];
 
 // ------------------------------------------------------------------ difficulty tiers (WP7.6)

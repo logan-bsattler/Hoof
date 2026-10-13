@@ -41,6 +41,11 @@ export const FINDING = {
     probeText: 'She pulls the foot away. The skin between the claws is split, grey and stinking, and the whole foot is hot and puffy.',
     diagnosedText: 'Foot rot. No blade near it: clean the split, spray it, and get the vet.',
   },
+  toenecrosis: {
+    look: 'black, crumbling horn at the toe tip', feel: 'very sore at the tip only',
+    probeText: 'She jerks the foot away. The toe tip is black and crumbling, and it stinks.',
+    diagnosedText: 'Toe necrosis. Pare the black horn back, block the sound claw with wood, and get the vet.',
+  },
   stain: {
     look: 'dark patch', feel: 'firm',
     probeText: 'Dark is just staining. Firm underneath.',
@@ -135,6 +140,12 @@ function placePuncture(rand, side, claw, v = {}) {
   L.b = [x + Math.cos(ang) * hl, y + Math.sin(ang) * hl];
   L.pocket = { x, y, r: band(rand, 8.5, 10, v.size) + (line ? 2 : 0) };
   return L;
+}
+
+// Toe necrosis at the axial tip of `claw`'s toe, in the toe triangle: a round patch of black horn.
+function placeNecro(rand, side, claw, v = {}) {
+  const s = clawSide(claw, side);
+  return { claw, x: GEOM.midX + s * band(rand, 26, 34), y: band(rand, 558, 568, v.at), r: band(rand, 14, 18, v.size) };
 }
 
 // Digital dermatitis on `claw`'s side of the heel cleft, between the bulbs: a round raw patch
@@ -375,6 +386,62 @@ export const CONDITIONS = {
         howto: '<li><b>Too neat to be a stain?</b> A perfect dot or straight line is something driven in. Pare a narrow funnel down to it.</li>',
         misreadNote: 'Misread the lesion. A perfectly round dot or ruled line mid-sole that she flinches on is a puncture.',
         plan: `Plan: functional trim (steps 1–3), rasp, then pare a narrow funnel straight down on the mark until it drains, block the sound ${sound} claw, flush and wrap the ${sore} claw.`,
+      };
+    },
+  },
+
+  // Case G "Black Toe" (WP8.4): toe necrosis. Dead horn at the toe tip, sometimes down to the
+  // bone. The trimmer pares it back and puts the tall wood block on the sound claw; the bone is the vet's.
+  toenecrosis: {
+    caseId: 'G',
+    title: 'Black Toe',
+    noun: 'toe',
+    weight: 0.1,
+    steps: [...TRIM, 'necro', 'step5', 'refer'],
+    requires: { open: true, block: 'wood', treat: false },
+    call: 'vet',
+    recheck: true,
+    diagnosis: 'toenecrosis',
+
+    place(rand, side, v = {}) {
+      const big = v.big ?? CLAW.OUTER;
+      const sore = rand() < 0.7 ? big : otherClaw(big);
+      const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
+      const lesion = placeNecro(rand, side, sore, v);
+      const looseHorn = placeHeelHorn(rand, at, otherClaw(sore));
+      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn], v);
+      return { lesion, looseHorn, decoys };
+    },
+
+    copy({ cow, limb, lesion }) {
+      const sore = CLAW_NAME[lesion.claw], sound = CLAW_NAME[soundClaw({ lesion })];
+      return {
+        intro:
+          `#${cow} has been lame on the ${limb} for weeks and nothing's shifted it. The farmer says she was trimmed hard last time. ` +
+          'Lift the foot and look right at the toe tips.',
+        diagnosisPrompt: 'She’s been lame a long time. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'toenecrosis', label: 'Toe necrosis',
+            feedback: `Right. Black, crumbling horn at the tip of the ${sore} toe: toe necrosis, and it can go down to the bone.`,
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer springs at the sole/heel junction. This is black, dead horn at the toe tip: toe necrosis.',
+          },
+          {
+            id: 'whiteline', label: 'White-line abscess',
+            feedback: 'A white-line abscess tracks in from the wall to a pocket of pus. This is dead horn at the very tip of the toe: toe necrosis.',
+          },
+          {
+            id: 'foreign', label: 'Foreign body',
+            feedback: 'A puncture is a neat hole or line mid-sole. This is a whole black, crumbling toe tip: toe necrosis.',
+          },
+        ],
+        howto: '<li><b>Wood block:</b> tap the block tool a second time to swap rubber for the taller wood block.</li>',
+        misreadNote: 'Misread the lesion. Black, crumbling horn at the toe tip that she can’t bear touched is toe necrosis.',
+        callNote: 'Toe necrosis can reach the bone: she needs the vet. Released, she’ll only get worse.',
+        plan: `Plan: functional trim (steps 1–3), rasp, pare the black toe back to healthy horn, wood block on the sound ${sound} claw, then send her to the vet.`,
       };
     },
   },

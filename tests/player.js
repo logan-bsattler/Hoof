@@ -35,7 +35,7 @@ export function makePlayer(hoof, opts = {}) {
           // The grinder and knife lift off once the horn under them is at target. Loose horn
           // still wants the knife; the grinder just levels over the white-line track.
           const i = hoof.cellAt(x, y);
-          const settled = i >= 0 && (!hoof.loose[i] || (tool === 'grinder' && hoof.looseInit[i] === LOOSE.TRACT));
+          const settled = i >= 0 && (!hoof.loose[i] || (tool === 'grinder' && (hoof.looseInit[i] === LOOSE.TRACT || hoof.looseInit[i] === LOOSE.NECRO)));
           const done = settled && (tool === 'grinder' || tool === 'knife') &&
             hoof.thick[i] <= hoof.zoneTarget(i) + 0.4;
           if (done || (tool === 'grinder' && discTouchesUlcer(x, y))) { px = x; py = y; continue; }
@@ -95,6 +95,15 @@ export function makePlayer(hoof, opts = {}) {
       for (let a = 0; a < 12; a++) {
         const t = (a / 12) * 2 * Math.PI, r = K.r * 0.6;
         p.drag('knife', [[K.x, K.y], [K.x + r * Math.cos(t), K.y + r * Math.sin(t)]], 60);
+      }
+      return p;
+    },
+    // Toe necrosis: tiny knife pulls on each still-black cell, so the healthy toe round it is spared.
+    necro() {
+      for (let i = 0; i < hoof.n; i++) {
+        if (hoof.looseInit[i] !== LOOSE.NECRO || !hoof.loose[i]) continue;
+        const x = hoof.cellX(i), y = hoof.cellY(i);
+        p.drag('knife', [[x - 1, y], [x + 1, y]], 40);
       }
       return p;
     },

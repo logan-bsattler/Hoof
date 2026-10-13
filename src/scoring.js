@@ -67,6 +67,7 @@ export function lesionOpened(m, hoof) {
   const L = hoof.caseDef.lesion;
   // Digital dermatitis is skin: there is nothing to open.
   if (!L || L.type === 'dd') return true;
+  if (L.type === 'toenecrosis') return m.looseRemain[LOOSE.NECRO] <= 0.1;
   return L.type === 'whiteline' || L.type === 'foreign' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
 
@@ -130,9 +131,17 @@ export function scoreCase(m, session, hoof, caseDef) {
   else if (L && !need.block && hoof.block) { correctness -= 20; notes.push('No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.'); }
   if (L && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
   if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${caseDef.noun ?? 'ulcer'} is still carrying weight.`); }
+  // Toe necrosis wants the taller wood block; everything else the rubber one.
+  const kind = need.block === 'wood' ? 'wood' : 'rubber';
+  if (need.block && hoof.block === sound && hoof.blockKind !== kind) {
+    correctness -= 15;
+    notes.push(kind === 'wood' ? 'Wrong block. With the toe pared back she needs the taller wood block to keep it off the floor.'
+      : 'Wrong block. A rubber block was all she needed: the wood one is for a toe pared back to the bone.');
+  }
   if (need.open && !lesionOpened(m, hoof)) {
     correctness -= 20;
     notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' :
+      L.type === 'toenecrosis' ? 'Black, dead horn left at the toe. Pare it back to healthy horn before she goes.' :
       L.type === 'foreign' ? 'The puncture was never pared down to the pus. It’s still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
   if (trim && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
@@ -198,7 +207,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 
   // Finish: clean, smooth, no loose horn.
-  const looseLeft = (m.looseRemain[LOOSE.ULCER] + m.looseRemain[LOOSE.HEEL]) / 2;
+  const looseLeft = Math.min(1, (m.looseRemain[LOOSE.ULCER] + m.looseRemain[LOOSE.HEEL] + m.looseRemain[LOOSE.NECRO]) / 2);
   const finish = !trim ? ramp(m.mudMean, 0.02, 0.4) : 0.3 * ramp(m.mudMean, 0.02, 0.4) + 0.4 * ramp(m.roughMean, 0.12, 0.6) + 0.3 * 100 * (1 - looseLeft);
   if (trim && m.roughMean > 0.2) notes.push('Surface is rough. A few rasp passes trues it up.');
   if (trim && m.looseRemain[LOOSE.HEEL] > 0.1) notes.push('Loose heel horn left on (step 5).');

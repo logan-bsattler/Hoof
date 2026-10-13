@@ -94,7 +94,7 @@ function playthrough(cd, quiet = false) {
       const R = (L?.r ?? 0) * 1.75 + flat + 1;
       for (const x of dishX(c)) {
         // DD sits up in the cleft, clear of the dish: nothing to steer round.
-        const sole = L && L.type !== 'dd';
+        const sole = L && L.type !== 'dd' && L.type !== 'toenecrosis';
         const dx = sole ? Math.abs(x - L.x) : Infinity;
         if (!sole || c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
         const h = Math.sqrt(R * R - dx * dx);
@@ -128,6 +128,14 @@ function playthrough(cd, quiet = false) {
     hoof.block = soundClaw(cd);
     s.blockAttempts.push(hoof.block);
     until('funnel', () => {});
+  } else if (L?.type === 'toenecrosis') {
+    // Step 4: pare the black toe back, then the wood block on the sound claw.
+    for (let k = 0; k < 4 && hoof.metrics().looseRemain[LOOSE.NECRO] >= 0.1; k++) p.necro();
+    assert.ok(hoof.metrics().looseRemain[LOOSE.NECRO] < 0.1, 'black toe pared out');
+    hoof.block = soundClaw(cd);
+    hoof.blockKind = 'wood';
+    s.blockAttempts.push(hoof.block);
+    until('necro', () => {});
   } else if (cd.requires.open) {
     // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
     // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.
@@ -149,6 +157,8 @@ function playthrough(cd, quiet = false) {
   until('step5', () => {
     for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
   });
+
+  if (cd.call) { s.call = cd.call; until('refer', () => {}); }
 
   if (cd.requires.treat) {
     // Treat: flush the opened ulcer (or spray the DD patch), then pad and wrap it.

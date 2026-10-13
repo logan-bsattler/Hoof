@@ -24,10 +24,11 @@ export const CLAW = { NONE: 0, OUTER: 1, INNER: 2 };
 export const CLAW_NAME = { 1: 'outer', 2: 'inner' };
 
 // Loose-horn groups. TRACT is the white-line abscess: under-run horn along the white line.
-export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2, TRACT: 3 };
+// NECRO is toe necrosis: black, crumbling horn at the toe tip, pared out to healthy horn.
+export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2, TRACT: 3, NECRO: 4 };
 
 // Which loose group carries each lesion kind.
-export const LESION_LOOSE = { ulcer: LOOSE.ULCER, whiteline: LOOSE.TRACT, foreign: LOOSE.TRACT };
+export const LESION_LOOSE = { ulcer: LOOSE.ULCER, whiteline: LOOSE.TRACT, foreign: LOOSE.TRACT, toenecrosis: LOOSE.NECRO };
 
 // The white-line tract, per cell: where it starts at the wall, the track, the abscess pocket.
 export const TRACT = { NONE: 0, ENTRY: 1, TRACK: 2, POCKET: 3 };
@@ -236,6 +237,7 @@ export class Hoof {
     this.mudCover = Math.min(1, mud);
     this.mudHard = Math.max(1, mud);
     this.block = CLAW.NONE;
+    this.blockKind = 'rubber';  // or 'wood': the taller block a toe necrosis claw needs
     this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
     this.wrapClaw = CLAW.NONE;
     this.rand = mulberry32(seed);
@@ -350,6 +352,10 @@ export class Hoof {
     else if (L?.type === 'footrot') {
       for (let i = 0; i < this.n; i++) if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.ROT;
     }
+    // Toe necrosis: a patch of dead, black horn at the tip of the toe, down to the bone.
+    else if (L?.type === 'toenecrosis') this.stampExact(L.x, L.y, L.r, (i) => {
+      if ((this.zone[i] & Z.LIVE) && this.claw[i] === L.claw) this.loose[i] = this.looseInit[i] = LOOSE.NECRO;
+    });
     else if (L) {
       // The dish goes round the cap, not through it: it stops where the flat of the knife would
       // start working the cap.
@@ -454,6 +460,7 @@ export class Hoof {
     if (L && this.looseInit[i] === LESION_LOOSE[L.type]) {
       const finding = this.caseDef.findings?.find((f) => f.kind === L.type) ?? null;
       if (this.drained) return { kind: 'firm', text: 'Drained. The pressure’s off: keep weight off this claw.' };
+      if (L.type === 'toenecrosis' && !this.loose[i]) return { kind: 'firm', text: 'Pared back to healthy horn. What’s under it is the bone: that’s the vet’s.' };
       return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
     }
     // Decoys sit in the surface horn: once it's trimmed away there is nothing left to read.
@@ -485,7 +492,7 @@ export class Hoof {
     const n = this.thick.length;
     const out = new Float32Array(n);
     const bears = (i) => (this.zone[i] & Z.LIVE) && !(this.zone[i] & (Z.DEAD | Z.DISH | Z.HEEL | Z.ULCER))
-      && this.looseInit[i] !== LOOSE.ULCER && this.looseInit[i] !== LOOSE.TRACT && this.thick[i] > 0.05;
+      && this.looseInit[i] !== LOOSE.ULCER && this.looseInit[i] !== LOOSE.TRACT && this.looseInit[i] !== LOOSE.NECRO && this.thick[i] > 0.05;
     const top = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
     for (let i = 0; i < n; i++) if (bears(i)) top[this.claw[i]] = Math.max(top[this.claw[i]], this.thick[i]);
     for (let i = 0; i < n; i++) {
@@ -506,7 +513,7 @@ export class Hoof {
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
-      looseN: { 1: 0, 2: 0, 3: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0 }, tintSum: 0, tractTint: 0, ddN: 0, ddTint: 0,
+      looseN: { 1: 0, 2: 0, 3: 0, 4: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0, 4: 0 }, tintSum: 0, tractTint: 0, ddN: 0, ddTint: 0,
       thinCells: 0, overWB: 0, wbN: 0, overDish: 0, dishN: 0,
       triCut: 0, triN: 0, heelRemoved: 0, heelN: 0, blood: 0,
     };
@@ -540,8 +547,8 @@ export class Hoof {
       // The cleft is skin: it is neither trimmed nor graded as horn.
       if (z & Z.CLEFT) continue;
 
-      // The ulcer core and the pared-out white-line groove are meant to sit low.
-      if ((z & Z.ULCER) || lg === LOOSE.TRACT) continue;
+      // The ulcer core, the pared-out white-line groove and the pared toe are meant to sit low.
+      if ((z & Z.ULCER) || lg === LOOSE.TRACT || lg === LOOSE.NECRO) continue;
       // Horn under the block can't be rasped, and no longer needs to be.
       if (!(z & Z.HEEL) && !(this.block && c === this.block)) {
         m.roughSum += this.rough[i];
@@ -585,6 +592,7 @@ export class Hoof {
       1: m.looseN[1] ? m.looseLeft[1] / m.looseN[1] : 0,
       2: m.looseN[2] ? m.looseLeft[2] / m.looseN[2] : 0,
       3: m.looseN[3] ? m.looseLeft[3] / m.looseN[3] : 0,
+      4: m.looseN[4] ? m.looseLeft[4] / m.looseN[4] : 0,
     };
     // How well the opened ulcer (or the DD patch, or the foot-rot split) has been flushed with the spray (0..1).
     m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER]

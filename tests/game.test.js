@@ -40,9 +40,11 @@ function idealTrim(hoof) {
     const funnel = hoof.caseDef.lesion?.type === 'foreign';
     if (hoof.looseInit[i] === LOOSE.TRACT) hoof.thick[i] = hoof.zoneTarget(i) - ((hoof.tract[i] === TRACT.POCKET) !== funnel ? 2.5 : 1.5);
     if (funnel && hoof.looseInit[i] === LOOSE.TRACT) hoof.tint[i] = 1;
+    if (hoof.looseInit[i] === LOOSE.NECRO) hoof.thick[i] = hoof.zoneTarget(i) - 1.5;
   }
   // DD needs no block; a case without a requires list (the hand-built ones) is an ulcer.
   if (hoof.caseDef.requires?.block ?? true) hoof.block = soundClaw(hoof.caseDef);
+  if (hoof.caseDef.requires?.block === 'wood') hoof.blockKind = 'wood';
   if (!hoof.caseDef.lesion) return; // a sound foot gets no block and no wrap
   hoof.drained = ['whiteline', 'foreign'].includes(hoof.caseDef.lesion.type);
   if (!hoof.caseDef.requires.treat) return; // a drained abscess stays open to the air
