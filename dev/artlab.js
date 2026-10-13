@@ -1,10 +1,11 @@
 // Dev-only art lab: replays scripted tool work on fresh hoofs and draws each stage large,
 // so texture and cut edges can be judged side by side. Not loaded by the game.
 
-import { Hoof, CLAW, Z } from '../src/hoof.js';
+import { Hoof, CLAW, Z, clawPolygon } from '../src/hoof.js';
 import { CASE_B, makeCase } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
 import { makePlayer } from '../tests/player.js';
+import { drawBlock, drawPad, drawWrap } from '../src/toolart.js';
 
 const CROP = { x: 24, y: 165, w: 352, h: 480 };
 // ?focus=lesion crops a close-up around the ulcer; ?focus=toe the nipped toe tips.
@@ -19,7 +20,10 @@ const ZOOM = Number(Q.get('zoom')) || 1.225;
 const ONLY = Q.has('stage') ? Number(Q.get('stage')) : -1;
 
 // ?cond=<condition id>[&seed=n] stages a dealt cow of that condition instead of Case B.
-const CD = Q.has('cond') ? makeCase(Q.get('cond'), Number(Q.get('seed')) || 1) : CASE_B;
+// &oldblock=1 (or =wood) glues last visit's block on the big claw (J2) and stages the pry.
+const OLD = Q.get('oldblock');
+const MODS = OLD ? { oldBlock: { claw: CLAW.OUTER, kind: OLD === 'wood' ? 'wood' : 'rubber' } } : {};
+const CD = Q.has('cond') ? makeCase(Q.get('cond'), Number(Q.get('seed')) || 1, MODS) : CASE_B;
 
 function session() {
   const hoof = new Hoof(CD);
@@ -43,8 +47,31 @@ const sprayLesion = (s) => {
   return s;
 };
 
+// Open a lesion the way the bot does: saw the ulcer's cap, then orbit; or follow the track.
+const open = (s, U) => {
+  if (U.type === 'whiteline') { for (let k = 0; k < 6 && !s.hoof.drained; k++) s.followTrack(U); return s; }
+  for (let k = 0; k < 40 && !s.hoof.capOpenAt[U.claw]; k++) s.drag('knife', [[U.x - U.r, U.y], [U.x + U.r, U.y], [U.x - U.r, U.y]], 160);
+  const ring = U.r + 6, orbit = [];
+  for (let a = 0; a <= 48; a++) orbit.push([U.x + ring * Math.cos((a / 48) * 2 * Math.PI), U.y + ring * Math.sin((a / 48) * 2 * Math.PI)]);
+  for (let k = 0; k < 6 && s.hoof.metrics().looseRemainAt[U.claw] >= 0.1; k++) s.drag('knife', orbit, 90);
+  return s;
+};
+const openAll = (s) => {
+  s.brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
+  for (const U of s.hoof.lesions()) open(s, U);
+  for (const U of s.hoof.lesions()) { const W = U.pocket ?? U; s.drag('spray', [[W.x - 10, W.y], [W.x + 10, W.y], [W.x - 10, W.y]], 20); }
+  return s;
+};
+// Pad/wrap stage per claw, drawn over the art as the game's render.dressing does.
+const dress = (s, stages) => Object.assign(s, { dressing: stages });
+
 const L = CD.lesion;
-const STAGES = Q.has('cond') ? [
+const STAGES = OLD ? [
+  ['Old block on', () => session()],
+  ['One tap', () => { const s = session(); s.hoof.oldBlock.taps = 1; return s; }],
+  ['Two taps', () => { const s = session(); s.hoof.oldBlock.taps = 2; return s; }],
+  ['Pried off, brushed', () => { const s = session(); s.hoof.oldBlock.on = false; s.hoof.block = CLAW.NONE; return s.brushAll(); }],
+] : Q.has('cond') ? [
   ['Dirty', () => session()],
   ['Brushed', () => session().brushAll()],
   ['Brushed, lesion sprayed', () => sprayLesion(session().brushAll())],
@@ -67,6 +94,12 @@ const STAGES = Q.has('cond') ? [
     }],
     ['Brushed, false sole pared', () => session().brushAll().pareSole()],
     ['Pared, then ground', () => session().brushAll().pareSole().nip().grind(CLAW.OUTER).grind(CLAW.INNER)],
+  ] : []),
+  ...(CD.lesions?.length > 1 ? [
+    ['Ground, both opened, flushed', () => openAll(session())],
+    ['First claw padded', () => dress(openAll(session()), { [CD.lesions[0].claw]: 1 })],
+    ['First wrapped, second padded', () => dress(openAll(session()), { [CD.lesions[0].claw]: 2, [CD.lesions[1].claw]: 1 })],
+    ['Both wrapped', () => dress(openAll(session()), { [CD.lesions[0].claw]: 2, [CD.lesions[1].claw]: 2 })],
   ] : []),
 ] : [
   ['Dirty (0:15)', () => session()],
@@ -104,6 +137,19 @@ STAGES.forEach(([name, make], k) => {
   c.fillStyle = '#4a3d2c';
   c.fillRect(CROP.x, CROP.y, CROP.w, CROP.h);
   s.art.draw(c);
+  const ob = s.hoof.oldBlock;
+  if (ob?.on) {
+    const pts = clawPolygon(ob.claw, false, s.hoof.side);
+    c.save();
+    if (ob.taps) { const [x, y] = pts[0]; c.translate(x, y); c.rotate(0.03 * ob.taps); c.translate(-x, -y); }
+    drawBlock(c, ob.claw, pts, 1, 1, ob.kind, 1 + ob.taps);
+    c.restore();
+  }
+  for (const U of s.dressing ? s.hoof.lesions() : []) {
+    const w = s.dressing[U.claw] ?? 0, pts = clawPolygon(U.claw, false, s.hoof.side);
+    if (w >= 1) drawPad(c, U, pts);
+    if (w >= 2) drawWrap(c, pts);
+  }
   const fig = document.createElement('figure');
   const m = s.hoof.metrics();
   const mm = (c) => `${m.claws[c].wbMean.toFixed(1)}/${m.claws[c].dishMean.toFixed(1)}`;

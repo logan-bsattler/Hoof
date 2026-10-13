@@ -321,8 +321,8 @@ export class Renderer {
     if (ob) {
       c.save();
       const pts = clawPolygon(hoof.block, false, hoof.side);
-      if (ob.taps) { const [x, y] = pts[0]; c.translate(x, y); c.rotate(0.012 * ob.taps); c.translate(-x, -y); }
-      drawBlock(c, hoof.block, pts, 1, 1, hoof.blockKind, true);
+      if (ob.taps) { const [x, y] = pts[0]; c.translate(x, y); c.rotate(0.03 * ob.taps); c.translate(-x, -y); }
+      drawBlock(c, hoof.block, pts, 1, 1, hoof.blockKind, 1 + ob.taps);
       c.restore();
     } else if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block, false, hoof.side), 1, press, hoof.blockKind);
     if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw, false, hoof.side), 0.4, 1, ghostKind);

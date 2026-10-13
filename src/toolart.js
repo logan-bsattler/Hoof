@@ -399,6 +399,19 @@ function bbox(pts) {
 
 // The block covers the weight-bearing sole: heel line to past the toe, a touch wider than the
 // claw so the claw outline trims its edge. `side` turns the tread bars the right way round.
+// Is (x, y) inside the polygon, or within `tol` of its edge?
+function nearPoly(pts, x, y, tol) {
+  let inside = false, d2 = Infinity;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    const dx = xj - xi, dy = yj - yi;
+    const t = Math.max(0, Math.min(1, ((x - xi) * dx + (y - yi) * dy) / (dx * dx + dy * dy || 1)));
+    d2 = Math.min(d2, (xi + t * dx - x) ** 2 + (yi + t * dy - y) ** 2);
+  }
+  return inside || d2 <= tol * tol;
+}
+
 function blockFrame(clawPts) {
   const b = bbox(clawPts);
   const cx = b.x + b.w / 2;
@@ -407,8 +420,9 @@ function blockFrame(clawPts) {
 
 // Black rubber block, tread out: a raised rim, circular lugs and diagonal bars,
 // with glue squeezing out at the edge. `press` 0..1 animates it being pressed on.
-// kind 'wood' draws the taller wood block instead (WP8.4). worn: weeks of walking on it (WP9 J2).
-export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber', worn = false) {
+// kind 'wood' draws the taller wood block instead (WP8.4). worn: weeks of walking on it (WP9 J2),
+// 1 + the knife taps so far, each tap opening the glue line wider.
+export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber', worn = 0) {
   const f = blockFrame(clawPts);
   const s = 1.06 - 0.06 * press;
   c.save();
@@ -417,15 +431,19 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber
   c.scale(s, s);
   c.translate(-f.cx, -f.cy);
 
-  // Glue beads peeking out at the edge.
+  // Glue beads peeking out at the edge, only where the edge meets the claw: the frame is wider
+  // than the claw's tapering toe, and a bead out on the floor reads as litter. An old block's
+  // glue has gone grey with muck, and most of it has worn away.
   const rand = mulberry32(claw * 17);
-  c.fillStyle = 'rgba(232,222,196,0.95)';
+  c.fillStyle = worn ? 'rgba(118,104,82,0.85)' : 'rgba(232,222,196,0.95)';
   for (let k = 0; k < 26; k++) {
     const a = rand() * TAU;
     const ca = Math.cos(a), sa = Math.sin(a);
     const px = f.cx + (f.rx + 1) * Math.sign(ca) * Math.abs(ca) ** (2 / 2.6);
     const py = f.cy + (f.ry + 1) * Math.sign(sa) * Math.abs(sa) ** (2 / 2.6);
-    c.beginPath(); c.ellipse(px, py, 1.5 + rand() * 3.5, 1.2 + rand() * 2, a, 0, TAU); c.fill();
+    const rx = 1.5 + rand() * 3.5, ry = 1.2 + rand() * 2;
+    if (!nearPoly(clawPts, px, py, 4) || (worn && k % 3)) continue;
+    c.beginPath(); c.ellipse(px, py, rx, ry, a, 0, TAU); c.fill();
   }
 
   c.save();
@@ -433,7 +451,7 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber
   c.clip();
   if (kind === 'wood') {
     woodFace(c, f, rand);
-    if (worn) wornFace(c, f, rand);
+    if (worn) wornFace(c, f, rand, worn - 1);
     c.restore();
     c.restore();
     return;
@@ -478,44 +496,60 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber
     c.fillStyle = `rgba(200,180,140,${0.1 + rand() * 0.2})`;
     c.fillRect(f.cx + (rand() - 0.5) * f.rx * 1.6, f.cy + (rand() - 0.5) * f.ry * 1.6, 1 + rand(), 1 + rand());
   }
-  if (worn) wornFace(c, f, rand);
+  if (worn) wornFace(c, f, rand, worn - 1);
   c.restore();
   c.restore();
 }
 
-// Weeks of walking on it: the toe end scuffed flat and pale, muck ground into the tread,
-// and a dark line where the glue has started to let go at the edge.
-function wornFace(c, f, rand) {
-  // Worn flat towards the toe (the bottom of the frame), where she lands.
-  c.fillStyle = lin(c, f.cx, f.cy + f.ry, f.cx, f.cy - f.ry * 0.2, [[0, 'rgba(150,140,125,0.55)'], [1, 'rgba(150,140,125,0)']]);
+// Weeks of walking on it: the toe end scuffed flat and pale, a film of dust over the rest,
+// muck ground into the tread, and a gap where the glue has let go at the edge. Each knife tap
+// (`taps`) runs the gap further round and opens it wider.
+function wornFace(c, f, rand, taps = 0) {
+  // Dust dulls the whole face.
   superellipse(c, f.cx, f.cy, f.rx, f.ry);
+  c.fillStyle = 'rgba(120,110,95,0.22)';
+  c.fill();
+  // Worn flat towards the toe (the bottom of the frame), where she lands.
+  c.fillStyle = lin(c, f.cx, f.cy + f.ry, f.cx, f.cy + f.ry * 0.1, [[0, 'rgba(168,158,140,0.8)'], [0.55, 'rgba(150,140,125,0.45)'], [1, 'rgba(150,140,125,0)']]);
   c.fill();
   // Muck packed into the tread.
-  for (let k = 0; k < 22; k++) {
+  for (let k = 0; k < 16; k++) {
     const x = f.cx + (rand() - 0.5) * f.rx * 1.7, y = f.cy + (rand() - 0.5) * f.ry * 1.7;
-    c.fillStyle = `rgba(${70 + rand() * 30 | 0},${52 + rand() * 20 | 0},${30 + rand() * 12 | 0},${0.35 + rand() * 0.4})`;
-    c.beginPath(); c.ellipse(x, y, 3 + rand() * 9, 2 + rand() * 5, rand() * TAU, 0, TAU); c.fill();
+    c.fillStyle = `rgba(${62 + rand() * 22 | 0},${52 + rand() * 14 | 0},${38 + rand() * 10 | 0},${0.6 + rand() * 0.3})`;
+    // A clump of smaller smears, not one clean oval.
+    for (let j = 0; j < 4; j++) {
+      c.beginPath();
+      c.ellipse(x + (rand() - 0.5) * 12, y + (rand() - 0.5) * 8, 1.5 + rand() * 5, 1 + rand() * 3, rand() * TAU, 0, TAU);
+      c.fill();
+    }
   }
   // Scratches from the yard floor, running heel to toe.
-  c.strokeStyle = 'rgba(220,210,190,0.18)';
-  c.lineWidth = 0.8;
-  for (let k = 0; k < 18; k++) {
+  c.strokeStyle = 'rgba(225,215,195,0.35)';
+  c.lineWidth = 0.9;
+  for (let k = 0; k < 24; k++) {
     const x = f.cx + (rand() - 0.5) * f.rx * 1.5, y = f.cy + (rand() - 0.5) * f.ry * 1.4;
     c.beginPath(); c.moveTo(x, y); c.lineTo(x + (rand() - 0.5) * 4, y + 8 + rand() * 16); c.stroke();
   }
-  // The glue letting go: a dark gap round part of the rim.
-  c.strokeStyle = 'rgba(10,8,6,0.7)';
-  c.lineWidth = 2.2;
-  const a0 = rand() * TAU;
-  c.beginPath();
-  for (let k = 0; k <= 24; k++) {
-    const a = a0 + (k / 24) * 1.6;
-    const ca = Math.cos(a), sa = Math.sin(a);
-    const px = f.cx + (f.rx - 1.5) * Math.sign(ca) * Math.abs(ca) ** (2 / 2.6);
-    const py = f.cy + (f.ry - 1.5) * Math.sign(sa) * Math.abs(sa) ** (2 / 2.6);
-    k ? c.lineTo(px, py) : c.moveTo(px, py);
-  }
-  c.stroke();
+  // The glue letting go: a dark gap round part of the rim, its pale lifted edge catching the light.
+  const a0 = rand() * TAU, span = 1.6 + 0.9 * taps;
+  const rim = (inset) => {
+    c.beginPath();
+    for (let k = 0; k <= 32; k++) {
+      const a = a0 + (k / 32) * span;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const px = f.cx + (f.rx - inset) * Math.sign(ca) * Math.abs(ca) ** (2 / 2.6);
+      const py = f.cy + (f.ry - inset) * Math.sign(sa) * Math.abs(sa) ** (2 / 2.6);
+      k ? c.lineTo(px, py) : c.moveTo(px, py);
+    }
+    c.stroke();
+  };
+  const gap = 2.4 + 1.6 * taps;
+  c.strokeStyle = 'rgba(8,6,4,0.85)';
+  c.lineWidth = gap;
+  rim(gap / 2);
+  c.strokeStyle = 'rgba(200,190,170,0.55)';
+  c.lineWidth = 1;
+  rim(gap + 0.5);
 }
 
 // The wood block's face: squarer than the rubber one, tan with grain running heel to toe,
@@ -576,6 +610,8 @@ function lug(c, x, y, r) {
 
 // White treatment pad pressed over the lesion, with the antiseptic blooming through.
 export function drawPad(c, lesion, clawPts, alpha = 1) {
+  // A white-line track is dressed over the pocket it drained from, not where it starts.
+  lesion = lesion.pocket ?? lesion;
   c.save();
   c.globalAlpha = alpha;
   polyPath(c, clawPts);
