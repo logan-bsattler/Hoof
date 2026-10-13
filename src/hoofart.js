@@ -867,28 +867,41 @@ export class HoofArt {
             const shade = by * (1 - on) * (0.25 + 0.5 * lift);
             R *= 1 - shade; G *= 1 - shade; B *= 1 - shade * 0.9;
             if (on > 0) {
-              // Old, dried sole: pale grey-yellow, dull, in flaky layers along the contours.
-              const layer = 0.5 + 0.5 * Math.sin(ncv * 9 + (ly - DS.y) * 0.35);
-              let cr = 200 - 22 * layer - 12 * ngr, cg = 188 - 20 * layer - 12 * ngr, cb = 152 - 16 * layer - 8 * ngr;
-              const crack = smoothstep(0.035, 0, Math.abs(ncv - 0.5)) * 0.55;
+              // Old, dried sole: the sole's own tone and stains, dulled and greyed toward chalk.
+              const lum = (R + G + B) / 3;
+              let cr = R + (lum * 1.06 + 36 - R) * 0.45, cg = G + (lum * 1.02 + 32 - G) * 0.45, cb = B + (lum * 0.9 + 20 - B) * 0.45;
+              // Flaky layers: terraces of the cavity noise, lit from the upper left, so each
+              // flake has a pale edge facing the lamp and a dark one away from it.
+              const off = Math.max(1, Math.round(1.4 * S)) * (w + 1);
+              const nUL = nCav[Math.max(0, p - off)] / 255, nDR = nCav[Math.min(nCav.length - 1, p + off)] / 255;
+              const q = (v) => Math.floor(v * 7 + (ngr - 0.5) * 0.6);
+              const emb = Math.max(-1, Math.min(1, (q(ncv) - q(nUL)) - (q(ncv) - q(nDR)) * 0.5));
+              const fl = emb > 0 ? 30 * emb : 20 * emb;
+              cr += fl; cg += fl * 0.95; cb += fl * 0.8;
+              // A few flakes already curling up: a brighter, drier scale with a fine dark crack.
+              const curl = smoothstep(0.72, 0.8, ngr) * smoothstep(0.55, 0.7, ncv) * 0.5;
+              cr += (lum + 46 - cr) * curl; cg += (lum + 40 - cg) * curl; cb += (lum + 22 - cb) * curl;
+              const crack = smoothstep(0.03, 0, Math.abs(ncv - 0.5)) * 0.45;
               cr *= 1 - crack; cg *= 1 - crack; cb *= 1 - crack * 0.9;
-              // The rim of the layer, where it has lifted: a pale lip catching the lamp, over a dark gap.
-              const rimB = smoothstep(ft + 0.3, ft + 0.08, df) * inside;
-              const lip = rimB * lift;
-              cr += (236 - cr) * lip * 0.7; cg += (226 - cg) * lip * 0.7; cb += (198 - cb) * lip * 0.7;
-              const gap = rimB * (1 - rimB) * 4 * lift * 0.5;
+              // The rim of the layer, where it has lifted: a thin pale lip catching the lamp,
+              // a dark gap just inside it.
+              const rimB = smoothstep(ft + 0.3, ft + 0.06, df) * inside;
+              const lip = smoothstep(0.55, 0.95, rimB) * lift;
+              cr += (lum + 70 - cr) * lip * 0.75; cg += (lum + 62 - cg) * lip * 0.75; cb += (lum + 40 - cb) * lip * 0.75;
+              const gap = smoothstep(0.15, 0.5, rimB) * smoothstep(0.85, 0.55, rimB) * lift * 0.45;
               cr *= 1 - gap; cg *= 1 - gap; cb *= 1 - gap;
-              R += (cr - R) * on * 0.9; G += (cg - G) * on * 0.9; B += (cb - B) * on * 0.9;
+              // Where it still lies flat, the layer's edge melts into the sole.
+              const lay = on * (0.55 + 0.4 * Math.max(lift, smoothstep(0.1, 0.6, 1 - rimB)));
+              R += (cr - R) * lay; G += (cg - G) * lay; B += (cb - B) * lay;
               crust = Math.max(crust, on * 0.5);
               sheen = Math.min(sheen, 1 - 0.5 * on);
               gy -= 0.6 * lip * on;
             }
             const open = inside * (1 - smoothstep(0.35, 0.65, Math.min(1, fieldAt(looseF, lx + wx, ly + wy) / Math.max(0.05, df))));
             if (open > 0) {
-              // The new sole: paler and finer-grained, a touch yellow, with a little waxy sheen.
-              const cr = 236 - 6 * ngr, cg = 222 - 6 * ngr, cb = 184 - 6 * ngr;
-              R += (cr - R) * open * 0.65; G += (cg - G) * open * 0.65; B += (cb - B) * open * 0.65;
-              sheen = Math.max(sheen, 1 + 0.25 * open);
+              // The new sole: a shade paler and cleaner than the old, finer-grained, a little waxy.
+              R += (R + 14 - 4 * ngr - R) * open * 0.6; G += (G + 12 - 4 * ngr - G) * open * 0.6; B += (B + 8 - 4 * ngr - B) * open * 0.6;
+              sheen = Math.max(sheen, 1 + 0.2 * open);
             }
           }
 
