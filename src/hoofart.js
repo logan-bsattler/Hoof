@@ -41,6 +41,10 @@ const SOLE_RAMP = [
   [16, [208, 180, 122]],
 ];
 const RAMP_N = 256, RAMP_MAX = 16;
+// Shade curves for the warm shadows (sh^0.8 red, sh^1.2 blue), tabulated over the shade's range.
+const SH_LO = 0.2, SH_N = 1024, SH_K = SH_N / (1 - SH_LO);
+const SH_R = new Float32Array(SH_N + 2), SH_B = new Float32Array(SH_N + 2);
+for (let j = 0; j < SH_N + 2; j++) { const v = SH_LO + j / SH_K; SH_R[j] = v ** 0.8; SH_B[j] = v ** 1.2; }
 const RAMP = (() => {
   const lut = new Uint8ClampedArray(RAMP_N * 3);
   for (let k = 0; k < RAMP_N; k++) {
@@ -191,6 +195,13 @@ export class HoofArt {
     const nLump = new Uint8Array(n);
     for (let p = 0; p < n; p++) nLump[p] = clamp255(lump[p] * 255);
     Object.assign(this, { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec });
+    // Growth lines follow the outline: static per pixel, so worked out once here.
+    const growth = new Float32Array(n);
+    for (let p = 0; p < n; p++) {
+      if (!cls[p]) continue;
+      growth[p] = 1 - 0.025 * Math.sin(edge[p] * 1.3 + (nStain[p] / 255) * 10) + (nGrain[p] / 255 - 0.5) * 0.025;
+    }
+    this.growth = growth;
 
     // Straw and fibre strands embedded in the manure.
     this.straw = paintStraw(this, mulberry32(4411));
@@ -455,8 +466,8 @@ export class HoofArt {
   compose(x0, y0, x1, y1) {
     const hoof = this.hoof;
     const { S, w, X0, Y0, cls, edge, sx0, sy0, cellCls, fallback } = this;
-    const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec, straw, hash, markT, markA, arcX, arcY } = this;
-    const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell;
+    const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec, straw, hash, markT, markA, arcX, arcY, growth, mudX, mudY } = this;
+    const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell, gx0 = g.x0;
     const d = this.img.data;
     const { thick, init, mud, rough, tint } = hoof;
     const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF;
@@ -489,8 +500,6 @@ export class HoofArt {
     const tipY = this.tipY;
     const decoys = (hoof.caseDef.findings ?? []).filter((f) => !hoof.isLesionFinding(f));
 
-    let i0 = 0, i1 = 0, i2 = 0, i3 = 0, w0 = 0, w1 = 0, w2 = 0, w3 = 0;
-    const sm = (a) => a[i0] * w0 + a[i1] * w1 + a[i2] * w2 + a[i3] * w3;
     // Plain bilinear sample of looseF at a logical point (for the cavity's inner shadow).
     const fieldAt = (a, lx, ly) => {
       const fx = (lx - g.x0) / cell - 0.5, fy = (ly - g.y0) / cell - 0.5;
@@ -566,12 +575,13 @@ export class HoofArt {
         const c = cls[p];
         if (!c) { d[o + 3] = 0; continue; }
         const lx = X0 + (px + 0.5) / S;
-        const fx = (lx - g.x0) / cell - 0.5;
+        const fx = (lx - gx0) / cell - 0.5;
         const ix = Math.floor(fx), tx = fx - ix;
 
         // Bilinear weights over neighbouring cells of the same class.
         const b = iy * cols + ix;
-        i0 = b; i1 = b + 1; i2 = b + cols; i3 = b + cols + 1;
+        // Per-pixel locals (not closure-captured), so each field read below stays cheap.
+        let i0 = b, i1 = b + 1, i2 = b + cols, i3 = b + cols + 1, w0, w1, w2, w3;
         const okx0 = ix >= 0, okx1 = ix + 1 < cols, oky0 = iy >= 0, oky1 = iy + 1 < rows;
         w0 = okx0 && oky0 && cellCls[i0] === c ? (1 - tx) * (1 - ty) : 0;
         w1 = okx1 && oky0 && cellCls[i1] === c ? tx * (1 - ty) : 0;
@@ -591,7 +601,7 @@ export class HoofArt {
           i0 = i1 = i2 = i3 = f; w0 = 1; w1 = w2 = w3 = 0;
         }
 
-        const t = sm(thick), m = sm(mud);
+        const t = (thick[i0] * w0 + thick[i1] * w1 + thick[i2] * w2 + thick[i3] * w3), m = (mud[i0] * w0 + mud[i1] * w1 + mud[i2] * w2 + mud[i3] * w3);
         const e = edge[p];
         const ns = nStain[p] / 255, ncv = nCav[p] / 255, ngr = nGrain[p] / 255;
         // The wall band wanders in width, and its inner edge is ragged where the crust broke off.
@@ -605,7 +615,7 @@ export class HoofArt {
           // Overgrown dead toe horn: stained, layered, and gone once nipped. The edge sits
           // midway between a kept and a nipped cell and is torn with noise, so leftover
           // stubs break off raggedly instead of showing the cell grid.
-          const kept = t / Math.max(0.5, sm(init));
+          const kept = t / Math.max(0.5, (init[i0] * w0 + init[i1] * w1 + init[i2] * w2 + init[i3] * w3));
           const tear = 0.5 + (ncv - 0.5) * 0.7 + (ngr - 0.5) * 0.18;
           if (kept < tear) { d[o + 3] = 0; continue; }
           // Kept dark and cool (slate-brown) so it reads against the warm straw floor.
@@ -632,7 +642,7 @@ export class HoofArt {
             R += (150 + 20 * ngr - R) * face; G += (136 + 18 * ngr - G) * face; B += (108 + 14 * ngr - B) * face;
           }
         } else {
-          const ti = sm(init), r = sm(rough);
+          const ti = (init[i0] * w0 + init[i1] * w1 + init[i2] * w2 + init[i3] * w3), r = (rough[i0] * w0 + rough[i1] * w1 + rough[i2] * w2 + rough[i3] * w3);
           const removed = ti - t;
           {
             const cv = colV[c], cvy = colVy[c], k4 = px * 4;
@@ -662,7 +672,7 @@ export class HoofArt {
           const amber = smoothstep(wallW + 14, wallW + 2, e) * 0.35;
           R += (232 - R) * amber; G += (192 - G) * amber; B += (130 - B) * amber;
           // Growth lines follow the outline; a faint grain, and the odd fleck of grit.
-          const gl = 1 - 0.025 * Math.sin(e * 1.3 + ns * 10) + (ngr - 0.5) * 0.025;
+          const gl = growth[p];
           R *= gl; G *= gl; B *= gl;
           if (nFleck[p] > 246 && ngr > 0.5) { const k = 0.62 + 0.2 * ncv; R *= k; G *= k * 0.95; B *= k * 0.9; }
 
@@ -705,7 +715,8 @@ export class HoofArt {
 
           // Decoys: a reddish bruise in the horn, or a dark stain like the ulcer's, without the
           // hole. Both are surface marks that trimming takes off (DECOY_DEPTH).
-          for (const f of decoysHere) {
+          for (let k = 0; k < decoysHere.length; k++) {
+            const f = decoysHere[k];
             if (f.claw !== c) continue;
             const dd = Math.sqrt((lx - f.x) * (lx - f.x) + (ly - f.y) * (ly - f.y));
             if (dd > f.r * 2) continue;
@@ -721,7 +732,7 @@ export class HoofArt {
           // Lesion cap: a small dark hole in the horn over the ulcer.
           let lf = 0;
           if (dL < Lr * 2.4) {
-            lf = sm(looseF);
+            lf = (looseF[i0] * w0 + looseF[i1] * w1 + looseF[i2] * w2 + looseF[i3] * w3);
             const holeR = 2.1 + ncv * 1.1;
             if (dL < holeR * 2.4) {
               // The bruised ring round the hole goes with the cap once the pocket is opened.
@@ -820,7 +831,7 @@ export class HoofArt {
               const fw = smoothstep(0.35, 0.8, looseAt(lx + 1.3, ly + 1.8)) * (1 - sh);
               cr += (236 - 10 * ngr - cr) * fw * 0.8; cg += (206 - 10 * ngr - cg) * fw * 0.8; cb += (186 - 8 * ngr - cb) * fw * 0.8;
               // Antiseptic pools in the crevices and stains the rest only faintly.
-              const tn = sm(tint) * (0.18 + 0.7 * smoothstep(0.5, 0.25, ncv));
+              const tn = (tint[i0] * w0 + tint[i1] * w1 + tint[i2] * w2 + tint[i3] * w3) * (0.18 + 0.7 * smoothstep(0.5, 0.25, ncv));
               cr += (96 - cr) * tn * 0.75; cg += (196 - cg) * tn * 0.75; cb += (164 - cb) * tn * 0.75;
               R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
               wetness = Math.max(wetness, open);
@@ -836,7 +847,7 @@ export class HoofArt {
             const dM = PU.shape === 'line' ? distToPath(lx, ly, [PU.a, PU.b]).d - PU.w * 0.6 : Math.hypot(lx - PU.x, ly - PU.y) - PU.r;
             // How closed the puncture's own horn is here: the loose field blends with sound horn
             // at its rim, so read it against the tract's footprint.
-            const lf = Math.min(1, sm(looseF) / Math.max(0.05, sm(tractF)));
+            const lf = Math.min(1, (looseF[i0] * w0 + looseF[i1] * w1 + looseF[i2] * w2 + looseF[i3] * w3) / Math.max(0.05, (tractF[i0] * w0 + tractF[i1] * w1 + tractF[i2] * w2 + tractF[i3] * w3)));
             const mark = smoothstep(0.5, -0.5, dM) * lf;
             const pool = smoothstep(K.r * 1.2, K.r * 0.4, dP) * 0.1 * lf;
             R *= 1 - pool; G *= 1 - pool; B *= 1 - pool * 0.8;
@@ -966,7 +977,7 @@ export class HoofArt {
           // that follows it in from the wall, and the drained pocket at its end.
           if (T && c === T.claw && lx > tb[0] && lx < tb[2] && ly > tb[1] && ly < tb[3]) {
             const dT = distToPath(lx, ly, T.path).d, K = T.pocket, dP = Math.hypot(lx - K.x, ly - K.y);
-            const lf = sm(looseF);
+            const lf = (looseF[i0] * w0 + looseF[i1] * w1 + looseF[i2] * w2 + looseF[i3] * w3);
             // Sealed: a ragged dark line, thinner than the track, and a faint grey shadow over
             // the pocket where the pus pools under the sole.
             const sw = T.w * (0.45 + 0.35 * ncv);
@@ -1010,7 +1021,7 @@ export class HoofArt {
               let cr = 116 - 22 * ncv + 10 * ngr, cg = 106 - 18 * ncv + 8 * ngr, cb = 96 - 12 * ncv + 6 * ngr;
               const crack = smoothstep(5 + 3 * ncv, 1, e) * split;
               cr += (52 - cr) * crack; cg += (42 - cg) * crack; cb += (38 - cb) * crack;
-              const tn = sm(tint) * 0.7;
+              const tn = (tint[i0] * w0 + tint[i1] * w1 + tint[i2] * w2 + tint[i3] * w3) * 0.7;
               cr += (62 - cr) * tn; cg += (158 - cg) * tn; cb += (146 - cb) * tn;
               R += (cr - R) * split; G += (cg - G) * split; B += (cb - B) * split;
               const mk = margin * 0.8 * (1 - 0.6 * tn);
@@ -1027,7 +1038,7 @@ export class HoofArt {
                 let cr = 196 - 30 * ncv, cg = 44 + 16 * ncv, cb = 50 + 12 * ncv;
                 const dot = smoothstep(0.72, 0.86, ngr) * 0.7;
                 cr += (238 - cr) * dot; cg += (162 - cg) * dot; cb += (150 - cb) * dot;
-                const tn = sm(tint) * 0.7;
+                const tn = (tint[i0] * w0 + tint[i1] * w1 + tint[i2] * w2 + tint[i3] * w3) * 0.7;
                 cr += (62 - cr) * tn; cg += (158 - cg) * tn; cb += (146 - cb) * tn;
                 R += (cr - R) * raw; G += (cg - G) * raw; B += (cb - B) * raw;
                 R += (232 - R) * rim * 0.8; G += (226 - G) * rim * 0.8; B += (212 - B) * rim * 0.8;
@@ -1042,13 +1053,13 @@ export class HoofArt {
             let near = 0;
             for (const [dx, wt] of NEAR_TAPS) near += (fieldAt(cleftF, lx - dx, ly) + fieldAt(cleftF, lx + dx, ly)) * wt;
             near = Math.min(1, near);
-            const k = heel * (0.18 + 0.4 * near) * (1 - 0.5 * sm(tint)) * (0.85 + 0.3 * ncv) * (1 - cf);
+            const k = heel * (0.18 + 0.4 * near) * (1 - 0.5 * (tint[i0] * w0 + tint[i1] * w1 + tint[i2] * w2 + tint[i3] * w3)) * (0.85 + 0.3 * ncv) * (1 - cf);
             R += (200 - R) * k; G += (104 - G) * k; B += (92 - B) * k;
             sheen = Math.max(sheen, 1 + 0.4 * near * heel);
           }
 
           // Light spray tint on the horn.
-          const tn = sm(tint);
+          const tn = (tint[i0] * w0 + tint[i1] * w1 + tint[i2] * w2 + tint[i3] * w3);
           if (tn > 0.01 && dL > Lr * 1.6) {
             const k = tn * 0.16;
             R += (140 - R) * k; G += (206 - G) * k; B += (184 - B) * k;
@@ -1081,7 +1092,7 @@ export class HoofArt {
           }
 
           // Blood.
-          const bl = sm(bloodF);
+          const bl = (bloodF[i0] * w0 + bloodF[i1] * w1 + bloodF[i2] * w2 + bloodF[i3] * w3);
           if (bl > 0.2) {
             const k = smoothstep(0.2, 0.6, bl);
             R += (166 - R) * k; G += (12 - G) * k; B += (24 - B) * k;
@@ -1097,7 +1108,7 @@ export class HoofArt {
         let mudSp = 0;
         if (cov > 0) {
           const rel = cov * (0.35 + 0.65 * smoothstep(thr, thr + 0.3, m));
-          gx += this.mudX[p] * rel; gy += this.mudY[p] * rel;
+          gx += mudX[p] * rel; gy += mudY[p] * rel;
           // Thin smears are a translucent orange-brown; thick, wet clumps go near black.
           const lu = nLump[p] / 255;
           const deep = smoothstep(thr - 0.05, thr + 0.25, m + (lu - 0.5) * 0.4);
@@ -1117,7 +1128,10 @@ export class HoofArt {
         const diff = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
         const sh = Math.max(0.24, Math.min(1.14, 0.2 + (0.8 * diff) / LIGHT[2])) * (c >= 3 ? 0.88 : 1);
         // Horn is translucent, so its shadows warm instead of going grey.
-        R *= sh < 1 ? Math.pow(sh, 0.8) : sh; G *= sh; B *= sh < 1 ? Math.pow(sh, 1.2) : sh;
+        if (sh < 1) {
+          const u = (sh - SH_LO) * SH_K, j = u | 0, tu = u - j;
+          R *= SH_R[j] + (SH_R[j + 1] - SH_R[j]) * tu; G *= sh; B *= SH_B[j] + (SH_B[j + 1] - SH_B[j]) * tu;
+        } else { R *= sh; G *= sh; B *= sh; }
         const nh = Math.max(0, nx * HALF[0] + ny * HALF[1] + nz * HALF[2]);
         const nh4 = nh * nh * nh * nh, nh16 = nh4 * nh4 * nh4 * nh4;
         const clean = (1 - cov) * (c >= 3 ? 0.4 : 1);
