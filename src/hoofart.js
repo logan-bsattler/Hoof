@@ -480,6 +480,13 @@ export class HoofArt {
         Math.max(...xs, K.x + K.r * 1.8) + m, Math.max(...ys, K.y + K.r * 1.8) + m];
     }
     const heelY = GEOM.heelY;
+    // A toe-dragger (D26): each claw's lowest dead-toe row, where the tip scuffs on the ground.
+    if (this.tipFor !== hoof) {
+      this.tipFor = hoof;
+      this.tipY = { [CLAW.OUTER]: -1e9, [CLAW.INNER]: -1e9 };
+      if (hoof.caseDef.toeDrag) for (let i = 0; i < hoof.n; i++) if (hoof.zone[i] & Z.DEAD) this.tipY[hoof.claw[i]] = Math.max(this.tipY[hoof.claw[i]], hoof.cellY(i));
+    }
+    const tipY = this.tipY;
     const decoys = (hoof.caseDef.findings ?? []).filter((f) => !hoof.isLesionFinding(f));
 
     let i0 = 0, i1 = 0, i2 = 0, i3 = 0, w0 = 0, w1 = 0, w2 = 0, w3 = 0;
@@ -578,6 +585,13 @@ export class HoofArt {
           if (e < 1.6) { R *= 0.35; G *= 0.35; B *= 0.38; }
           else if (e < wallW) { R *= 0.6; G *= 0.6; B *= 0.62; }
           else if (e < wallW + 1.5) { R += 26; G += 24; B += 22; }
+          // Dragged along the ground, the tip wears square: dusty pale horn, scored lengthwise.
+          const scuff = smoothstep(tipY[c - 2] - 34, tipY[c - 2] - 6, ly);
+          if (scuff > 0) {
+            const score = 0.75 + 0.25 * Math.sin(lx * 2.3 + ngr * 4) * Math.sin(lx * 0.7 + ns * 6);
+            const k = scuff * (0.55 + 0.25 * ncv);
+            R += (172 * score - R) * k; G += (158 * score - G) * k; B += (134 * score - B) * k;
+          }
           // Where the jaws went through, the fresh cross-section shows paler horn.
           if (kept < 0.97) {
             const face = smoothstep(tear + 0.16, tear + 0.03, kept);

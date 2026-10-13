@@ -691,4 +691,61 @@ export const CONDITIONS = {
       };
     },
   },
+
+  // Case J "Higher Up" (D26): lame, but nothing in the foot (Shearer: non-foot lameness). The
+  // foot is clean and firm everywhere; the trouble is a hock, knee or stifle, and it's the vet's.
+  // The tells: the farmer's word, a swollen joint or a dragged toe in the intro, toe tips worn
+  // square from dragging (art and testers), and every mark firm. Her last step asks whether to
+  // trim or send her, so the panel doesn't give the call away.
+  nonfoot: {
+    caseId: 'J',
+    title: 'Higher Up',
+    noun: 'leg',
+    weight: 0.1,
+    steps: ['clean', 'diagnose', 'decide'],
+    requires: { open: false, block: false, treat: false, trim: false },
+    call: 'vet',
+    diagnosis: 'nonfoot',
+    toeDrag: true,
+
+    place(rand, side, v = {}) { return CONDITIONS.routine.place(rand, side, v); },
+
+    copy({ cow, limb }) {
+      const front = limb.endsWith('front');
+      const joint = front ? 'knee' : 'hock';
+      const cue = cow % 2 ? `Her ${joint} is up like a grapefruit, hot and puffy.`
+        : 'She’s swinging the leg stiff and dragging the toe through the muck.';
+      const hint = (cow >> 1) % 2 ? 'The farmer saw her go down on the scraped concrete by the parlour on Tuesday.'
+        : 'The farmer says she was ridden hard by a bulling heifer at the weekend.';
+      return {
+        intro:
+          `#${cow} is lame on the ${limb}. ${cue} ${hint} ` +
+          'Lift the foot and see if it’s in there.',
+        diagnosisPrompt: 'She’s lame on this leg. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'nonfoot', label: 'Nothing in the foot: it’s higher up',
+            feedback: `Right. The foot is clean and firm everywhere, and the toe’s worn square from dragging. The trouble is up the leg: the ${joint} or above. That’s the vet’s.`,
+          },
+          {
+            id: 'sound', label: 'Nothing: she’s sound',
+            feedback: `The foot is sound, but she isn’t: she’s lame on it. Nothing in the foot means it’s higher up, at the ${joint} or above. That’s the vet’s.`,
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer springs under the testers. Everything here stayed firm: the lameness is higher up the leg.',
+          },
+          {
+            id: 'bruise', label: 'Sole bruise',
+            feedback: 'Old marks that stay firm aren’t what’s laming her. The foot is clean: the trouble is higher up the leg.',
+          },
+        ],
+        howto: '<li><b>Lame, but the foot’s clean?</b> Look up the leg. Trimming a sound foot won’t fix a bad hock: call the vet.</li>',
+        misreadNote: `Misread the cow. Lame, with a clean, firm foot and a toe worn from dragging: the trouble is higher up, at the ${joint} or above.`,
+        callNote: 'Nothing in the foot was laming her: the leg needed the vet. Released, she’s still lame.',
+        trimNote: 'No trim today. The trouble was up the leg: every stroke on a sound foot was one she didn’t need.',
+        plan: 'Plan: no trim today. The foot is sound: the lameness is up the leg. Send her to the hospital pen and call the vet.',
+      };
+    },
+  },
 };

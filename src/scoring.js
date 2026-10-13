@@ -155,7 +155,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   // Last visit's block still on (J2): that's the fault, not a needless new one.
   const oldOn = !!hoof.oldBlock?.on;
   if (oldOn) { correctness -= 20; notes.push('An old block left on overloads her: it should have come off by now.'); }
-  else if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
+  else if (!L && hoof.block) { correctness -= 20; notes.push(caseDef.toeDrag ? 'No block: there’s nothing in the foot to rest. It only tips a bad leg onto one claw.' : 'She was sound: no block needed. It only tips her onto one claw.'); }
   // Both claws sore (J3): a block puts her whole weight on the other sore one.
   else if (pair && hoof.block) { correctness -= 30; notes.push('The block put her whole weight on the other sore claw. With both claws bad, no block: wrap both and pen her.'); }
   else if (L && !need.block && hoof.block) {

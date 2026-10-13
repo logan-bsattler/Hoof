@@ -38,6 +38,15 @@ const MID_X = 200;
 
 // What the testers find on a foot-rot heel bulb.
 const FOOTROT_HEEL = 'Hot and puffy above the heel, and she pulls away. The swelling runs right across both claws.';
+// A cow lame higher up the leg (D26) drags the toe: its tip is worn square and scuffed, not sore.
+const SCUFF_TEXT = 'The toe tip is worn square and scuffed, and she doesn’t mind it. She’s been dragging this foot.';
+// One read-card finding per claw per cow, kept so a second tap on the same toe isn't a new one.
+const scuffs = new WeakMap();
+function scuffFinding(cd, claw) {
+  if (!scuffs.has(cd)) scuffs.set(cd, {});
+  const by = scuffs.get(cd);
+  return (by[claw] ??= { kind: 'scuff', claw, look: 'toe tip worn square and scuffed', feel: 'firm, not sore' });
+}
 
 // How deep (mm) a decoy mark goes into the horn before trimming takes it off.
 export const DECOY_DEPTH = { stain: 1, bruise: 2.5 }; // centre line between the claws
@@ -504,7 +513,11 @@ export class Hoof {
     if (i < 0) return { kind: 'none', text: 'Tap the hoof with the testers.' };
     const z = this.zone[i];
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
-    if (z & Z.DEAD) return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
+    if (z & Z.DEAD) {
+      // Dragging the toe (D26) wears its tip square: a read-card line, not a sore spot.
+      if (this.caseDef.toeDrag) return { kind: 'scuff', finding: scuffFinding(this.caseDef, this.claw[i]), text: SCUFF_TEXT };
+      return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
+    }
     const L = this.caseDef.lesion;
     if (z & (Z.DD | Z.ROT)) {
       const finding = this.caseDef.findings?.find((f) => f.kind === L.type) ?? null;

@@ -117,6 +117,12 @@ export const STEPS = [
     tip: 'Spray the split, grey skin between the claws until it’s soaked. No blade near it, and no wrap.',
     done: (m) => m.lesionTint >= CFG.treat.tintMin,
   },
+  // Lame with nothing in the foot (D26): the panel doesn't say which way, only that it's a choice.
+  {
+    id: 'decide', label: 'Trim her, or send her?', tool: null,
+    tip: 'Does what you found in the foot explain why she’s lame? If it does, trim. If it doesn’t, it isn’t yours to fix: tap Vet / leave… beside Release.',
+    done: (m, s, hoof) => s.call === hoof.caseDef.call,
+  },
   // A cow who leaves the crush by a call (WP8.1): done when that call is made.
   {
     id: 'refer', label: (cd) => `Send her: ${CALLS[cd.call].label.toLowerCase()}`, tool: null,

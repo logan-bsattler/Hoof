@@ -76,6 +76,11 @@ function playthrough(cd, quiet = false) {
   s.diagnosisCorrect = true;
   assert.ok(done('diagnose'));
 
+  // Lame higher up the leg (D26): nothing to do to the foot. Hands off, and call the vet.
+  if (cd.toeDrag) {
+    s.call = cd.call;
+    return verdict();
+  }
   if (cd.requires.trim === false) {
     // Foot rot: no blade near it. Spray the length of the split, then call the vet.
     const rot = [];

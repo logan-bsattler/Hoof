@@ -490,7 +490,7 @@ function placeBlock(claw) {
   buzz(30);
   game.shake = 4;
   if (!caseDef.lesion) {
-    ui.toast('She’s sound. A block only goes on to rest a sore claw.', 'warn', 4000);
+    ui.toast(caseDef.toeDrag ? 'Nothing in the foot to rest: a block won’t help a bad leg.' : 'She’s sound. A block only goes on to rest a sore claw.', 'warn', 4000);
   } else if (hoof.lesions().length > 1) {
     ui.toast('No block: both claws are sore. It puts her whole weight on the other bad one.', 'warn', 4500);
   } else if (!caseDef.requires?.block) {

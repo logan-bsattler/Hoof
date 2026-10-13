@@ -58,7 +58,7 @@ export const FARMS = [
   {
     id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', cows: 5, rep: 380,
     intro: 'A big, busy unit. Priya’s heifers have never been in a crush before, and they let you know it.',
-    mix: { ulcer: 0.2, whiteline: 0.2, dd: 0.2, puncture: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5,
+    mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5,
   },
   {
     id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', cows: 6, rep: 500,
@@ -223,6 +223,7 @@ export function backLine(cd) {
 function backText(cd, b, was, last) {
   if (b.outcome === 'calved') return `Fresh now: she’s calved since visit ${b.visit}. Time for that trim.`;
   if (b.outcome === 'recheck') {
+    if (b.was === 'nonfoot') return `Back for a recheck. ${last}, and she went off lame with nobody calling the vet. She’s no better, and it still isn’t in the foot.`;
     if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
     return was.diagnosis === 'sound'
       ? `Back for a recheck. ${last}, and she went off sore. Go gently this time and she earns her points.`

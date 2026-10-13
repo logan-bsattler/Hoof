@@ -60,6 +60,7 @@ test('a first visit deals the farm’s mix as a deck, not a streak', () => {
   const count = (list) => list.reduce((m, c) => ({ ...m, [c]: (m[c] ?? 0) + 1 }), {});
   assert.deepEqual(count(herdDeck(FARMS[0])), { routine: 2, ulcer: 1 }, 'Willow Bank: one ulcer, two routine');
   assert.deepEqual(count(herdDeck(FARMS[1])), { routine: 2, whiteline: 1, ulcer: 1 }, 'Hollins brings its white line');
+  assert.equal(count(herdDeck(farmById('greystone'))).nonfoot, 1, 'Greystone brings a cow lame up the leg (D26)');
   for (const f of FARMS) {
     const deck = herdDeck(f);
     assert.equal(deck.length, f.cows);

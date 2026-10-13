@@ -57,6 +57,8 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     requires: C.requires,
     // How she should leave the crush: null (release), or a CALLS id (WP8.1).
     call: C.call ?? null,
+    // Lame higher up the leg (D26): she drags the toe, and its tip is worn square.
+    ...(C.toeDrag ? { toeDrag: true } : {}),
 
     // Excess sole (mm above target) on each claw. Outer hind claws overgrow most.
     excess,

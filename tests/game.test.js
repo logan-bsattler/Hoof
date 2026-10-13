@@ -499,7 +499,7 @@ test('routine: opening a decoy, a needless block or a misread all cost points', 
 
 test('dealCase deals both conditions, and the same seed deals the same cow', () => {
   const seen = new Set();
-  for (let seed = 1; seed <= 40; seed++) seen.add(dealCase(seed).condition);
+  for (let seed = 1; seed <= 80; seed++) seen.add(dealCase(seed).condition);
   assert.deepEqual([...seen].sort(), Object.keys(CONDITIONS).sort());
   assert.deepEqual(dealCase(99), dealCase(99));
 });
@@ -732,7 +732,7 @@ test('variations: decoy count and kinds, lesion size and position follow the mod
     for (const n of [0, 1, 3]) {
       const cd = makeCase(id, 4, { decoyCount: n, decoyKinds: ['bruise'] });
       const decoys = cd.findings.filter((f) => f.kind === 'bruise' || f.kind === 'stain');
-      assert.equal(decoys.length, id === 'routine' ? Math.max(1, n) : n, `${id} ${n} decoys`);
+      assert.equal(decoys.length, (id === 'routine' || id === 'nonfoot') ? Math.max(1, n) : n, `${id} ${n} decoys`);
       assert.ok(decoys.every((f) => f.kind === 'bruise'));
     }
   }
@@ -956,4 +956,38 @@ test('old block: left on costs 20 (not the needless-block note); off and trimmed
   idealTrim(h);
   const g = scoreCase(h.metrics(), idealSession(re), h, re);
   assert.equal(g.grade, 'Textbook', g.notes.join(' | '));
+});
+
+test('D26: lame higher up the leg. A clean, firm foot, a scuffed toe, and the vet', () => {
+  const cd = makeCase('nonfoot', 41);
+  assert.equal(cd.lesion, null);
+  assert.equal(cd.call, 'vet');
+  assert.ok(cd.toeDrag);
+  assert.match(cd.intro, /hock|dragging/);
+  const hoof = new Hoof(cd);
+  for (let i = 0; i < hoof.n; i++) hoof.mud[i] = 0;
+  // Every mark is firm; the dead toe reads as worn from dragging, one finding per claw.
+  let toe = -1;
+  for (let i = 0; i < hoof.n; i++) if (hoof.zone[i] & Z.DEAD) { toe = i; break; }
+  const r = hoof.probe(toe, false);
+  assert.equal(r.kind, 'scuff');
+  assert.equal(r.finding, hoof.probe(toe, false).finding, 'the same toe is the same finding');
+  for (const f of cd.findings) assert.notEqual(hoof.probe(hoof.cellAt(f.x, f.y), false).kind, 'lesion');
+
+  const read = () => { const s = newSession(); s.probes.push(cd.findings[0].kind); s.diagnosis = 'nonfoot'; s.diagnosisCorrect = true; return s; };
+  // Hands off and the vet: Textbook.
+  const s = read(); s.call = 'vet';
+  const ok = scoreCase(hoof.metrics(), s, hoof, cd);
+  assert.equal(ok.grade, 'Textbook');
+  assert.equal(ok.gait, 'to the vet');
+  // Trimmed first: Restraint pays 15 a stroke, at most 30.
+  const cut = read(); cut.call = 'vet'; cut.cuts = 5;
+  assert.equal(scoreCase(hoof.metrics(), cut, hoof, cd).parts.restraint, 70);
+  // Released: she walks off lame and the note says why.
+  const rel = scoreCase(hoof.metrics(), read(), hoof, cd);
+  assert.equal(rel.gait, 'lame');
+  assert.ok(rel.notes.some((n) => /needed the vet/.test(n)));
+  // Read as sound: a misread.
+  const snd = read(); snd.diagnosis = 'sound'; snd.diagnosisCorrect = false; snd.call = 'vet';
+  assert.ok(scoreCase(hoof.metrics(), snd, hoof, cd).parts.correctness <= 85);
 });
