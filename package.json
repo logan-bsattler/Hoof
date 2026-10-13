@@ -1,6 +1,6 @@
 {
   "name": "true-hoof",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "TRUE HOOF: a calm, craftsmanlike cattle hoof-trimming game (web prototype).",
   "type": "module",
   "private": true,
