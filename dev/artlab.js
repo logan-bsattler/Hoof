@@ -58,6 +58,16 @@ const STAGES = Q.has('cond') ? [
     for (let k = 0; k < 4; k++) s.necro();
     return s;
   }]] : []),
+  ...(L?.type === 'doublesole' ? [
+    ['Brushed, false sole half pared', () => {
+      const s = session().brushAll();
+      s.drag('knife', [[L.x - L.r, L.y + L.r * 0.3], [L.x + L.r, L.y + L.r * 0.3]], 90);
+      s.drag('knife', [[L.x - L.r, L.y + L.r * 0.7], [L.x + L.r, L.y + L.r * 0.7]], 90);
+      return s;
+    }],
+    ['Brushed, false sole pared', () => session().brushAll().pareSole()],
+    ['Pared, then ground', () => session().brushAll().pareSole().nip().grind(CLAW.OUTER).grind(CLAW.INNER)],
+  ] : []),
 ] : [
   ['Dirty (0:15)', () => session()],
   ['Brushed, first grinder passes (0:35)', () => session().brushAll().nip().grind(CLAW.OUTER, 330, 470, 1)],

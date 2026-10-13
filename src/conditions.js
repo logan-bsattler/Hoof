@@ -46,6 +46,11 @@ export const FINDING = {
     probeText: 'She jerks the foot away. The toe tip is black and crumbling, and it stinks.',
     diagnosedText: 'Toe necrosis. Pare the black horn back, block the sound claw with wood, and get the vet.',
   },
+  doublesole: {
+    look: 'a sole patch with a lifted edge', feel: 'hollow, not sore',
+    probeText: 'It sounds hollow under the testers, and she doesn’t mind. A layer of old sole has lifted off the one underneath.',
+    diagnosedText: 'A double sole. Get the knife under the lifted edge and pare the false sole off.',
+  },
   stain: {
     look: 'dark patch', feel: 'firm',
     probeText: 'Dark is just staining. Firm underneath.',
@@ -146,6 +151,13 @@ function placePuncture(rand, side, claw, v = {}) {
 function placeNecro(rand, side, claw, v = {}) {
   const s = clawSide(claw, side);
   return { claw, x: GEOM.midX + s * band(rand, 26, 34), y: band(rand, 558, 568, v.at), r: band(rand, 14, 18, v.size) };
+}
+
+// A double sole on `claw`: a round patch of false sole mid-sole, well in from both walls,
+// between the dish channel and the abaxial white line.
+function placeDouble(rand, side, claw, v = {}) {
+  const s = clawSide(claw, side);
+  return { claw, x: GEOM.midX + s * band(rand, 70, 80), y: band(rand, 320, 420, v.at), r: band(rand, 26, 32, v.size) };
 }
 
 // Digital dermatitis on `claw`'s side of the heel cleft, between the bulbs: a round raw patch
@@ -442,6 +454,60 @@ export const CONDITIONS = {
         misreadNote: 'Misread the lesion. Black, crumbling horn at the toe tip that she can’t bear touched is toe necrosis.',
         callNote: 'Toe necrosis can reach the bone: she needs the vet. Released, she’ll only get worse.',
         plan: `Plan: functional trim (steps 1–3), rasp, pare the black toe back to healthy horn, wood block on the sound ${sound} claw, then send her to the vet.`,
+      };
+    },
+  },
+
+  // Case H "Two Soles" (WP8.5): a double sole. An old layer of sole that has lifted off a new
+  // one after a bout of laminitis or a bruise. She isn't lame: it turns up at a routine trim.
+  // The job is to pare the false sole off with the knife before the trim. No block, no wrap.
+  doublesole: {
+    caseId: 'H',
+    title: 'Two Soles',
+    noun: 'false sole',
+    weight: 0.1,
+    steps: ['clean', 'diagnose', 'pareSole', 'step1', 'step2', 'step3', 'finish', 'step5'],
+    requires: { open: true, block: false, treat: false },
+    diagnosis: 'doublesole',
+
+    place(rand, side, v = {}) {
+      const big = v.big ?? CLAW.OUTER;
+      const claw = rand() < 0.7 ? big : otherClaw(big);
+      const at = (c, axial) => GEOM.midX + clawSide(c, side) * axial;
+      const lesion = placeDouble(rand, side, claw, v);
+      const looseHorn = placeHeelHorn(rand, at, otherClaw(claw));
+      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn], v);
+      return { lesion, looseHorn, decoys };
+    },
+
+    copy({ cow, limb, lesion }) {
+      const claw = CLAW_NAME[lesion.claw];
+      return {
+        intro:
+          `Routine herd trim. #${cow} is due on the ${limb} and walks sound, but she had a bad spell after calving. ` +
+          'Check every mark before you cut.',
+        diagnosisPrompt: 'She’s sound on it. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'doublesole', label: 'Double sole',
+            feedback: `Right. A layer of old sole lifting off the ${claw} claw, hollow under it: a double sole. The new sole is underneath.`,
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer springs and she feels it. This is hollow and she doesn’t mind: a false sole lifting off the new one.',
+          },
+          {
+            id: 'bruise', label: 'Sole bruise',
+            feedback: 'A bruise stays firm and flat. This patch is hollow, with an edge you could get a blade under: a double sole.',
+          },
+          {
+            id: 'whiteline', label: 'White-line abscess',
+            feedback: 'An abscess tracks in from the wall and she flinches. This patch is mid-sole, hollow and painless: a double sole.',
+          },
+        ],
+        howto: '<li><b>Hollow, not sore?</b> A false sole. Pare it off with the knife before you trim: the grinder tears into the thin new sole under it.</li>',
+        misreadNote: 'Misread the mark. A patch with a lifted edge that sounds hollow and doesn’t hurt is a double sole.',
+        plan: `Plan: pare the false sole off the ${claw} claw with the knife, then the functional trim (steps 1–3), rasp and the loose heel horn. No block, no wrap.`,
       };
     },
   },

@@ -35,7 +35,7 @@ export function makePlayer(hoof, opts = {}) {
           // The grinder and knife lift off once the horn under them is at target. Loose horn
           // still wants the knife; the grinder just levels over the white-line track.
           const i = hoof.cellAt(x, y);
-          const settled = i >= 0 && (!hoof.loose[i] || (tool === 'grinder' && (hoof.looseInit[i] === LOOSE.TRACT || hoof.looseInit[i] === LOOSE.NECRO)));
+          const settled = i >= 0 && (!hoof.loose[i] || (tool === 'grinder' && (hoof.looseInit[i] === LOOSE.TRACT || hoof.looseInit[i] === LOOSE.NECRO || hoof.looseInit[i] === LOOSE.DOUBLE)));
           const done = settled && (tool === 'grinder' || tool === 'knife') &&
             hoof.thick[i] <= hoof.zoneTarget(i) + 0.4;
           if (done || (tool === 'grinder' && discTouchesUlcer(x, y))) { px = x; py = y; continue; }
@@ -104,6 +104,15 @@ export function makePlayer(hoof, opts = {}) {
         if (hoof.looseInit[i] !== LOOSE.NECRO || !hoof.loose[i]) continue;
         const x = hoof.cellX(i), y = hoof.cellY(i);
         p.drag('knife', [[x - 1, y], [x + 1, y]], 40);
+      }
+      return p;
+    },
+    // Double sole: knife pulls across the false sole, row by row, until it's lifted all over.
+    pareSole() {
+      const step = CFG.tools.knife.radius * 0.8;
+      for (let dy = -L.r; dy <= L.r; dy += step) {
+        const h = Math.sqrt(Math.max(0, L.r * L.r - dy * dy)) + 2;
+        p.drag('knife', [[L.x - h, L.y + dy], [L.x + h, L.y + dy]], 90);
       }
       return p;
     },

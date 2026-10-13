@@ -858,3 +858,47 @@ test('a cow to be left: the call scores full, strokes cost Restraint, a full tri
   assert.equal(trimmed.grade, 'Needs work');
   assert.notEqual(trimmed.gait, 'left till dry-off');
 });
+
+// WP8.5: double sole.
+test('double sole: a hollow false sole the knife lifts off, the grinder tears through', () => {
+  const cd = makeCase('doublesole', 3);
+  const L = cd.lesion;
+  const h = new Hoof(cd);
+  const i = h.cellAt(L.x, L.y);
+  assert.equal(h.looseInit[i], LOOSE.DOUBLE);
+  assert.ok(!(h.zone[i] & Z.DISH), 'the dish keeps out of the false sole');
+  h.mud.fill(0);
+  const r = h.probe(i, false);
+  assert.equal(r.kind, 'lesion');
+  assert.equal(r.finding.kind, 'doublesole');
+  applyStroke(h, 'knife', L.x, L.y, 4);
+  assert.equal(h.loose[i], 0, 'the knife lifts it');
+  assert.ok(h.thick[i] <= h.zoneTarget(i) + 0.2 + 1e-6, `new sole at ${h.thick[i].toFixed(2)} mm`);
+  assert.equal(h.probe(i, true).kind, 'firm');
+
+  const g = new Hoof(cd);
+  const ev = applyGrind(g, L.x, L.y, 1 / 60);
+  assert.ok(ev.grinderLesion, 'grinding the false sole is flagged');
+  assert.ok(g.thick[i] < g.zoneTarget(i) - 1, 'and it bites into the thin sole under it');
+});
+
+test('double sole: left on, or blocked, costs; pared and trimmed is Textbook with no block', () => {
+  const cd = makeCase('doublesole', 4);
+  const h = new Hoof(cd);
+  idealTrim(h);
+  assert.equal(h.block, CLAW.NONE);
+  const ok = scoreCase(h.metrics(), idealSession(cd), h, cd);
+  assert.equal(ok.grade, 'Textbook', ok.notes.join(' | '));
+  assert.equal(ok.gait, 'sound');
+  // The false sole back on.
+  const left = new Hoof(cd);
+  idealTrim(left);
+  for (let i = 0; i < left.n; i++) if (left.looseInit[i] === LOOSE.DOUBLE) left.loose[i] = LOOSE.DOUBLE;
+  const r = scoreCase(left.metrics(), idealSession(cd), left, cd);
+  assert.ok(r.notes.some((n) => n.startsWith('False sole left on')), r.notes.join(' | '));
+  assert.notEqual(r.gait, 'sound');
+  // A needless block.
+  h.block = soundClaw(cd);
+  const b = scoreCase(h.metrics(), idealSession(cd), h, cd);
+  assert.ok(b.notes.some((n) => n.includes('new sole is sound')), b.notes.join(' | '));
+});

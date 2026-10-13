@@ -25,6 +25,12 @@ export const STEPS = [
     tip: 'Clean it, then test anything that looks wrong with the hoof testers. Commit your read when you’re sure.',
     done: (m, s) => !!s.diagnosis,
   },
+  // Double sole: the false sole comes off first, so the trim works on the real sole under it.
+  {
+    id: 'pareSole', label: 'Pare off the false sole', tool: 'knife',
+    tip: 'Get the knife under the lifted edge of the old sole and pare it away until it’s new sole all over. Not the grinder: it tears into the thin sole underneath.',
+    done: (m) => m.looseRemain[LOOSE.DOUBLE] < 0.1,
+  },
   {
     id: 'step1', label: (cd) => `1 · Trim the first (${CLAW_NAME[firstClaw(cd)]}) claw`, tool: 'nippers',
     tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.`,

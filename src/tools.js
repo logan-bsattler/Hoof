@@ -54,7 +54,7 @@ export function toolRadius(id) {
 function newEvents() {
   return {
     removed: 0, mud: 0, dead: 0,
-    loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0, [LOOSE.NECRO]: 0 },
+    loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0, [LOOSE.NECRO]: 0, [LOOSE.DOUBLE]: 0 },
     blood: false, bloodCells: 0, thin: false, lesionCut: false, grinderLesion: false,
     dirtyCut: false, nipLive: false, nipSole: false, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
@@ -193,6 +193,15 @@ function pareNecro(hoof, i, ev) {
   return true;
 }
 
+// Double sole: the blade gets under the false sole's edge and it lifts away, leaving the new
+// sole a touch above trim height.
+function pareDouble(hoof, i, ev) {
+  if (!hoof.loose[i] || hoof.looseInit[i] !== LOOSE.DOUBLE) return false;
+  clearLoose(hoof, i, ev);
+  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) + 0.2);
+  return true;
+}
+
 // Stroke tools: called with the distance travelled since the last stamp.
 export function applyStroke(hoof, tool, x, y, dist) {
   const ev = newEvents();
@@ -213,7 +222,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
       // The cap and the open core answer only to the flat of the blade; its feathered edge rides over them.
       if (closedCap(hoof, i)) { if (f >= KNIFE_FLAT) onCap++; return; }
       if ((hoof.zone[i] & Z.ULCER) && f < KNIFE_FLAT) return;
-      if (pareTract(hoof, i, ev) || pareNecro(hoof, i, ev)) return;
+      if (pareTract(hoof, i, ev) || pareNecro(hoof, i, ev) || pareDouble(hoof, i, ev)) return;
       if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
       // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
       const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist, cfg.resist, cfg.wall);
@@ -251,6 +260,14 @@ export function applyGrind(hoof, x, y, dt) {
     if (hoof.zone[i] & Z.ULCER) ev.grinderLesion = true;
     // The disc can't open the cap: it just skates over it. That's knife work.
     if (closedCap(hoof, i)) { ev.grinderLesion = true; return; }
+    // The disc tears through a false sole and on into the thinner new sole under it.
+    if (hoof.loose[i] && hoof.looseInit[i] === LOOSE.DOUBLE) {
+      ev.grinderLesion = true;
+      clearLoose(hoof, i, ev);
+      hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - 1.2);
+      hoof.rough[i] = 0.8;
+      return;
+    }
     // The disc levels over the white-line track but can't follow it: that's knife work.
     // Nor can it tell dead black horn from live: it grinds the necrosis as horn, still black.
     if (hoof.looseInit[i] !== LOOSE.TRACT && hoof.looseInit[i] !== LOOSE.NECRO && clearLoose(hoof, i, ev)) {

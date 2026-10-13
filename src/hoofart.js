@@ -273,6 +273,8 @@ export class HoofArt {
     this.tractF = new Float32Array(hoof.n);
     // And the toe necrosis's dead horn: the pared pit can only open inside it.
     this.necroF = new Float32Array(hoof.n);
+    // And the double sole's false sole: the new sole shows only inside it.
+    this.doubleF = new Float32Array(hoof.n);
     // The heel cleft's skin, and the DD patch on it.
     this.cleftF = new Float32Array(hoof.n);
     this.ddF = new Float32Array(hoof.n);
@@ -281,6 +283,7 @@ export class HoofArt {
       this.ulcerF[i] = hoof.looseInit[i] === LOOSE.ULCER ? 1 : 0;
       this.tractF[i] = hoof.looseInit[i] === LOOSE.TRACT ? 1 : 0;
       this.necroF[i] = hoof.looseInit[i] === LOOSE.NECRO ? 1 : 0;
+      this.doubleF[i] = hoof.looseInit[i] === LOOSE.DOUBLE ? 1 : 0;
       this.cleftF[i] = hoof.zone[i] & Z.CLEFT ? 1 : 0;
       this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
     }
@@ -467,6 +470,7 @@ export class HoofArt {
     const T = L?.type === 'whiteline' ? L : null;
     const PU = L?.type === 'foreign' ? L : null;
     const NE = L?.type === 'toenecrosis' ? L : null, necroF = this.necroF;
+    const DS = L?.type === 'doublesole' ? L : null, doubleF = this.doubleF;
     let tb = null;
     if (T) {
       const K = T.pocket, m = T.w * 2.2, xs = T.path.map((q) => q[0]), ys = T.path.map((q) => q[1]);
@@ -839,6 +843,52 @@ export class HoofArt {
               const left = smoothstep(0.95, 0.99, ngr) * 0.6;
               cr += (60 - cr) * left; cg += (56 - cg) * left; cb += (50 - cb) * left;
               R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
+            }
+          }
+
+          // Double sole: a layer of old sole lifting off the new one. Chalky, dull and flaky, its
+          // toe-side edge lifted into a pale lip over a dark gap that shadows the sole below it.
+          // Pared off, the new sole under it: paler, smoother, a little waxy.
+          if (c === lesionC && DS && Math.abs(lx - DS.x) < DS.r * 1.5 && Math.abs(ly - DS.y) < DS.r * 1.5) {
+            const wx = (nIsle[p] / 255 - 0.5) * 7, wy = (nStain[p] / 255 - 0.5) * 7;
+            const ft = 0.5 + (ncv - 0.5) * 0.3;
+            // How much false sole is on at a point: its footprint, times its own loose field.
+            const onAt = (ax, ay) => {
+              const df = fieldAt(doubleF, ax, ay);
+              return smoothstep(ft - 0.06, ft + 0.06, df) * smoothstep(0.35, 0.65, Math.min(1, fieldAt(looseF, ax, ay) / Math.max(0.05, df)));
+            };
+            const df = fieldAt(doubleF, lx + wx, ly + wy);
+            const inside = smoothstep(ft - 0.06, ft + 0.06, df);
+            const on = onAt(lx + wx, ly + wy);
+            // The edge lifts most on the toe side, a ragged stretch of it.
+            const lift = smoothstep(DS.y - DS.r * 0.1, DS.y + DS.r * 0.9, ly + (ncv - 0.5) * 14);
+            // The lifted lip throws a shadow down and right (lamp at upper left) into the gap.
+            const by = onAt(lx + wx - 2.2, ly + wy - 3.4);
+            const shade = by * (1 - on) * (0.25 + 0.5 * lift);
+            R *= 1 - shade; G *= 1 - shade; B *= 1 - shade * 0.9;
+            if (on > 0) {
+              // Old, dried sole: pale grey-yellow, dull, in flaky layers along the contours.
+              const layer = 0.5 + 0.5 * Math.sin(ncv * 9 + (ly - DS.y) * 0.35);
+              let cr = 200 - 22 * layer - 12 * ngr, cg = 188 - 20 * layer - 12 * ngr, cb = 152 - 16 * layer - 8 * ngr;
+              const crack = smoothstep(0.035, 0, Math.abs(ncv - 0.5)) * 0.55;
+              cr *= 1 - crack; cg *= 1 - crack; cb *= 1 - crack * 0.9;
+              // The rim of the layer, where it has lifted: a pale lip catching the lamp, over a dark gap.
+              const rimB = smoothstep(ft + 0.3, ft + 0.08, df) * inside;
+              const lip = rimB * lift;
+              cr += (236 - cr) * lip * 0.7; cg += (226 - cg) * lip * 0.7; cb += (198 - cb) * lip * 0.7;
+              const gap = rimB * (1 - rimB) * 4 * lift * 0.5;
+              cr *= 1 - gap; cg *= 1 - gap; cb *= 1 - gap;
+              R += (cr - R) * on * 0.9; G += (cg - G) * on * 0.9; B += (cb - B) * on * 0.9;
+              crust = Math.max(crust, on * 0.5);
+              sheen = Math.min(sheen, 1 - 0.5 * on);
+              gy -= 0.6 * lip * on;
+            }
+            const open = inside * (1 - smoothstep(0.35, 0.65, Math.min(1, fieldAt(looseF, lx + wx, ly + wy) / Math.max(0.05, df))));
+            if (open > 0) {
+              // The new sole: paler and finer-grained, a touch yellow, with a little waxy sheen.
+              const cr = 236 - 6 * ngr, cg = 222 - 6 * ngr, cb = 184 - 6 * ngr;
+              R += (cr - R) * open * 0.65; G += (cg - G) * open * 0.65; B += (cb - B) * open * 0.65;
+              sheen = Math.max(sheen, 1 + 0.25 * open);
             }
           }
 

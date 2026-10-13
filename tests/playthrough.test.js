@@ -11,7 +11,7 @@ import { CASE_B, dealMods, makeCase } from '../src/case.js';
 import { CONDITIONS, CALLS } from '../src/conditions.js';
 import { KNIFE_FLAT, applyGrind, applyWrap } from '../src/tools.js';
 import { evaluateSteps, trimFinished } from '../src/steps.js';
-import { newSession, scoreCase } from '../src/scoring.js';
+import { newSession, scoreCase, trimUnderway } from '../src/scoring.js';
 import { makePlayer } from './player.js';
 
 const DT = 1 / 60;
@@ -24,7 +24,7 @@ function playthrough(cd, quiet = false) {
   // Session bookkeeping, as main.js handle() does it.
   const p = makePlayer(hoof, {
     onEvent(ev, tool, x, y) {
-      if (ev.claws.size && s.firstCutClaw == null) s.firstCutClaw = [...ev.claws][0];
+      if (ev.claws.size && s.firstCutClaw == null && trimUnderway(s, cd)) s.firstCutClaw = [...ev.claws][0];
       if (ev.dirtyCut) s.dirtyCuts++;
       if (ev.grinderLesion) s.grinderLesion = true;
       if (ev.cleftCut) s.cleftCuts++;
@@ -79,6 +79,9 @@ function playthrough(cd, quiet = false) {
     return verdict();
   }
 
+  // A double sole: the false sole comes off with the knife before any trimming.
+  if (L?.type === 'doublesole') until('pareSole', () => p.pareSole());
+
   // Steps 1–2: nip both toes tip first, then grind the first claw (inner on a hind foot,
   // outer on a front) and match the other to it.
   p.nip();
@@ -94,7 +97,7 @@ function playthrough(cd, quiet = false) {
       const R = (L?.r ?? 0) * 1.75 + flat + 1;
       for (const x of dishX(c)) {
         // DD sits up in the cleft, clear of the dish: nothing to steer round.
-        const sole = L && L.type !== 'dd' && L.type !== 'toenecrosis';
+        const sole = L && !['dd', 'toenecrosis', 'doublesole'].includes(L.type);
         const dx = sole ? Math.abs(x - L.x) : Infinity;
         if (!sole || c !== L.claw || dx >= R) { p.drag('knife', [[x, GEOM.dishY0], [x, GEOM.dishY1]], 120); continue; }
         const h = Math.sqrt(R * R - dx * dx);
@@ -136,6 +139,8 @@ function playthrough(cd, quiet = false) {
     hoof.blockKind = 'wood';
     s.blockAttempts.push(hoof.block);
     until('necro', () => {});
+  } else if (L?.type === 'doublesole') {
+    // Pared before the trim: nothing to open now, and no block.
   } else if (cd.requires.open) {
     // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
     // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.

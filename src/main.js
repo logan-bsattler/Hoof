@@ -6,7 +6,7 @@ import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_B, dealCase, makeCase, temperament } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
-import { newSession, scoreCase, judgeBlood } from './scoring.js';
+import { newSession, scoreCase, judgeBlood, trimUnderway } from './scoring.js';
 import { CALLS, CONDITIONS } from './conditions.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
@@ -366,12 +366,14 @@ function tap(x, y) {
     }
     if (!game.session.diagnosis) ui.setReadable(game.found.length > 0);
     if (r.kind === 'lesion' && !game.session.diagnosis) {
-      Sound.spring();
-      buzz([10, 40, 20]);
       // The weeping hole: squeezing it pushes fluid and bubbles out. A white-line track is
-      // still sealed under the wall: she just flinches.
+      // still sealed under the wall: she just flinches. A false sole just sounds hollow.
       const L = caseDef.lesion;
-      if (L.type === 'ulcer') {
+      if (L.type === 'doublesole') { Sound.tock(); buzz(5); }
+      else { Sound.spring(); buzz([10, 40, 20]); }
+      if (L.type === 'doublesole') {
+        // Hollow, not sore: she doesn't move.
+      } else if (L.type === 'ulcer') {
         renderer.weep(L.x, L.y, 1);
         Sound.bubbles();
       } else if (L.type === 'dd' || L.type === 'footrot') {
@@ -584,12 +586,12 @@ function handle(ev, x, y) {
       if (Math.random() < 0.15) particles.spawn('dust', x, y, '#e6d8b8');
     }
   }
-  if (ev.loose[LOOSE.HEEL] + ev.loose[LOOSE.ULCER] + ev.loose[LOOSE.TRACT] > 0) {
+  if (ev.loose[LOOSE.HEEL] + ev.loose[LOOSE.ULCER] + ev.loose[LOOSE.TRACT] + ev.loose[LOOSE.DOUBLE] > 0) {
     particles.spawn('flake', x, y, '#d9c79c', 1);
     Sound.flake();
   }
 
-  if (ev.claws.size && s.firstCutClaw == null) s.firstCutClaw = [...ev.claws][0];
+  if (ev.claws.size && s.firstCutClaw == null && trimUnderway(s, caseDef)) s.firstCutClaw = [...ev.claws][0];
   if (ev.dirtyCut) {
     s.dirtyCuts++;
     warnOnce('dirty', 'You’re cutting through muck. Clean the foot first: you can’t read what you can’t see.');
@@ -599,7 +601,8 @@ function handle(ev, x, y) {
   else if (ev.nipLive) warnOnce('nipLine', 'That bite reached the trim line. Ease back a touch: the grinder does the rest.', 'info', 8);
   if (ev.grinderLesion) {
     s.grinderLesion = true;
-    warnOnce('grindLesion', `Not the grinder near the ${caseDef.noun}! Use the knife there.`);
+    warnOnce('grindLesion', caseDef.lesion?.type === 'doublesole' ? 'Not the grinder on the false sole! It tears into the thin new sole. Lift the old layer off with the knife.'
+      : `Not the grinder near the ${caseDef.noun}! Use the knife there.`);
   }
   if (ev.capStrain && !ev.capPop) strainCap(ev.capStrain, x, y);
   if (ev.capPop) popCap(x, y);

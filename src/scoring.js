@@ -20,6 +20,10 @@ export function newSession() {
   };
 }
 
+// Has the trim proper begun, so a cut sets which claw went first? Paring off a false sole
+// comes before the trim and doesn't count.
+export const trimUnderway = (session, caseDef) => caseDef.lesion?.type !== 'doublesole' || session.stepDoneAt.pareSole != null;
+
 // One tool event drew blood from `cells` cells: a forgivable nick, or the end of the case.
 // Records the outcome in the session and returns 'nick' or 'fail'.
 export function judgeBlood(session, cells) {
@@ -68,6 +72,7 @@ export function lesionOpened(m, hoof) {
   // Digital dermatitis is skin: there is nothing to open.
   if (!L || L.type === 'dd') return true;
   if (L.type === 'toenecrosis') return m.looseRemain[LOOSE.NECRO] <= 0.1;
+  if (L.type === 'doublesole') return m.looseRemain[LOOSE.DOUBLE] <= 0.1;
   return L.type === 'whiteline' || L.type === 'foreign' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
 
@@ -128,7 +133,11 @@ export function scoreCase(m, session, hoof, caseDef) {
   } else if (!session.diagnosisCorrect) { correctness -= 15; notes.push(caseDef.misreadNote); }
   const need = caseDef.requires ?? { open: true, block: true, treat: true };
   if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
-  else if (L && !need.block && hoof.block) { correctness -= 20; notes.push('No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.'); }
+  else if (L && !need.block && hoof.block) {
+    correctness -= 20;
+    notes.push(L.type === 'doublesole' ? 'No block needed: the new sole is sound, just thin. A block only tips her onto one claw.'
+      : 'No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.');
+  }
   if (L && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
   if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${caseDef.noun ?? 'ulcer'} is still carrying weight.`); }
   // Toe necrosis wants the taller wood block; everything else the rubber one.
@@ -142,6 +151,7 @@ export function scoreCase(m, session, hoof, caseDef) {
     correctness -= 20;
     notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' :
       L.type === 'toenecrosis' ? 'Black, dead horn left at the toe. Pare it back to healthy horn before she goes.' :
+      L.type === 'doublesole' ? 'False sole left on. Pare the old layer off so the new sole underneath can harden.' :
       L.type === 'foreign' ? 'The puncture was never pared down to the pus. It’s still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
   if (trim && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
@@ -160,7 +170,11 @@ export function scoreCase(m, session, hoof, caseDef) {
     correctness -= 15;
     notes.push(L?.type === 'dd' ? 'You put a blade into the heel cleft. DD is treated, not cut: clean, spray, wrap.' : 'You cut into the skin of the heel cleft. Keep the blades on horn.');
   }
-  if (need.open && session.grinderLesion) { correctness -= 10; notes.push('Grinder over the lesion. Use the knife near the ulcer.'); }
+  if (need.open && session.grinderLesion) {
+    correctness -= 10;
+    notes.push(L.type === 'doublesole' ? 'Grinder on the false sole: it tore into the thin new sole under it. Lift the old layer with the knife.'
+      : 'Grinder over the lesion. Use the knife near the ulcer.');
+  }
   if (session.dirtyCuts > 0) { correctness -= 10; notes.push('You cut into a dirty foot. Clean first, then cut.'); }
   if (session.dishBeforeLevel) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }
   // The call (WP8.1): a cow that needs the pen or the vet and is released, or sent the wrong way.
@@ -207,7 +221,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 
   // Finish: clean, smooth, no loose horn.
-  const looseLeft = Math.min(1, (m.looseRemain[LOOSE.ULCER] + m.looseRemain[LOOSE.HEEL] + m.looseRemain[LOOSE.NECRO]) / 2);
+  const looseLeft = Math.min(1, (m.looseRemain[LOOSE.ULCER] + m.looseRemain[LOOSE.HEEL] + m.looseRemain[LOOSE.NECRO] + m.looseRemain[LOOSE.DOUBLE]) / 2);
   const finish = !trim ? ramp(m.mudMean, 0.02, 0.4) : 0.3 * ramp(m.mudMean, 0.02, 0.4) + 0.4 * ramp(m.roughMean, 0.12, 0.6) + 0.3 * 100 * (1 - looseLeft);
   if (trim && m.roughMean > 0.2) notes.push('Surface is rough. A few rasp passes trues it up.');
   if (trim && m.looseRemain[LOOSE.HEEL] > 0.1) notes.push('Loose heel horn left on (step 5).');
@@ -235,7 +249,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   // A sound foot has nothing to relieve; a needless block rocks her onto one claw.
   // DD needs no block: treating it is the relief, and a block only tips her.
   const relief = !L ? (hoof.block ? 40 : 100)
-    : !need.block ? (!hoof.block && treated(m, hoof) ? 100 : 40)
+    : !need.block ? (!hoof.block && (!need.treat || treated(m, hoof)) && (!need.open || lesionOpened(m, hoof)) ? 100 : 40)
     : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
   const gaitScore = 0.5 * balance + 0.5 * relief;
   const blockedSore = !!L && hoof.block === L.claw;

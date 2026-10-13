@@ -173,10 +173,12 @@ export class Renderer {
         c.setLineDash([]);
         label(c, '▲ white line', P[0][0], P[0][1] + 22, '#ff6b5b', fs);
       } else {
-        c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
+        // A false sole is a broad patch already: ring it close.
+        const ring = L.r * (L.type === 'doublesole' ? 1.25 : 2.1);
+        c.arc(L.x, L.y, ring, 0, Math.PI * 2);
         c.stroke();
         c.setLineDash([]);
-        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼', foreign: 'puncture ▼', toenecrosis: 'toe necrosis ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
+        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼', foreign: 'puncture ▼', toenecrosis: 'toe necrosis ▼', doublesole: 'false sole ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - ring - 6, '#ff6b5b', fs);
       }
       c.restore();
     }
