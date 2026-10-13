@@ -173,11 +173,13 @@ export const healedBack = (farm) => Math.max(1, Math.floor(farm.cows / 3));
 export function returningCows(farm, visit, history) {
   if (visit < 2) return [];
   const cows = farmCows(history, farm.id);
-  const well = cows.filter((h) => !h.lame);
+  // A recheck: lame last time, or a condition that always comes back (toe necrosis, WP8.4).
+  const recheck = (h) => h.lame || h.recheck;
+  const well = cows.filter((h) => !recheck(h));
   const rand = mulberry32(cowSeed(farm, visit, 999));
   const healed = [];
   while (well.length && healed.length < healedBack(farm)) healed.push(well.splice(Math.floor(rand() * well.length), 1)[0]);
-  return [...cows.filter((h) => h.lame), ...healed].slice(0, farm.cows);
+  return [...cows.filter(recheck), ...healed].slice(0, farm.cows);
 }
 
 // One cow back again, from her last record. She keeps her tag, foot and temperament; the
@@ -188,12 +190,14 @@ export function returnCase(farm, h, visit, k) {
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
   if (base.temper !== undefined) cow.temper = base.temper;
   const back = { visit: h.visit, grade: h.grade, was: h.condition };
-  if (!h.lame) {
+  if (!h.lame && !h.recheck) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
     return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: 'healed' } };
   }
   // Recheck: the lesion has spread to the top of its band (a hand-placed one grows 2 px).
-  const worse = base.lesion ? { lesion: { ...base.lesion, r: base.lesion.r + 2 } } : { lesionSize: 1 };
+  // A toe necrosis cow always comes back: barely any black toe after a Textbook job, else the full patch.
+  const worse = h.recheck && !h.lame ? { lesionSize: h.grade === 'Textbook' ? 0.2 : 1 }
+    : base.lesion ? { lesion: { ...base.lesion, r: base.lesion.r + 2 } } : { lesionSize: 1 };
   return { ...makeCase(h.condition, h.seed, { ...base, ...cow, ...worse }), back: { ...back, outcome: 'recheck' } };
 }
 
@@ -204,6 +208,7 @@ export function backLine(cd) {
   const was = CONDITIONS[b.was];
   const last = `Visit ${b.visit}: ${b.grade}`;
   if (b.outcome === 'recheck') {
+    if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
     return was.diagnosis === 'sound'
       ? `Back for a recheck. ${last}, and she went off sore. Go gently this time and she earns her points.`
       : `Back for a recheck. ${last}, and she went off lame. The ${cd.noun} has got worse since: put it right and she earns her points this time.`;
@@ -292,6 +297,7 @@ export function recordCow(route, caseDef, result) {
   route.history.push({
     farm: v.farm, visit: v.n, tag, seed: caseDef.seed, condition: caseDef.condition,
     foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back, call,
+    ...(CONDITIONS[caseDef.condition]?.recheck ? { recheck: true } : {}),
   });
   v.k++;
   return { points, lame, back, last: v.k >= farmById(v.farm).cows };

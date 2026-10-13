@@ -9,7 +9,7 @@ import { CFG } from '../src/config.js';
 import {
   FARMS, HOUSING, POINTS, HERD_BONUS, farmMods, herdDeck, visitCases, cowSeed, cowPoints,
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
-  farmCows, healedBack, backLine, TIERS, tierFor, tierMods,
+  farmCows, healedBack, backLine, TIERS, tierFor, tierMods, farmById,
 } from '../src/route.js';
 import { Hoof } from '../src/hoof.js';
 
@@ -324,4 +324,24 @@ test('a cow sent off the line is recorded with her call, earns her grade and is 
   assert.equal(route.history[0].call, 'vet');
   recordCow(route, herd[1], result('Clean'));
   assert.equal(route.history[1].call, null);
+});
+
+test('toe necrosis always comes back for a recheck, smaller after a Textbook job', () => {
+  const farm = farmById('ridgeway');
+  const route = { ...newRoute(), rep: farm.rep };
+  const herd = startVisit(route, farm.id);
+  const toe = herd.find((cd) => cd.condition === 'toenecrosis');
+  assert.ok(toe, 'the first Ridgeway visit deals a toe necrosis cow');
+  for (const cd of herd) recordCow(route, cd, { grade: 'Textbook', gait: cd === toe ? 'to the vet' : 'sound', call: cd === toe ? 'vet' : null });
+  endVisit(route);
+  const tag = toe.subtitle.split(' · ')[0];
+  const h = route.history.find((r) => r.tag === tag);
+  assert.equal(h.recheck, true);
+  assert.equal(h.lame, false);
+  const back = visitCases(farm, 2, route.history).find((cd) => cd.subtitle.startsWith(tag));
+  assert.ok(back, 'she comes back on the next visit');
+  assert.equal(back.back.outcome, 'recheck');
+  assert.equal(back.condition, 'toenecrosis');
+  assert.ok(back.lesion.r < 15, `a Textbook job leaves a small patch (r ${back.lesion.r.toFixed(1)})`);
+  assert.match(backLine(back), /recheck/);
 });
