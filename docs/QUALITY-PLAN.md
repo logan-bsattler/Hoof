@@ -579,6 +579,17 @@ Continues the realism pass (`348b521`, `e6baf32`, `cbc2c14`: wet manure, waxy so
 - Time `build` + the first `compose` in the game at S=2 and S=3, on desktop and on a phone, and compare against `c3598f3` (before the pass).
 - If a case start hitches noticeably: precompute the noise fields once (they don't depend on the hoof), cache them across cases, or build them over a few frames.
 
+**10.1 status (2026-10-13): measured; the cost is in play, not at case start.** `dev/bench.html` times it (`?src=../reference/bench-old/src` runs an export of `c3598f3`, git-ignored). Desktop, Chrome, median ms, now vs `c3598f3`:
+
+| | S=2 | S=3 |
+|---|---|---|
+| Next cow, same side | 343–592 vs 87–254 | 688–756 vs 183–209 |
+| Next cow, other side (outline rebuild) | 708–1217 vs ~100 | 1531–2078 vs ~190 |
+| Full compose | 299–346 vs 100–134 | 592–702 vs 195–224 |
+| One stroke's patch (64 logical px) | 10–11 vs 3.1–3.4 | 20–23 vs 7–8 (p90 35 vs 11) |
+
+The case start is already sliced behind the loading bar (24 ms a frame; noise fields cached per session), so it's a longer wait, not a freeze. The stroke patch is the problem: compose runs every frame while cutting, and at S=3 on a phone (3–5× slower than this desktop) it could be 60–100 ms a frame. First speedup pass (separable relief spline, per-column spline weights, decoys and cleft culled by box, `hypot`→`sqrt`): about 1.2–1.5× faster, pixels within ±1 of before (scratch harness composed 10 conditions × 2 seeds × dirty/brushed/cut). **Next:** the bilinear `sm()` reads closure-captured `let` weights (context loads per pixel; hand-inline the per-pixel ones); `smoothstep` isn't inlined in the oversized compose (~6%); the static per-pixel terms (growth-line `sin`, `wallW`) could be precomputed; `Math.pow` in the lighting could become a table. Then Ben runs `dev/bench.html` on his phone over the LAN.
+
 ### 10.2 Ground-sole crosshatch
 - At 1.3 zoom, the ground sole still shows a faint woven texture. It's the surface on screen for most of a trim, so it matters most.
 - Try less per-pixel grain, and longer, smoother grinder arcs that don't restart at each stamp (the seams between passes show).

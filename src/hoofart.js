@@ -510,28 +510,57 @@ export class HoofArt {
     const RG = this.reliefGrid();
     const PER = Math.max(2.4, 0.9 * S);  // striation spacing, render px
     const GPER = 2.6 * S;                // grinder arcs are broader
-    const kx = new Float32Array(4), kdx = new Float32Array(4), ky = new Float32Array(4), kdy = new Float32Array(4);
-    const reliefOut = new Float32Array(3);
-    // Cubic B-spline over the padded relief grid: smooth value and slope (mm per cell).
-    const relief = (a, ix, iy) => {
-      let v = 0, vx = 0, vy = 0;
-      for (let j = 0; j < 4; j++) {
-        const ry = Math.max(0, Math.min(rows - 1, iy - 1 + j)) * cols;
-        let rv = 0, rdx = 0;
-        for (let i = 0; i < 4; i++) {
-          const q = a[ry + Math.max(0, Math.min(cols - 1, ix - 1 + i))];
-          rv += kx[i] * q; rdx += kdx[i] * q;
-        }
-        v += ky[j] * rv; vx += ky[j] * rdx; vy += kdy[j] * rv;
+    // The spline's column weights depend only on the pixel column: worked out once.
+    if (!this.kxTab) {
+      const kx = new Float32Array(4), kdx = new Float32Array(4);
+      this.kxTab = new Float32Array(w * 4); this.kdxTab = new Float32Array(w * 4);
+      for (let px = 0; px < w; px++) {
+        const fx = (X0 + (px + 0.5) / S - g.x0) / cell - 0.5;
+        bspline(fx - Math.floor(fx), kx, kdx);
+        this.kxTab.set(kx, px * 4); this.kdxTab.set(kdx, px * 4);
       }
-      reliefOut[0] = v; reliefOut[1] = vx; reliefOut[2] = vy;
-    };
+    }
+    const kxTab = this.kxTab, kdxTab = this.kdxTab;
+    const ky = new Float32Array(4), kdy = new Float32Array(4);
+    // Cubic B-spline over the padded relief grid: smooth value and slope (mm per cell). It is
+    // separable, so each pixel row first folds the grid's rows down to one value (and its y
+    // slope) per cell column, for each claw; a pixel then only blends four columns.
+    const colV = { 1: new Float64Array(cols), 2: new Float64Array(cols) };
+    const colVy = { 1: new Float64Array(cols), 2: new Float64Array(cols) };
+    const cx0 = Math.max(0, Math.floor((X0 + (x0 + 0.5) / S - g.x0) / cell - 0.5) - 1);
+    const cx1 = Math.min(cols - 1, Math.floor((X0 + (x1 - 0.5) / S - g.x0) / cell - 0.5) + 2);
+    // Decoys this patch can reach.
+    const near = (f) => f.x + f.r * 2 > X0 + x0 / S && f.x - f.r * 2 < X0 + x1 / S && f.y + f.r * 2 > Y0 + y0 / S && f.y - f.r * 2 < Y0 + y1 / S;
+    const decoysHere = decoys.filter(near);
+    // The heel cleft's box (logical px), padded for the bilinear reach and the warped lookup.
+    if (this.cleftFor !== hoof) {
+      this.cleftFor = hoof;
+      const bx = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < hoof.n; i++) {
+        if (!cleftF[i]) continue;
+        const x = hoof.cellX(i), y = hoof.cellY(i);
+        bx[0] = Math.min(bx[0], x); bx[1] = Math.min(bx[1], y); bx[2] = Math.max(bx[2], x); bx[3] = Math.max(bx[3], y);
+      }
+      const pad = cell * 1.5 + 3;
+      this.cleftBox = [bx[0] - pad, bx[1] - pad, bx[2] + pad, bx[3] + pad];
+    }
+    const cb = this.cleftBox;
 
     for (let py = y0; py < y1; py++) {
       const ly = Y0 + (py + 0.5) / S;
       const fy = (ly - g.y0) / cell - 0.5;
       const iy = Math.floor(fy), ty = fy - iy;
       bspline(ty, ky, kdy);
+      for (const c of [1, 2]) {
+        const a = RG[c], cv = colV[c], cvy = colVy[c];
+        const r0 = Math.max(0, Math.min(rows - 1, iy - 1)) * cols, r1 = Math.max(0, Math.min(rows - 1, iy)) * cols;
+        const r2 = Math.max(0, Math.min(rows - 1, iy + 1)) * cols, r3 = Math.max(0, Math.min(rows - 1, iy + 2)) * cols;
+        for (let x = cx0; x <= cx1; x++) {
+          const q0 = a[r0 + x], q1 = a[r1 + x], q2 = a[r2 + x], q3 = a[r3 + x];
+          cv[x] = ky[0] * q0 + ky[1] * q1 + ky[2] * q2 + ky[3] * q3;
+          cvy[x] = kdy[0] * q0 + kdy[1] * q1 + kdy[2] * q2 + kdy[3] * q3;
+        }
+      }
       for (let px = x0; px < x1; px++) {
         const p = py * w + px, o = p * 4;
         const c = cls[p];
@@ -605,13 +634,19 @@ export class HoofArt {
         } else {
           const ti = sm(init), r = sm(rough);
           const removed = ti - t;
-          bspline(tx, kx, kdx);
-          relief(RG[c], ix, iy);
-          gx += (reliefOut[1] / cell) * RELIEF;
-          gy += (reliefOut[2] / cell) * RELIEF;
+          {
+            const cv = colV[c], cvy = colVy[c], k4 = px * 4;
+            let vx = 0, vy = 0;
+            for (let i = 0; i < 4; i++) {
+              const col = Math.max(0, Math.min(cols - 1, ix - 1 + i));
+              vx += kdxTab[k4 + i] * cv[col]; vy += kxTab[k4 + i] * cvy[col];
+            }
+            gx += (vx / cell) * RELIEF;
+            gy += (vy / cell) * RELIEF;
+          }
           sheen = 1 - 0.6 * r;
           const UL = ulcerOn[c], Lr = UL ? UL.r : 0;
-          const dL = UL ? Math.hypot(lx - UL.x, ly - UL.y) : 1e9;
+          const dL = UL ? Math.sqrt((lx - UL.x) * (lx - UL.x) + (ly - UL.y) * (ly - UL.y)) : 1e9;
           let decoyDark = 0;
 
           // 1. Ivory sole, coloured by thickness.
@@ -670,9 +705,9 @@ export class HoofArt {
 
           // Decoys: a reddish bruise in the horn, or a dark stain like the ulcer's, without the
           // hole. Both are surface marks that trimming takes off (DECOY_DEPTH).
-          for (const f of decoys) {
+          for (const f of decoysHere) {
             if (f.claw !== c) continue;
-            const dd = Math.hypot(lx - f.x, ly - f.y);
+            const dd = Math.sqrt((lx - f.x) * (lx - f.x) + (ly - f.y) * (ly - f.y));
             if (dd > f.r * 2) continue;
             const keep = smoothstep(DECOY_DEPTH[f.kind], DECOY_DEPTH[f.kind] * 0.4, removed);
             if (f.kind === 'bruise') {
@@ -958,7 +993,8 @@ export class HoofArt {
           }
 
           // Heel cleft: soft, greyish-pink skin where the bulbs fold in toward each other.
-          const cf = smoothstep(0.25, 0.75, fieldAt(cleftF, lx + (nIsle[p] / 255 - 0.5) * 4, ly + (nStain[p] / 255 - 0.5) * 4));
+          const cf = lx < cb[0] || lx > cb[2] || ly < cb[1] || ly > cb[3] ? 0
+            : smoothstep(0.25, 0.75, fieldAt(cleftF, lx + (nIsle[p] / 255 - 0.5) * 4, ly + (nStain[p] / 255 - 0.5) * 4));
           if (cf > 0) {
             const k = cf * 0.55;
             R += (172 + 16 * ngr - R) * k; G += (134 + 12 * ngr - G) * k; B += (120 + 10 * ngr - B) * k;
@@ -1022,7 +1058,7 @@ export class HoofArt {
           // is read through a warped lookup so it tears raggedly instead of tracing cells; the
           // free toe-side edge stands proud, catching the lamp and shadowing the sole below.
           if (c === heelC) {
-            const dH = Math.hypot(lx - LH.x, ly - LH.y);
+            const dH = Math.sqrt((lx - LH.x) * (lx - LH.x) + (ly - LH.y) * (ly - LH.y));
             if (dH < LH.r * 2.2) {
               const wx = (nIsle[p] / 255 - 0.5) * 7, wy = (nStain[p] / 255 - 0.5) * 7;
               const ft = 0.5 + (ncv - 0.5) * 0.5;
