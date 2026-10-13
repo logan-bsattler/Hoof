@@ -25,7 +25,8 @@ export const HERD_BONUS = 5;
 // One road, in order. `rep` is the reputation that opens the farm. Ranges are [lo, hi]:
 // growth scales the excess horn, mud 1 = usual muck, temper 0 calm .. 1 lively.
 // `mix` sets each visit's share of conditions (dealt as a deck, see herdDeck); `front` is the
-// share of front feet.
+// share of front feet. `calving` is the chance a routine cow is close to calving and should be
+// left till dry-off (WP9 J1).
 export const FARMS = [
   {
     id: 'willowbank', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
@@ -42,33 +43,33 @@ export const FARMS = [
   {
     id: 'brackenford', name: 'Brackenford', farmer: 'the Pryce brothers', housing: 'freestall', cows: 4, rep: 100,
     intro: 'Eighty cows housed all year on concrete. The Pryces want the lame ones sorted before the vet comes Friday.',
-    mix: { ulcer: 0.35, whiteline: 0.25, doublesole: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.85, 1.2], temper: [0.25, 0.6], front: 0,
+    mix: { ulcer: 0.35, whiteline: 0.25, doublesole: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.85, 1.2], temper: [0.25, 0.6], front: 0, calving: 0.5,
   },
   {
     id: 'toplane', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 180,
     intro: 'Mary wants her old girls done front and back. Front feet grow the other way round: mind which claw goes first.',
-    mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5,
+    mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5, calving: 0.5,
   },
   {
     id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', cows: 5, rep: 270,
     intro: 'The yard at Marsh End never dries out, and the slurry scraper broke in March. Expect muck, and what lives in it.',
-    mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15,
+    mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5,
   },
   {
     id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', cows: 5, rep: 380,
     intro: 'A big, busy unit. Priya’s heifers have never been in a crush before, and they let you know it.',
-    mix: { ulcer: 0.2, whiteline: 0.2, dd: 0.2, puncture: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2,
+    mix: { ulcer: 0.2, whiteline: 0.2, dd: 0.2, puncture: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5,
   },
   {
     id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', cows: 6, rep: 500,
     intro: 'Nobody’s trimmed at Coldharbour for two years. Long feet, a wet yard and cows that don’t want handling.',
-    mix: { ulcer: 0.2, dd: 0.15, whiteline: 0.15, footrot: 0.15, doublesole: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25,
+    mix: { ulcer: 0.2, dd: 0.15, whiteline: 0.15, footrot: 0.15, doublesole: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25, calving: 0.5,
     decoys: [1, 3],
   },
   {
     id: 'ridgeway', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
     intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
-    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, puncture: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2,
+    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, puncture: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5,
     decoys: [1, 3],
   },
 ];
@@ -121,6 +122,8 @@ export function farmMods(farm, seed) {
     temper: between(farm.temper),
   };
   if (farm.decoys) mods.decoyCount = Math.floor(between([farm.decoys[0], farm.decoys[1] + 1]));
+  // Drawn last, so it leaves every earlier draw as it was. makeCase uses it on routine feet only.
+  if (farm.calving && rand() < farm.calving) mods.calving = true;
   return { condition, mods };
 }
 
@@ -175,24 +178,26 @@ export function returningCows(farm, visit, history) {
   const cows = farmCows(history, farm.id);
   // A recheck: lame last time, or a condition that always comes back (toe necrosis, WP8.4).
   const recheck = (h) => h.lame || h.recheck;
-  const well = cows.filter((h) => !recheck(h));
+  // A cow left (or trimmed) close to calving always comes back fresh for her trim (J1).
+  const calved = (h) => h.calving && !recheck(h);
+  const well = cows.filter((h) => !recheck(h) && !calved(h));
   const rand = mulberry32(cowSeed(farm, visit, 999));
   const healed = [];
   while (well.length && healed.length < healedBack(farm)) healed.push(well.splice(Math.floor(rand() * well.length), 1)[0]);
-  return [...cows.filter(recheck), ...healed].slice(0, farm.cows);
+  return [...cows.filter(recheck), ...cows.filter(calved), ...healed].slice(0, farm.cows);
 }
 
 // One cow back again, from her last record. She keeps her tag, foot and temperament; the
 // horn and muck are this visit's.
 export function returnCase(farm, h, visit, k) {
   const now = farmMods(farm, cowSeed(farm, visit, 100 + k)).mods;
-  const { excess: _e, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
+  const { excess: _e, calving: _c, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
   if (base.temper !== undefined) cow.temper = base.temper;
   const back = { visit: h.visit, grade: h.grade, was: h.condition };
   if (!h.lame && !h.recheck) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
-    return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: 'healed' } };
+    return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: h.calving ? 'calved' : 'healed' } };
   }
   // Recheck: the lesion has spread to the top of its band (a hand-placed one grows 2 px).
   // A toe necrosis cow always comes back: barely any black toe after a Textbook job, else the full patch.
@@ -207,6 +212,7 @@ export function backLine(cd) {
   if (!b) return '';
   const was = CONDITIONS[b.was];
   const last = `Visit ${b.visit}: ${b.grade}`;
+  if (b.outcome === 'calved') return `Fresh now: she’s calved since visit ${b.visit}. Time for that trim.`;
   if (b.outcome === 'recheck') {
     if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
     return was.diagnosis === 'sound'
@@ -257,7 +263,7 @@ export function cowPoints(result) {
 //   visits    { farmId: visits finished }
 //   best      { farmId: best day's earnings }
 //   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame,
-//             back, call } where back is 'recheck', 'healed' or null for a cow new to the farm,
+//             back, call } where back is 'recheck', 'healed', 'calved' or null for a cow new to the farm,
 //             and call is how she left the crush: null (released) or a CALLS id (WP8.1)
 //   visit     the day in progress, or null: { farm, n, k, rows }
 
@@ -298,6 +304,7 @@ export function recordCow(route, caseDef, result) {
     farm: v.farm, visit: v.n, tag, seed: caseDef.seed, condition: caseDef.condition,
     foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back, call,
     ...(CONDITIONS[caseDef.condition]?.recheck ? { recheck: true } : {}),
+    ...(caseDef.calving ? { calving: true } : {}),
   });
   v.k++;
   return { points, lame, back, last: v.k >= farmById(v.farm).cows };

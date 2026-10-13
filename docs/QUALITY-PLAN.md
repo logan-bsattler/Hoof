@@ -530,12 +530,16 @@ Cases where the right answer is a call, not a cut. They depend on 8.1's end-of-c
 
 **Change to 8.1 first (D22):** split the sheet into three calls: *Hospital pen* (soft bedding near the parlour, no vet), *Call the vet*, and *Leave her till dry-off*. Foot rot and toe necrosis are `call: 'vet'`; both-claws-bad is `call: 'pen'`. Picking the pen when she needs the vet (or the reverse) is a near miss: Correctness −15, not the full wrong-call penalty.
 
+**D22 status (2026-10-13): already done in 8.1.** `CALLS` has pen, vet and leave. Pen-vs-vet is Correctness −15, and released when a referral was needed is −25 (vet) or −15 (pen).
+
 ### J1 Close to calving (call: leave; small)
 - **Source:** Nate 1:29:04: don't trim a cow close to calving; trim her at dry-off.
 - **Cue:** the farmer's line on the visit card names her ("#418's due in ten days"), and her intro repeats it. No special art (D24). The foot itself is an ordinary routine foot with decoys, so the trap is to trim it because it's there.
 - **Right play:** read the intro, maybe clean and look, then *Leave her till dry-off*. Full points (Ben's call). Any trim stroke past cleaning costs Restraint −10 per claw worked (capped −30); a full trim and release is Needs work with the note "She was due any day: she'd have waited for dry-off."
 - **Return:** she comes back on the next visit as an ordinary (dry) cow, intro "fresh now; time for that trim".
 - **Model:** a `mods.calving: true` flag any condition can carry (only dealt on routine feet at first), `call` read from the case, not only the condition. `farmMods` deals it at a low per-farm share (0 on Willow Bank, about 1 cow in 8 after Brackenford).
+
+**Status (2026-10-13): done.** `farm.calving` (0.5 from Brackenford on, none at Willow Bank or Hollins) is the chance a routine card is a cow close to calving. `farmMods` draws it last, so no earlier draw moves. `makeCase` honours `mods.calving` on routine feet only: `closeToCalving` sets `calving` (days, 4–12 from the seed), `call: 'leave'` and the intro line. Her step list stays the routine one, because the step panel is always visible and a 'refer' step would give the call away. The visit card names her ("… mentions #N’s due to calve in D days"). The leave scoring was already in 8.1 (full marks; Restraint −10 a stroke, cap −30; a trim-and-release is capped below Needs work). History rows get `calving: true`. On the next visit she always comes back as a routine trim, with `back.outcome` 'calved' and the line "Fresh now: she’s calved since visit N". The visit card counts calved cows apart from healed ones, and save.js accepts 'calved'. Tests: two route tests (deal, cue and return); the return-visit test allows for calved cows. Pacing is unchanged (13 days at Textbook). sw v28.
 
 ### J2 Recheck still wearing last visit's block (call: null; medium)
 - **Source:** Nate 38:42: taking the old block off is often the main reason for a recheck; Shearer: blocks still on after 3–6 weeks come off and are replaced only if she still needs relief.

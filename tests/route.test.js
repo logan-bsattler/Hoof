@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CASE_B } from '../src/case.js';
+import { CASE_B, makeCase } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { CFG } from '../src/config.js';
 import {
@@ -203,7 +203,10 @@ test('a return visit deals the lame cows back as rechecks, a few healed ones, th
 
   // The rest are new to the farm: no tag it has seen before.
   const fresh = herd.filter((cd) => !cd.back);
-  assert.equal(fresh.length, farm.cows - 1 - healed.length);
+  // A cow that was close to calving last time is back too, fresh (J1).
+  const calved = herd.filter((cd) => cd.back?.outcome === 'calved');
+  assert.equal(calved.length, first.filter((cd) => cd.calving && cd !== was).length);
+  assert.equal(fresh.length, farm.cows - 1 - healed.length - calved.length);
   for (const cd of fresh) assert.ok(!before.has(tag(cd)), `${tag(cd)} is new to the farm`);
   // The same history always deals the same herd.
   assert.deepEqual(visitCases(farm, 2, route.history).map(tag), herd.map(tag));
@@ -344,4 +347,56 @@ test('toe necrosis always comes back for a recheck, smaller after a Textbook job
   assert.equal(back.condition, 'toenecrosis');
   assert.ok(back.lesion.r < 15, `a Textbook job leaves a small patch (r ${back.lesion.r.toFixed(1)})`);
   assert.match(backLine(back), /recheck/);
+});
+
+// ------------------------------------------------------------------ WP9 J1 close to calving
+test('close to calving: only routine feet, only past Hollins; the call is leave, the cue is in the intro', () => {
+  for (const f of FARMS) {
+    let n = 0, routine = 0;
+    for (let visit = 1; visit <= 12; visit++) {
+      for (const cd of visitCases(f, visit)) {
+        if (cd.condition === 'routine') routine++;
+        if (!cd.calving) continue;
+        n++;
+        assert.equal(cd.condition, 'routine', `${f.name}: a calving cow is a routine foot`);
+        assert.equal(cd.call, 'leave');
+        assert.match(cd.intro, new RegExp(`due to calve in ${cd.calving} days`));
+        assert.ok(cd.calving >= 4 && cd.calving <= 12);
+      }
+    }
+    if (!f.calving) assert.equal(n, 0, `${f.name} has no calving cows`);
+    else assert.ok(n > 0 && n < routine, `${f.name}: ${n} of ${routine} routine cows close to calving`);
+  }
+  // The same seed with and without the flag: everything but the call and intro is the same foot.
+  const seed = 321, plain = makeCase('routine', seed), due = makeCase('routine', seed, { calving: true });
+  assert.deepEqual(due.findings, plain.findings);
+  assert.deepEqual(due.steps, plain.steps, 'the step list doesn’t give the call away');
+  assert.equal(makeCase('ulcer', seed, { calving: true }).calving, undefined, 'only routine feet');
+});
+
+test('a calving cow comes back fresh next visit, as a routine trim, however she was handled', () => {
+  const farm = farmById('brackenford');
+  for (const call of ['leave', null]) {
+    const route = newRoute();
+    route.rep = farm.rep;
+    let v = 1, herd;
+    for (; v <= 12; v++) {
+      herd = startVisit(route, farm.id);
+      if (herd.some((cd) => cd.calving)) break;
+      herd.forEach((cd) => recordCow(route, cd, result('Clean')));
+      endVisit(route);
+    }
+    const cow = herd.find((cd) => cd.calving);
+    assert.ok(cow, 'a calving cow turns up within 12 visits');
+    herd.forEach((cd) => recordCow(route, cd, cd === cow ? { ...result('Textbook', call ? 'left till dry-off' : 'sound'), call } : result('Clean')));
+    endVisit(route);
+    assert.equal(route.history.at(-herd.length + herd.indexOf(cow)).calving, true);
+    const next = visitCases(farm, v + 1, route.history);
+    const back = next.find((cd) => tag(cd) === tag(cow));
+    assert.ok(back, 'she comes back');
+    assert.equal(back.back.outcome, 'calved');
+    assert.equal(back.condition, 'routine');
+    assert.ok(!back.calving, 'fresh now, not due again');
+    assert.match(backLine(back), /calved/);
+  }
 });

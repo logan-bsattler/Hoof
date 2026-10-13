@@ -796,13 +796,17 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const n = (route.visits[farm.id] ?? 0) + 1;
   const farmer = `${farm.farmer[0].toUpperCase()}${farm.farmer.slice(1)}`;
   // Who's coming back: the lame ones from last time, and a few you trimmed well.
-  const back = visitCases(farm, n, route.history).filter((cd) => cd.back);
+  const herdNow = visitCases(farm, n, route.history);
+  const back = herdNow.filter((cd) => cd.back);
+  // Cows close to calving (J1): the farmer says so, and that's the only cue.
+  const due = herdNow.filter((cd) => cd.calving);
   const tags = (list) => list.map((cd) => `<b>${cd.subtitle.split(' · ')[0].replace('Holstein ', '')}</b>`).join(', ');
   const rechecks = back.filter((cd) => cd.back.outcome === 'recheck');
   // A black toe is due back whatever happened (WP8.4); the rest came back lame.
   const toes = rechecks.filter((cd) => CONDITIONS[cd.back.was]?.recheck);
   const lame = rechecks.filter((cd) => !CONDITIONS[cd.back.was]?.recheck);
-  const healed = back.length - rechecks.length;
+  const healed = back.filter((cd) => cd.back.outcome === 'healed').length;
+  const calved = back.filter((cd) => cd.back.outcome === 'calved');
   const pick = await ui.modal(
     `<div class="eyebrow">${HOUSING[farm.housing]} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
      <h1>${farm.name}</h1>
@@ -810,6 +814,8 @@ async function showVisit(farm, { fromMap = true } = {}) {
      <p>${farm.intro}</p>
      ${lame.length ? `<p class="back recheck">${farmer} wants a second look at ${tags(lame)}: lame after last time.</p>` : ''}
      ${toes.length ? `<p class="back recheck">${tags(toes)} ${toes.length === 1 ? 'is' : 'are'} due back for the toe recheck: a black toe is never done in one visit.</p>` : ''}
+     ${due.map((cd) => `<p class="back">${farmer} mentions ${tags([cd])}’s due to calve in ${cd.calving} days.</p>`).join('')}
+     ${calved.length ? `<p class="back healed">${tags(calved)} ${calved.length === 1 ? 'has' : 'have'} calved since last time and ${calved.length === 1 ? 'is' : 'are'} due ${calved.length === 1 ? 'her' : 'their'} trim.</p>` : ''}
      ${healed ? `<p class="back healed">${healed === 1 ? 'One cow' : `${healed} cows`} from last time ${healed === 1 ? 'is' : 'are'} back for ${healed === 1 ? 'her' : 'their'} next trim.</p>` : ''}`,
     fromMap
       ? [{ id: 'go', label: 'Start the day', primary: true }, { id: 'back', label: 'Back to the road' }]
