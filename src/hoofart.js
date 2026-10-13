@@ -775,8 +775,12 @@ export class HoofArt {
             const mark = smoothstep(0.5, -0.5, dM) * lf;
             const pool = smoothstep(K.r * 1.2, K.r * 0.4, dP) * 0.1 * lf;
             R *= 1 - pool; G *= 1 - pool; B *= 1 - pool * 0.8;
+            // A thin pale rim of horn pushed in at the edge: it keeps the shape crisp on a dark,
+            // stained sole, where a plain dark mark would sink into the stains.
+            const rim = smoothstep(1.8, 0.7, dM) * smoothstep(-0.1, 0.6, dM) * lf * 0.55;
+            if (rim > 0) { R += (206 - R) * rim; G += (186 - G) * rim; B += (148 - B) * rim; }
             if (mark > 0) {
-              R += (36 - R) * mark; G += (30 - G) * mark; B += (27 - B) * mark;
+              R += (22 - R) * mark; G += (18 - G) * mark; B += (16 - B) * mark;
               const glint = PU.shape === 'line' ? smoothstep(0.9, 0.97, ngr) * smoothstep(-0.4, -1.2, dM)
                 : smoothstep(1.3, 0.3, Math.hypot(lx - PU.x + 1.5, ly - PU.y + 1.5));
               spec += 80 * glint * mark;

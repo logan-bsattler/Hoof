@@ -253,7 +253,7 @@ export const CONDITIONS = {
           },
           {
             id: 'foreign', label: 'Foreign body',
-            feedback: "No puncture, no screw, no stone. It's a sole ulcer.",
+            feedback: 'A puncture is a neat round hole or a ruled line mid-sole. This is a soft, springy spot at the sole/heel junction: a sole ulcer.',
           },
           {
             id: 'dd', label: 'Digital dermatitis',
@@ -312,7 +312,7 @@ export const CONDITIONS = {
           },
           {
             id: 'foreign', label: 'Foreign body',
-            feedback: 'Nothing driven in. Grit got in through a split white line: a white-line abscess.',
+            feedback: 'A puncture is a neat hole or line mid-sole, and only the mark hurts. This dark line runs in from the wall and she flinches all along it: a white-line abscess.',
           },
           {
             id: 'dd', label: 'Digital dermatitis',
