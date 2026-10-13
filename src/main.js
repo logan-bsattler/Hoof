@@ -178,7 +178,7 @@ async function showIntro() {
        <li><b>Read</b> it with the hoof testers before you commit.</li>
        <li><b>Trim</b> the five steps in order: balance beats speed.</li>
        ${caseDef.howto ?? ''}
-       ${caseDef.requires?.treat ? '<li><b>Treat</b> it: flush, pad and wrap before she goes.</li>' : '<li><b>Leave</b> what’s firm alone: not every mark is trouble.</li>'}
+       ${caseDef.requires?.wrap === false ? '<li><b>Treat</b> what needs it before she goes.</li>' : caseDef.requires?.treat ? '<li><b>Treat</b> it: flush, pad and wrap before she goes.</li>' : '<li><b>Leave</b> what’s firm alone: not every mark is trouble.</li>'}
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
     // The guided run teaches the hind foot (inner claw first).
@@ -358,7 +358,7 @@ function tap(x, y) {
       if (L.type === 'ulcer') {
         renderer.weep(L.x, L.y, 1);
         Sound.bubbles();
-      } else if (L.type === 'dd') {
+      } else if (L.type === 'dd' || L.type === 'footrot') {
         // Raw skin: a sharp flinch, the foot snatched against the strap.
         jolt(5);
         Sound.moo(true);
@@ -388,6 +388,7 @@ const WRAP_MSG = {
   closed: 'Open the ulcer first. Pare the loose horn off it with the knife.',
   unflushed: () => caseDef.lesion?.type === 'dd' ? 'Spray the raw patch in the cleft until it’s soaked before you cover it.' : 'Flush the opened ulcer with the spray bottle before you cover it.',
   nothing: 'She’s sound: nothing to pad or wrap.',
+  nowrap: 'No wrap for foot rot. Spray it and let the vet see her.',
   early: 'Finish the trim first. The wrap goes on last, just before she’s released.',
   done: 'She’s wrapped. Release her.',
 };
@@ -598,9 +599,10 @@ function handle(ev, x, y) {
     s.cleftCuts++;
     // She flinches once per warning, not on every stamp of the blade.
     const fresh = (game.lastWarn.cleft ?? -99) + 4 <= game.time;
-    if (fresh && caseDef.lesion?.type === 'dd') { jolt(4); Sound.moo(true); }
-    warnOnce('cleft', caseDef.lesion?.type === 'dd'
-      ? 'No blade in the cleft! That’s raw skin: spray it and wrap it, don’t cut it.'
+    const skin = caseDef.lesion?.type === 'dd' || caseDef.lesion?.type === 'footrot';
+    if (fresh && skin) { jolt(4); Sound.moo(true); }
+    warnOnce('cleft', skin
+      ? 'No blade in the cleft! That’s raw skin: spray it, don’t cut it.'
       : 'That’s the heel cleft: skin, not horn. Keep the blades out of it.');
   }
   if (ev.blockedSkip) warnOnce('blocked', 'Can’t trim under the block.', 'info', 6);
@@ -925,7 +927,8 @@ function frame(now) {
         particles.spawn('mist', ptr.x - 8, ptr.y + 8, '#bff0e2', 3, [70, -60]);
         if (ev.sprayLesion > 0 && !game.session.flushed) {
           game.session.flushed = true;
-          ui.toast(caseDef.lesion?.type === 'dd' ? 'Spraying the raw patch. Soak all of it.'
+          ui.toast(caseDef.lesion?.type === 'footrot' ? 'Spraying the split skin. Soak all of it.'
+            : caseDef.lesion?.type === 'dd' ? 'Spraying the raw patch. Soak all of it.'
             : 'Flushing the pocket. Flush again after each round of paring.', 'good', 3200);
         }
         handle(ev, ptr.x, ptr.y);

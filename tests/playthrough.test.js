@@ -6,9 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, CLAW, LOOSE, GEOM, clawBox, dishRect, firstClaw, secondClaw, soundClaw } from '../src/hoof.js';
+import { Hoof, Z, CLAW, LOOSE, GEOM, clawBox, dishRect, firstClaw, secondClaw, soundClaw } from '../src/hoof.js';
 import { CASE_B, dealMods, makeCase } from '../src/case.js';
-import { CONDITIONS } from '../src/conditions.js';
+import { CONDITIONS, CALLS } from '../src/conditions.js';
 import { KNIFE_FLAT, applyGrind, applyWrap } from '../src/tools.js';
 import { evaluateSteps, trimFinished } from '../src/steps.js';
 import { newSession, scoreCase } from '../src/scoring.js';
@@ -67,6 +67,17 @@ function playthrough(cd, quiet = false) {
   s.diagnosis = cd.diagnosis;
   s.diagnosisCorrect = true;
   assert.ok(done('diagnose'));
+
+  if (cd.requires.trim === false) {
+    // Foot rot: no blade near it. Spray the length of the split, then call the vet.
+    const rot = [];
+    for (let i = 0; i < hoof.n; i++) if (hoof.zone[i] & Z.ROT) rot.push([hoof.cellX(i), hoof.cellY(i)]);
+    rot.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+    until('soak', () => p.drag('spray', rot, 40));
+    s.call = cd.call;
+    until('refer', () => {});
+    return verdict();
+  }
 
   // Steps 1–2: nip both toes tip first, then grind the first claw (inner on a hind foot,
   // outer on a front) and match the other to it.
@@ -146,6 +157,9 @@ function playthrough(cd, quiet = false) {
 
   }
 
+  return verdict();
+
+  function verdict() {
   const m = hoof.metrics();
   const { current } = evaluateSteps(m, s, hoof, ++now);
   assert.equal(current, -1, 'every step done');
@@ -155,7 +169,8 @@ function playthrough(cd, quiet = false) {
   if (!quiet) console.log(`playthrough ${cd.subtitle}, ${L ? `${L.type} ${L.claw === CLAW.OUTER ? 'outer' : 'inner'}` : cd.condition}: ${r.grade} ${r.total} (${parts}) · inner ${m.claws[CLAW.INNER].wbMean.toFixed(2)} ` +
     `outer ${m.claws[CLAW.OUTER].wbMean.toFixed(2)} mm · ${r.notes.join(' | ')}`);
   assert.equal(r.grade, 'Textbook', `${r.total}: ${r.notes.join(' | ')}`);
-  assert.equal(r.gait, 'sound');
+  assert.equal(r.gait, cd.call ? CALLS[cd.call].gait : 'sound');
+  }
 }
 
 test('a careful player reaches Textbook with the real tools, without drawing blood', () => playthrough(CASE_B));

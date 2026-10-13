@@ -176,7 +176,7 @@ export class Renderer {
         c.arc(L.x, L.y, L.r * 2.1, 0, Math.PI * 2);
         c.stroke();
         c.setLineDash([]);
-        label(c, L.type === 'dd' ? 'DD ▼' : 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
+        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - L.r * 2.1 - 6, '#ff6b5b', fs);
       }
       c.restore();
     }

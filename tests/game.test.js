@@ -14,6 +14,15 @@ const { target: T, dishTarget: D } = CFG.sole;
 
 // Put the hoof into the state a perfect trimmer would leave it in.
 function idealTrim(hoof) {
+  // Foot rot (WP8.2) wants no trim: clean the foot and soak the split, nothing more.
+  if (hoof.caseDef.requires?.trim === false) {
+    for (let i = 0; i < hoof.n; i++) {
+      if (!hoof.claw[i]) continue;
+      hoof.mud[i] = 0;
+      if (hoof.zone[i] & Z.ROT) hoof.tint[i] = 1;
+    }
+    return;
+  }
   for (let i = 0; i < hoof.n; i++) {
     if (!hoof.claw[i]) continue;
     const z = hoof.zone[i];
@@ -366,11 +375,13 @@ async function idealRun(cd) {
   const h = new Hoof(cd);
   idealTrim(h);
   const m = h.metrics();
-  const { status } = evaluateSteps(m, idealSession(cd), h, 1);
+  // A cow who needs a call gets it, and nothing she doesn't need.
+  const s = cd.call ? { ...idealSession(cd), call: cd.call, firstCutClaw: null, blockAttempts: [] } : idealSession(cd);
+  const { status } = evaluateSteps(m, s, h, 1);
   // The guided run is written for the ulcer case only.
   const t = cd.condition === 'ulcer' ? new Tutorial(cd) : null;
-  t?.update(m, idealSession(cd), h);
-  return { h, status, r: scoreCase(m, idealSession(cd), h, cd), t };
+  t?.update(m, s, h);
+  return { h, status, r: scoreCase(m, s, h, cd), t };
 }
 
 test('an ulcer on the inner claw: every step completes on the outer-claw block, Textbook', async () => {
@@ -438,7 +449,7 @@ for (const id of Object.keys(CONDITIONS)) test(`${id}: 50 dealt cows all build, 
     assert.ok(cd.findings.length >= (L ? 2 : 1), `seed ${seed}: at least one decoy`);
     for (const f of cd.findings) assert.ok(insideClaw(f.claw, f.x, f.y, cd.side, 4), `seed ${seed}: ${f.kind} outside its claw`);
     const { h, status, r, t } = await idealRun(cd);
-    if (L?.type === 'dd') assert.ok(h.metrics().ddN >= 8, `seed ${seed}: DD cells ${h.metrics().ddN}`);
+    if (L?.type === 'dd' || L?.type === 'footrot') assert.ok(h.metrics().ddN >= 8, `seed ${seed}: DD cells ${h.metrics().ddN}`);
     else if (L) assert.ok(h.metrics().looseN[LESION_LOOSE[L.type]] > 10, `seed ${seed}: lesion cells`);
     else assert.equal(h.metrics().looseN[LOOSE.ULCER] + h.metrics().looseN[LOOSE.TRACT], 0, `seed ${seed}: no lesion cells on a sound foot`);
     if (L?.path) {

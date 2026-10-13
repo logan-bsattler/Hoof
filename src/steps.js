@@ -5,6 +5,7 @@
 
 import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, firstClaw, secondClaw, soundClaw } from './hoof.js';
+import { CALLS } from './conditions.js';
 
 const { target: T, dishTarget: D } = CFG.sole;
 
@@ -72,6 +73,18 @@ export const STEPS = [
     id: 'dress', label: 'Treat: spray and wrap the cleft', tool: 'spray',
     tip: 'Keep the knife out of the cleft. Spray the raw patch until it’s soaked, then tap it with the pad + wrap: white pad first, then the pink wrap.',
     done: (m, s, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin,
+  },
+  // Foot rot: spray only. No blade near it and no wrap: the vet takes it from here.
+  {
+    id: 'soak', label: 'Treat: soak the split skin', tool: 'spray',
+    tip: 'Spray the split, grey skin between the claws until it’s soaked. No blade near it, and no wrap.',
+    done: (m) => m.lesionTint >= CFG.treat.tintMin,
+  },
+  // A cow who leaves the crush by a call (WP8.1): done when that call is made.
+  {
+    id: 'refer', label: (cd) => `Send her: ${CALLS[cd.call].label.toLowerCase()}`, tool: null,
+    tip: 'This one isn’t yours to fix. Tap Vet / leave… beside Release and make the call.',
+    done: (m, s, hoof) => s.call === hoof.caseDef.call,
   },
 ];
 

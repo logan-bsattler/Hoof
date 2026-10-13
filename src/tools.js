@@ -308,8 +308,8 @@ export function applySpray(hoof, x, y, dt) {
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (blocked(hoof, i, ev)) return;
     hoof.mud[i] = Math.max(0, hoof.mud[i] - cfg.rinse * dt * f);
-    // Opened ulcer tissue, or the raw DD patch on the cleft skin, soaks it up.
-    const opened = (hoof.looseInit[i] === LOOSE.ULCER && !hoof.loose[i]) || !!(hoof.zone[i] & Z.DD);
+    // Opened ulcer tissue, or the raw skin of DD or foot rot in the cleft, soaks it up.
+    const opened = (hoof.looseInit[i] === LOOSE.ULCER && !hoof.loose[i]) || !!(hoof.zone[i] & (Z.DD | Z.ROT));
     const a = Math.min(1 - hoof.tint[i], (opened ? cfg.rate : cfg.hornRate) * dt * f);
     hoof.tint[i] += a;
     ev.sprayed += a;
@@ -325,6 +325,7 @@ export function applyWrap(hoof, claw, m, ready) {
   const L = hoof.caseDef.lesion;
   if (!L) return { ok: false, reason: 'nothing' };
   if (hoof.caseDef.requires?.treat === false) return { ok: false, reason: 'untreated' };
+  if (hoof.caseDef.requires?.wrap === false) return { ok: false, reason: 'nowrap' };
   if (!claw) return { ok: false, reason: 'miss' };
   if (claw !== L.claw) return { ok: false, reason: 'sound' };
   if (hoof.wrap >= 2) return { ok: false, reason: 'done' };

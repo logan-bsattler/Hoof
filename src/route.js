@@ -52,7 +52,7 @@ export const FARMS = [
   {
     id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', cows: 5, rep: 270,
     intro: 'The yard at Marsh End never dries out, and the slurry scraper broke in March. Expect muck, and what lives in it.',
-    mix: { dd: 0.4, ulcer: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15,
+    mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15,
   },
   {
     id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', cows: 5, rep: 380,
@@ -62,7 +62,7 @@ export const FARMS = [
   {
     id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', cows: 6, rep: 500,
     intro: 'Nobody’s trimmed at Coldharbour for two years. Long feet, a wet yard and cows that don’t want handling.',
-    mix: { ulcer: 0.3, dd: 0.25, whiteline: 0.25, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25,
+    mix: { ulcer: 0.25, dd: 0.2, whiteline: 0.2, footrot: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25,
     decoys: [1, 3],
   },
 ];

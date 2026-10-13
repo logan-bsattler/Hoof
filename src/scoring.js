@@ -68,8 +68,8 @@ export function lesionOpened(m, hoof) {
   return L.type === 'whiteline' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
 
-// Flushed, padded and wrapped.
-const treated = (m, hoof) => hoof.wrap >= 2 && m.lesionTint >= CFG.treat.tintMin;
+// Flushed, padded and wrapped (sprayed only, where the condition wants no wrap: foot rot).
+const treated = (m, hoof) => (hoof.caseDef.requires?.wrap === false || hoof.wrap >= 2) && m.lesionTint >= CFG.treat.tintMin;
 
 export function scoreCase(m, session, hoof, caseDef) {
   const T = CFG.sole.target, D = CFG.sole.dishTarget;
@@ -97,6 +97,9 @@ export function scoreCase(m, session, hoof, caseDef) {
     return { failed: false, total, grade: g.name, medal: g.medal, gait: CALLS.leave.gait, mobility: null, parts, notes, call: 'leave' };
   }
 
+  // A foot that isn't to be trimmed today (foot rot) is graded on what was done instead.
+  const trim = caseDef.requires?.trim !== false;
+
   // Balance: level claws, right height, toe length, heel preserved.
   const level = ramp(Math.abs(m.levelDiff), 0.3, 3);
   // A wider band early on the route (WP7.6) widens the full-marks height by the same slack.
@@ -105,11 +108,13 @@ export function scoreCase(m, session, hoof, caseDef) {
   const height = (off(inner) + off(outer)) / 2;
   const toe = 100 * (1 - (inner.deadRemain + outer.deadRemain) / 2);
   const heel = ramp(m.heelRemovedMean, 0.3, 2);
-  const balance = 0.4 * level + 0.3 * height + 0.2 * toe + 0.1 * heel;
+  const balance = trim ? 0.4 * level + 0.3 * height + 0.2 * toe + 0.1 * heel : 100;
+  if (trim) {
   if (level < 70) notes.push(`Claws aren’t level: ${Math.abs(m.levelDiff).toFixed(1)} mm apart. She’ll rock on the taller one.`);
   if (height < 70) notes.push(`Sole height is off target (inner ${inner.wbMean.toFixed(1)} mm, outer ${outer.wbMean.toFixed(1)} mm; aim for ~${T}).`);
   if (toe < 85) notes.push('Overgrown toe left on. Nip back to the dashed line.');
   if (heel < 80) notes.push('You took horn off the heel. Step 1 rule: don’t touch the heel.');
+  }
 
   // Correctness: right read, right order, right claw.
   let correctness = 100;
@@ -127,15 +132,16 @@ export function scoreCase(m, session, hoof, caseDef) {
     correctness -= 20;
     notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
-  if (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
-  if (session.firstCutClaw === secondClaw(caseDef)) {
+  if (trim && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
+  if (trim && session.firstCutClaw === secondClaw(caseDef)) {
     const [a, b] = [CLAW_NAME[firstClaw(caseDef)], CLAW_NAME[secondClaw(caseDef)]];
     correctness -= 10;
     notes.push(`Started on the ${b} claw. On a ${caseDef.foot ?? 'hind'} foot, trim the ${a} claw first and match the ${b} to it.`);
   }
   if (need.treat && !treated(m, hoof)) {
     correctness -= 10;
-    notes.push(L.type === 'dd' ? 'The DD lesion went out untreated. Spray it, then pad and wrap it.' : 'The ulcer went out untreated. Flush it with the spray, then pad and wrap it.');
+    notes.push(L.type === 'footrot' ? 'The split skin went out unsprayed. Clean it and soak it before she goes.'
+      : L.type === 'dd' ? 'The DD lesion went out untreated. Spray it, then pad and wrap it.' : 'The ulcer went out untreated. Flush it with the spray, then pad and wrap it.');
   }
   // A blade in the heel cleft: skin, not horn, and on a DD foot the raw patch itself.
   if (session.cleftCuts) {
@@ -179,7 +185,10 @@ export function scoreCase(m, session, hoof, caseDef) {
   const dug = decoysDug(hoof, caseDef);
   // Hunting for the abscess through the sole instead of following the track.
   const hunted = soleDugBesideTrack(hoof, L) > 6;
-  const restraint = clamp(100 - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
+  // Strokes on a foot that wasn't to be trimmed: 15 each, at most 30.
+  const needless = trim ? 0 : Math.min(30, 15 * session.cuts);
+  if (needless) notes.push(caseDef.trimNote ?? 'This foot wasn’t to be trimmed today.');
+  const restraint = clamp(100 - needless - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
   if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
   if (hunted) notes.push('You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
@@ -187,9 +196,9 @@ export function scoreCase(m, session, hoof, caseDef) {
 
   // Finish: clean, smooth, no loose horn.
   const looseLeft = (m.looseRemain[LOOSE.ULCER] + m.looseRemain[LOOSE.HEEL]) / 2;
-  const finish = 0.3 * ramp(m.mudMean, 0.02, 0.4) + 0.4 * ramp(m.roughMean, 0.12, 0.6) + 0.3 * 100 * (1 - looseLeft);
-  if (m.roughMean > 0.2) notes.push('Surface is rough. A few rasp passes trues it up.');
-  if (m.looseRemain[LOOSE.HEEL] > 0.1) notes.push('Loose heel horn left on (step 5).');
+  const finish = !trim ? ramp(m.mudMean, 0.02, 0.4) : 0.3 * ramp(m.mudMean, 0.02, 0.4) + 0.4 * ramp(m.roughMean, 0.12, 0.6) + 0.3 * 100 * (1 - looseLeft);
+  if (trim && m.roughMean > 0.2) notes.push('Surface is rough. A few rasp passes trues it up.');
+  if (trim && m.looseRemain[LOOSE.HEEL] > 0.1) notes.push('Loose heel horn left on (step 5).');
 
   const parts = { balance, correctness, restraint, finish };
   const W = CFG.weights;
@@ -218,7 +227,8 @@ export function scoreCase(m, session, hoof, caseDef) {
     : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
   const gaitScore = 0.5 * balance + 0.5 * relief;
   const blockedSore = !!L && hoof.block === L.claw;
-  const walked = blockedSore ? 'lame'
+  // A cow who needed the pen or the vet and was released goes on getting worse.
+  const walked = blockedSore || (referral(want) && !made) ? 'lame'
     : gaitScore >= 75 ? 'sound' : gaitScore >= 50 ? 'tender' : 'lame';
   // A cow sent off the line doesn't walk off: no gait, no mobility score, and she isn't lame.
   const gait = made ? CALLS[made].gait : walked;

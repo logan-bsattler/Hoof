@@ -31,6 +31,11 @@ export const FINDING = {
     probeText: 'She snatches the foot away. Raw, strawberry-red skin in the cleft, sore to the lightest touch.',
     diagnosedText: 'Digital dermatitis. No blade near it: clean it, spray it, wrap it.',
   },
+  footrot: {
+    look: 'split grey skin in the cleft', feel: 'hot and swollen across both claws',
+    probeText: 'She pulls the foot away. The skin between the claws is split, grey and stinking, and the whole foot is hot and puffy.',
+    diagnosedText: 'Foot rot. No blade near it: clean the split, spray it, and get the vet.',
+  },
   stain: {
     look: 'dark patch', feel: 'firm',
     probeText: 'Dark is just staining. Firm underneath.',
@@ -349,6 +354,63 @@ export const CONDITIONS = {
         howto: '<li><b>No knife in the cleft:</b> clean it, spray it, wrap it.</li>',
         misreadNote: 'Misread the lesion. A raw red patch on the skin between the heel bulbs is digital dermatitis.',
         plan: 'Plan: functional trim (steps 1–3), rasp, flick off the loose heel horn, then spray the lesion and pad and wrap it. No blade in the cleft, and no block.',
+      };
+    },
+  },
+
+  // Case E "Hot Foot" (WP8.2): foot rot. An infection of the skin between the claws that swells
+  // the whole foot. The trimmer cleans and sprays it; the antibiotics are the vet's. The lesson is
+  // in what isn't done: no trim, no block, no wrap, and the call.
+  footrot: {
+    caseId: 'E',
+    title: 'Hot Foot',
+    noun: 'foot rot',
+    weight: 0.12,
+    steps: ['clean', 'diagnose', 'soak', 'refer'],
+    requires: { open: false, block: false, treat: true, wrap: false, trim: false },
+    call: 'vet',
+    diagnosis: 'footrot',
+
+    // The split runs the whole cleft (hoof.js marks it on both claws); `lesion` is where the
+    // testers' read card points, on one claw's side of it.
+    place(rand, side, v = {}) {
+      const sore = rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
+      const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
+      const lesion = placeCleft(rand, side, sore, v);
+      const looseHorn = placeHeelHorn(rand, at, rand() < 0.5 ? CLAW.OUTER : CLAW.INNER);
+      const decoys = placeDecoys(rand, at, side, [lesion, looseHorn], v);
+      return { lesion, looseHorn, decoys };
+    },
+
+    copy({ cow, limb }) {
+      return {
+        intro:
+          `#${cow} went lame on the ${limb} overnight, and the farmer says the foot stinks. ` +
+          'Lift it and look between the claws as well as at the soles.',
+        diagnosisPrompt: 'She’s very lame and the foot is hot. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'footrot', label: 'Foot rot',
+            feedback: 'Right. Split, grey, stinking skin between the claws, and swelling right across the foot: foot rot.',
+          },
+          {
+            id: 'dd', label: 'Digital dermatitis',
+            feedback: 'DD is a neat raw patch with no swelling. This whole foot is swollen and split: foot rot.',
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer springs in the horn of the sole. These soles are firm: the trouble is the split skin between the claws. Foot rot.',
+          },
+          {
+            id: 'whiteline', label: 'White-line abscess',
+            feedback: 'An abscess swells one claw. This swelling runs across both, with the skin split between them: foot rot.',
+          },
+        ],
+        howto: '<li><b>Not every foot gets trimmed.</b> Some go to the vet: <b>Vet / leave…</b> sits beside Release.</li>',
+        misreadNote: 'Misread the foot. Swelling across both claws, split grey skin between them and the smell: that’s foot rot.',
+        callNote: 'Foot rot needs the vet’s antibiotics. Released, she’ll only get worse.',
+        trimNote: 'No trim today. Foot rot needs the vet, not the knife: every stroke was one she didn’t need.',
+        plan: 'Plan: clean it, soak the split skin with the spray, then send her to the hospital pen and call the vet. No trim, no block, no wrap.',
       };
     },
   },

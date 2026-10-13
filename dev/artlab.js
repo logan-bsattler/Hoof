@@ -1,8 +1,8 @@
 // Dev-only art lab: replays scripted tool work on fresh hoofs and draws each stage large,
 // so texture and cut edges can be judged side by side. Not loaded by the game.
 
-import { Hoof, CLAW } from '../src/hoof.js';
-import { CASE_B } from '../src/case.js';
+import { Hoof, CLAW, Z } from '../src/hoof.js';
+import { CASE_B, makeCase } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
 import { makePlayer } from '../tests/player.js';
 
@@ -18,8 +18,11 @@ const Q = new URLSearchParams(location.search);
 const ZOOM = Number(Q.get('zoom')) || 1.225;
 const ONLY = Q.has('stage') ? Number(Q.get('stage')) : -1;
 
+// ?cond=<condition id>[&seed=n] stages a dealt cow of that condition instead of Case B.
+const CD = Q.has('cond') ? makeCase(Q.get('cond'), Number(Q.get('seed')) || 1) : CASE_B;
+
 function session() {
-  const hoof = new Hoof(CASE_B);
+  const hoof = new Hoof(CD);
   const art = new HoofArt(3);
   art.sync(hoof);
   const p = makePlayer(hoof, {
@@ -31,8 +34,21 @@ function session() {
   return Object.assign(p, { art });
 }
 
-const L = CASE_B.lesion;
-const STAGES = [
+// Spray along every cell of the lesion's skin (DD patch or foot-rot split).
+const sprayLesion = (s) => {
+  const pts = [];
+  for (let i = 0; i < s.hoof.n; i++) if (s.hoof.zone[i] & (Z.DD | Z.ROT)) pts.push([s.hoof.cellX(i), s.hoof.cellY(i)]);
+  pts.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  for (let k = 0; k < 3; k++) s.drag('spray', pts, 40);
+  return s;
+};
+
+const L = CD.lesion;
+const STAGES = Q.has('cond') ? [
+  ['Dirty', () => session()],
+  ['Brushed', () => session().brushAll()],
+  ['Brushed, lesion sprayed', () => sprayLesion(session().brushAll())],
+] : [
   ['Dirty (0:15)', () => session()],
   ['Brushed, first grinder passes (0:35)', () => session().brushAll().nip().grind(CLAW.OUTER, 330, 470, 1)],
   ['Ground to white (1:25)', () => session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER)],

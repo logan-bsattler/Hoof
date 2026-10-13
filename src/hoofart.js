@@ -67,6 +67,9 @@ for (let a = 0; a < ANG_N; a++) {
   SIN[a] = Math.sin((a / ANG_N) * Math.PI);
 }
 
+// Foot rot's heel flush: how near the cleft a pixel is, from a smooth spread of side samples.
+const NEAR_TAPS = [4, 8, 12, 16, 20, 24, 28].map((dx) => [dx, 0.5 * Math.exp(-dx / 12)]);
+
 export class HoofArt {
   constructor(S = 2) {
     const g = CFG.grid;
@@ -453,6 +456,7 @@ export class HoofArt {
     const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
+    const rot = L?.type === 'footrot';
     const lesionC = L?.claw ?? CLAW.NONE, heelC = LH.claw;
     // The ulcer art keys off dL (distance to the ulcer) and Lr; with no ulcer, dL stays huge.
     const ulcerC = L?.type === 'ulcer' ? L.claw : CLAW.NONE, Lr = ulcerC ? L.r : 0;
@@ -796,6 +800,24 @@ export class HoofArt {
             R += (172 + 16 * ngr - R) * k; G += (134 + 12 * ngr - G) * k; B += (120 + 10 * ngr - B) * k;
             // Digital dermatitis: a raw, strawberry-red patch, pitted with pale dots, inside a rim
             // of thickened greyish-white skin. The spray stains it teal.
+            // Foot rot: the skin has split down the cleft into a grey, moist, foul crack on both
+            // claws. The spray stains it teal.
+            if (rot) {
+              // Inflamed red at the margin, grey dead skin inside, a dark wet crack along the edge.
+              const u = cf + (ncv - 0.5) * 0.35;
+              const split = smoothstep(0.5, 0.85, u);
+              const margin = smoothstep(0.25, 0.5, u) * (1 - split);
+              let cr = 116 - 22 * ncv + 10 * ngr, cg = 106 - 18 * ncv + 8 * ngr, cb = 96 - 12 * ncv + 6 * ngr;
+              const crack = smoothstep(5 + 3 * ncv, 1, e) * split;
+              cr += (52 - cr) * crack; cg += (42 - cg) * crack; cb += (38 - cb) * crack;
+              const tn = sm(tint) * 0.7;
+              cr += (62 - cr) * tn; cg += (158 - cg) * tn; cb += (146 - cb) * tn;
+              R += (cr - R) * split; G += (cg - G) * split; B += (cb - B) * split;
+              const mk = margin * 0.8 * (1 - 0.6 * tn);
+              R += (196 - R) * mk; G += (84 - G) * mk; B += (78 - B) * mk;
+              wetness = Math.max(wetness, split * (0.25 + 0.45 * crack));
+              sheen = Math.min(sheen, 1 - 0.6 * split);
+            }
             if (DDL && c === DDL.claw) {
               const u = Math.hypot((lx - DDL.x) / (DDL.r * 0.75), (ly - DDL.y) / (DDL.r * 1.05)) + (ncv - 0.5) * 0.25;
               const on = smoothstep(0.3, 0.6, fieldAt(ddF, lx, ly)) * cf;
@@ -812,6 +834,17 @@ export class HoofArt {
                 wetness = Math.max(wetness, raw * 0.9);
               }
             }
+          }
+
+          // Foot rot: the bulbs either side of the cleft are swollen and angry, flushed red-pink
+          // where they bulge in toward the split. The spray takes the edge off the flush.
+          if (rot && heel > 0) {
+            let near = 0;
+            for (const [dx, wt] of NEAR_TAPS) near += (fieldAt(cleftF, lx - dx, ly) + fieldAt(cleftF, lx + dx, ly)) * wt;
+            near = Math.min(1, near);
+            const k = heel * (0.18 + 0.4 * near) * (1 - 0.5 * sm(tint)) * (0.85 + 0.3 * ncv) * (1 - cf);
+            R += (200 - R) * k; G += (104 - G) * k; B += (92 - B) * k;
+            sheen = Math.max(sheen, 1 + 0.4 * near * heel);
           }
 
           // Light spray tint on the horn.

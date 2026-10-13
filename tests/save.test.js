@@ -89,7 +89,7 @@ test('no save, a corrupted save, or blocked storage: a fresh round at farm 1, ne
   }
   // A past cow the return visit couldn't deal again (unknown condition, side, foot or visit).
   const cow = playedRound().history[0];
-  for (const broken of [{ condition: 'footrot' }, { side: 'LF' }, { foot: 'paw' }, { visit: 0 }]) {
+  for (const broken of [{ condition: 'scurvy' }, { side: 'LF' }, { foot: 'paw' }, { visit: 0 }]) {
     const text = JSON.stringify({ v: 1, rep: 5, visits: {}, best: {}, history: [{ ...cow, ...broken }] });
     assert.equal(parseRound(text), null, text);
   }

@@ -17,6 +17,7 @@ export const Z = {
   ULCER: 128,  // lesion core: corium sits just under the surface
   CLEFT: 256,  // skin of the heel cleft between the bulbs: no tool cuts here
   DD: 512,     // digital dermatitis: the raw lesion on the cleft skin
+  ROT: 1024,   // foot rot: the split, infected skin along the whole cleft, both claws
 };
 
 export const CLAW = { NONE: 0, OUTER: 1, INNER: 2 };
@@ -32,6 +33,9 @@ export const LESION_LOOSE = { ulcer: LOOSE.ULCER, whiteline: LOOSE.TRACT };
 export const TRACT = { NONE: 0, ENTRY: 1, TRACK: 2, POCKET: 3 };
 
 const MID_X = 200;
+
+// What the testers find on a foot-rot heel bulb.
+const FOOTROT_HEEL = 'Hot and puffy above the heel, and she pulls away. The swelling runs right across both claws.';
 
 // How deep (mm) a decoy mark goes into the horn before trimming takes it off.
 export const DECOY_DEPTH = { stain: 1, bruise: 2.5 }; // centre line between the claws
@@ -341,6 +345,10 @@ export class Hoof {
       // Digital dermatitis is skin, not loose horn: the raw patch sits on the cleft.
       if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.DD;
     });
+    // Foot rot splits the skin all along the cleft, on both claws: there's no horn to open.
+    else if (L?.type === 'footrot') {
+      for (let i = 0; i < this.n; i++) if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.ROT;
+    }
     else if (L) {
       // The dish goes round the cap, not through it: it stops where the flat of the knife would
       // start working the cap.
@@ -422,8 +430,8 @@ export class Hoof {
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
     if (z & Z.DEAD) return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
     const L = this.caseDef.lesion;
-    if (z & Z.DD) {
-      const finding = this.caseDef.findings?.find((f) => f.kind === 'dd') ?? null;
+    if (z & (Z.DD | Z.ROT)) {
+      const finding = this.caseDef.findings?.find((f) => f.kind === L.type) ?? null;
       return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
     }
     if (z & Z.CLEFT) return { kind: 'cleft', text: 'Heel cleft: skin, not horn. Keep the blades out of it.' };
@@ -439,6 +447,10 @@ export class Hoof {
     }
     if (this.looseInit[i] === LOOSE.HEEL && this.loose[i]) {
       return { kind: 'loose', text: 'Loose, undermined heel horn. Flick it off with the knife.' };
+    }
+    // Foot rot swells the whole foot: the heel bulbs above the cleft are hot and sore too.
+    if ((z & Z.HEEL) && L?.type === 'footrot') {
+      return { kind: 'lesion', finding: this.caseDef.findings?.find((f) => f.kind === 'footrot') ?? null, text: FOOTROT_HEEL };
     }
     if (z & Z.HEEL) return { kind: 'heel', text: 'Heel bulb. Leave it be.' };
     const t = this.thick[i];
@@ -506,7 +518,8 @@ export class Hoof {
         if (this.loose[i]) m.looseLeft[lg]++;
         if (lg === LOOSE.ULCER) m.tintSum += this.tint[i];
       }
-      if (z & Z.DD) { m.ddN++; m.ddTint += this.tint[i]; }
+      // The skin lesions the spray soaks: the DD patch, or the foot-rot split.
+      if (z & (Z.DD | Z.ROT)) { m.ddN++; m.ddTint += this.tint[i]; }
       // The cleft is skin: it is neither trimmed nor graded as horn.
       if (z & Z.CLEFT) continue;
 
@@ -556,7 +569,7 @@ export class Hoof {
       2: m.looseN[2] ? m.looseLeft[2] / m.looseN[2] : 0,
       3: m.looseN[3] ? m.looseLeft[3] / m.looseN[3] : 0,
     };
-    // How well the opened ulcer (or the DD patch) has been flushed with the spray (0..1).
+    // How well the opened ulcer (or the DD patch, or the foot-rot split) has been flushed with the spray (0..1).
     m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER] : 0;
     m.levelDiff = claws[CLAW.INNER].wbMean - claws[CLAW.OUTER].wbMean;
     m.heelRemovedMean = m.heelN ? m.heelRemoved / m.heelN : 0;
