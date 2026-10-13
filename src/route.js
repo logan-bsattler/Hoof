@@ -191,10 +191,14 @@ export function returningCows(farm, visit, history) {
 // horn and muck are this visit's.
 export function returnCase(farm, h, visit, k) {
   const now = farmMods(farm, cowSeed(farm, visit, 100 + k)).mods;
-  const { excess: _e, calving: _c, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
+  const { excess: _e, calving: _c, oldBlock: _o, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
   if (base.temper !== undefined) cow.temper = base.temper;
   const back = { visit: h.visit, grade: h.grade, was: h.condition };
+  // She went off in a block (J2): a recheck always comes back still wearing it; a healed cow
+  // half the time (the farmer never got round to it), drawn from the visit's own seed.
+  const stillOn = h.blocked && ((h.lame || h.recheck) || mulberry32(cowSeed(farm, visit, 500 + k))() < 0.5);
+  if (stillOn) cow.oldBlock = { claw: h.blockClaw, kind: h.blocked };
   if (!h.lame && !h.recheck) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
     return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: h.calving ? 'calved' : 'healed' } };
@@ -212,6 +216,11 @@ export function backLine(cd) {
   if (!b) return '';
   const was = CONDITIONS[b.was];
   const last = `Visit ${b.visit}: ${b.grade}`;
+  const line = backText(cd, b, was, last);
+  return cd.oldBlock ? `${line} She’s still wearing the ${cd.oldBlock.kind === 'wood' ? 'wood ' : ''}block from visit ${b.visit}.` : line;
+}
+
+function backText(cd, b, was, last) {
   if (b.outcome === 'calved') return `Fresh now: she’s calved since visit ${b.visit}. Time for that trim.`;
   if (b.outcome === 'recheck') {
     if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
@@ -263,8 +272,9 @@ export function cowPoints(result) {
 //   visits    { farmId: visits finished }
 //   best      { farmId: best day's earnings }
 //   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame,
-//             back, call } where back is 'recheck', 'healed', 'calved' or null for a cow new to the farm,
-//             and call is how she left the crush: null (released) or a CALLS id (WP8.1)
+//             back, call, blocked?, blockClaw? } where back is 'recheck', 'healed', 'calved' or null for a cow new to the farm,
+//             and call is how she left the crush: null (released) or a CALLS id (WP8.1);
+//             blocked is the kind of block she went off in ('rubber' | 'wood') and blockClaw its claw
 //   visit     the day in progress, or null: { farm, n, k, rows }
 
 export function newRoute() {
@@ -305,6 +315,8 @@ export function recordCow(route, caseDef, result) {
     foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back, call,
     ...(CONDITIONS[caseDef.condition]?.recheck ? { recheck: true } : {}),
     ...(caseDef.calving ? { calving: true } : {}),
+    // The block she went off in (J2), so a return visit can find it still on.
+    ...(result.block ? { blocked: result.block.kind, blockClaw: result.block.claw } : {}),
   });
   v.k++;
   return { points, lame, back, last: v.k >= farmById(v.farm).cows };

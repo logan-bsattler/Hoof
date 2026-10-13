@@ -1,4 +1,4 @@
-// The case checklist: clean → diagnose → five-step trim (rasp after step 3) → treat.
+// The case checklist: (old block off →) clean → diagnose → five-step trim (rasp after step 3) → treat.
 // Each step is a predicate over hoof metrics + the session log. A tip is a string, or a
 // function of the case for copy that names a claw (read it through stepTip); so is a label
 // (stepLabel). Steps 1 and 2 follow the foot: inner claw first on a hind foot, outer on a front.
@@ -15,6 +15,12 @@ const cap = (w) => w[0].toUpperCase() + w.slice(1);
 const levelled = (k, cd) => k.deadRemain < 0.12 && k.wbMean <= T + tolOf(cd);
 
 export const STEPS = [
+  // A cow back with last visit's block still on (WP9 J2): it comes off before anything else.
+  {
+    id: 'unblock', label: 'Take the old block off', tool: 'knife',
+    tip: 'She’s still wearing the block from last time. Tap it with the knife, two or three times, to pry it off. Nothing under it can be trimmed until it’s gone.',
+    done: (m, s, hoof) => !hoof.oldBlock?.on,
+  },
   {
     id: 'clean', label: 'Clean the foot', tool: 'brush',
     tip: 'Start with the wire brush and scrub the muck off. You can’t read a dirty foot.',

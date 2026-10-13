@@ -202,6 +202,21 @@ function pareDouble(hoof, i, ev) {
   return true;
 }
 
+// WP9 J2: a knife tap on last visit's block levers it a little further off; the last tap cracks
+// it free. Returns null when the tap isn't on a block still glued on, else { taps, off }.
+export function applyPry(hoof, x, y) {
+  const ob = hoof.oldBlock;
+  const i = hoof.cellAt(x, y);
+  if (!ob?.on || i < 0 || hoof.claw[i] !== ob.claw) return null;
+  ob.taps++;
+  if (ob.taps >= CFG.tools.knife.pryTaps) {
+    ob.on = false;
+    hoof.block = CLAW.NONE;
+    hoof.blockKind = 'rubber';
+  }
+  return { taps: ob.taps, off: !ob.on };
+}
+
 // Stroke tools: called with the distance travelled since the last stamp.
 export function applyStroke(hoof, tool, x, y, dist) {
   const ev = newEvents();

@@ -239,10 +239,17 @@ export class Hoof {
     this.mudHard = Math.max(1, mud);
     this.block = CLAW.NONE;
     this.blockKind = 'rubber';  // or 'wood': the taller block a toe necrosis claw needs
+    // Last visit's block, still glued on (WP9 J2): it has to be pried off with the knife.
+    // taps so far; on until it comes off.
+    const ob = caseDef.oldBlock;
+    this.oldBlock = ob ? { claw: ob.claw, kind: ob.kind, taps: 0, on: true } : null;
+    if (ob) { this.block = ob.claw; this.blockKind = ob.kind; }
     this.wrap = 0;              // 0 bare, 1 padded, 2 padded and wrapped
     this.wrapClaw = CLAW.NONE;
     this.rand = mulberry32(seed);
     this.build();
+    // No muck got under the old block: the sole it covers comes off clean.
+    if (ob) for (let i = 0; i < this.n; i++) if (this.claw[i] === ob.claw && (this.zone[i] & Z.LIVE) && !(this.zone[i] & Z.HEEL)) this.mud[i] = 0;
   }
 
   cellX(i) { return this.g.x0 + ((i % this.g.cols) + 0.5) * this.g.cell; }

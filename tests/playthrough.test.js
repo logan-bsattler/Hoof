@@ -9,7 +9,7 @@ import { CFG } from '../src/config.js';
 import { Hoof, Z, CLAW, LOOSE, GEOM, clawBox, dishRect, firstClaw, secondClaw, soundClaw } from '../src/hoof.js';
 import { CASE_B, dealMods, makeCase } from '../src/case.js';
 import { CONDITIONS, CALLS } from '../src/conditions.js';
-import { KNIFE_FLAT, applyGrind, applyWrap } from '../src/tools.js';
+import { KNIFE_FLAT, applyGrind, applyWrap, applyPry } from '../src/tools.js';
 import { evaluateSteps, trimFinished } from '../src/steps.js';
 import { newSession, scoreCase, trimUnderway } from '../src/scoring.js';
 import { makePlayer } from './player.js';
@@ -48,6 +48,12 @@ function playthrough(cd, quiet = false) {
   };
   // Where the flat of the knife reaches from its centre.
   const flat = CFG.tools.knife.radius * Math.sqrt(1 - KNIFE_FLAT);
+
+  // Last visit's block, still on (J2): knife taps on it until it comes off.
+  if (cd.oldBlock) {
+    const b = clawBox(cd.oldBlock.claw, side);
+    until('unblock', () => assert.ok(applyPry(hoof, b.x + b.w / 2, b.y + b.h / 2), 'the tap lands on the block'), 3);
+  }
 
   // Clean.
   until('clean', () => p.brushAll());
@@ -274,4 +280,15 @@ test('the careful player reaches Textbook at every tier’s band, on every condi
     for (const id of Object.keys(CONDITIONS)) for (const seed of [1, 2]) playthrough({ ...makeCase(id, seed), tolerance: t.tolerance }, true);
   }
   playthrough({ ...CASE_B, tolerance: TIERS[0].tolerance }, true);
+});
+
+test('the careful player pries an old block off first, then plays the foot as it is (J2)', () => {
+  for (const id of ['routine', 'ulcer', 'whiteline', 'toenecrosis']) {
+    for (const seed of [1, 2]) {
+      const plain = makeCase(id, seed);
+      // A recheck wears its block on the sound claw; a healed routine cow on either.
+      const claw = plain.lesion ? soundClaw(plain) : seed === 1 ? CLAW.OUTER : CLAW.INNER;
+      playthrough(makeCase(id, seed, { oldBlock: { claw, kind: id === 'toenecrosis' ? 'wood' : 'rubber' } }), true);
+    }
+  }
 });

@@ -4,9 +4,9 @@
 import { CFG, touchAngle, tolOf } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_B, dealCase, makeCase, temperament } from './case.js';
-import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
+import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap, applyPry } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
-import { newSession, scoreCase, judgeBlood, trimUnderway } from './scoring.js';
+import { newSession, scoreCase, judgeBlood, trimUnderway, blockOn } from './scoring.js';
 import { CALLS, CONDITIONS } from './conditions.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
@@ -313,6 +313,7 @@ function endPointer(e) {
   }
   game.pullRemoved = 0;
   if (game.state === 'play' && TOOLS[game.tool].mode === 'tap' && ptr.moved < 12) tap(ptr.x, ptr.y);
+  else if (game.state === 'play' && game.tool === 'knife' && ptr.moved < 12) pry(ptr.x, ptr.y);
   if (e.pointerType !== 'mouse') ptr.over = false;
 }
 canvas.addEventListener('pointerup', endPointer);
@@ -454,9 +455,28 @@ async function diagnose() {
   game.state = 'play';
 }
 
+// WP9 J2: a knife tap on last visit's block levers it off, a bit at a time.
+function pry(x, y) {
+  const r = applyPry(game.hoof, x, y);
+  if (!r) return;
+  const color = game.hoof.oldBlock.kind === 'wood' ? '#a0784a' : '#1b1b1d';
+  buzz(r.off ? 30 : 12);
+  game.shake = r.off ? 4 : 2;
+  if (!r.off) {
+    Sound.creak(r.taps / CFG.tools.knife.pryTaps);
+    particles.spawn('chunk', x, y, '#e8dec4', 2);
+    ui.toast(r.taps === 1 ? 'The glue’s cracking. Again.' : 'Nearly. Once more.', 'info', 1800);
+    return;
+  }
+  Sound.crack();
+  particles.spawn('chunk', x, y, color, 6);
+  ui.toast('Old block off. The claw under it is yours to work again.', 'good');
+}
+
 function placeBlock(claw) {
   const s = game.session;
   const hoof = game.hoof;
+  if (hoof.oldBlock?.on) { ui.toast('Take the old block off first: tap it with the knife.', 'info', 3400); return; }
   s.blockAttempts.push(claw);
   if (!s.diagnosis) s.blockBeforeDx = true;
   hoof.block = claw;
@@ -628,7 +648,7 @@ function handle(ev, x, y) {
       ? 'No blade in the cleft! That’s raw skin: spray it, don’t cut it.'
       : 'That’s the heel cleft: skin, not horn. Keep the blades out of it.');
   }
-  if (ev.blockedSkip) warnOnce('blocked', 'Can’t trim under the block.', 'info', 6);
+  if (ev.blockedSkip) warnOnce('blocked', game.hoof.oldBlock?.on ? 'Can’t trim under the old block. Tap it with the knife to pry it off.' : 'Can’t trim under the block.', 'info', 6);
 
   if (ev.blood) {
     if (judgeBlood(s, ev.bloodCells) === 'nick') nick(x, y);
@@ -735,7 +755,7 @@ async function showResults() {
 
 async function showFail() {
   game.state = 'results';
-  const earned = route.visit ? recordCow(route, caseDef, { failed: true, grade: 'Failed', gait: 'lame' }) : null;
+  const earned = route.visit ? recordCow(route, caseDef, { failed: true, grade: 'Failed', gait: 'lame', block: blockOn(game.hoof) }) : null;
   if (earned) saveRound(route);
   await ui.modal(
     `<div class="eyebrow">Case failed</div>

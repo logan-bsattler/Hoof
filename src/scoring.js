@@ -76,6 +76,9 @@ export function lesionOpened(m, hoof) {
   return L.type === 'whiteline' || L.type === 'foreign' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
 
+// The block she leaves the crush wearing, for her record (J2): { claw, kind } or null.
+export const blockOn = (hoof) => (hoof.block ? { claw: hoof.block, kind: hoof.blockKind } : null);
+
 // Flushed, padded and wrapped (sprayed only, where the condition wants no wrap: foot rot).
 const treated = (m, hoof) => (hoof.caseDef.requires?.wrap === false || hoof.wrap >= 2) && m.lesionTint >= CFG.treat.tintMin;
 
@@ -102,7 +105,7 @@ export function scoreCase(m, session, hoof, caseDef) {
     const g = CFG.grades.find((gr) => total >= gr.min);
     notes.push(session.cuts ? 'Right call, but you’d started on her. A cow that close to calving is left alone.'
       : 'Textbook. The right call, and nothing done that she didn’t need.');
-    return { failed: false, total, grade: g.name, medal: g.medal, gait: CALLS.leave.gait, mobility: null, parts, notes, call: 'leave' };
+    return { failed: false, total, grade: g.name, medal: g.medal, gait: CALLS.leave.gait, mobility: null, parts, notes, call: 'leave', block: blockOn(hoof) };
   }
 
   // A foot that isn't to be trimmed today (foot rot) is graded on what was done instead.
@@ -132,7 +135,10 @@ export function scoreCase(m, session, hoof, caseDef) {
     correctness -= 25; notes.push(L ? 'You never tested the sore spot itself. Read before you cut.' : 'You never tested the marks. Read before you cut.');
   } else if (!session.diagnosisCorrect) { correctness -= 15; notes.push(caseDef.misreadNote); }
   const need = caseDef.requires ?? { open: true, block: true, treat: true };
-  if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
+  // Last visit's block still on (J2): that's the fault, not a needless new one.
+  const oldOn = !!hoof.oldBlock?.on;
+  if (oldOn) { correctness -= 20; notes.push('An old block left on overloads her: it should have come off by now.'); }
+  else if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
   else if (L && !need.block && hoof.block) {
     correctness -= 20;
     notes.push(L.type === 'doublesole' ? 'No block needed: the new sole is sound, just thin. A block only tips her onto one claw.'
@@ -251,7 +257,8 @@ export function scoreCase(m, session, hoof, caseDef) {
   const relief = !L ? (hoof.block ? 40 : 100)
     : !need.block ? (!hoof.block && (!need.treat || treated(m, hoof)) && (!need.open || lesionOpened(m, hoof)) ? 100 : 40)
     : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
-  const gaitScore = 0.5 * balance + 0.5 * relief;
+  // A worn-out old block rocks her as badly as a needless one.
+  const gaitScore = 0.5 * balance + 0.5 * (oldOn ? Math.min(relief, 40) : relief);
   const blockedSore = !!L && hoof.block === L.claw;
   // A cow who needed the pen or the vet and was released goes on getting worse.
   const walked = blockedSore || (referral(want) && !made) ? 'lame'
@@ -265,5 +272,5 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (!notes.length) notes.push(made ? 'Textbook. The right call, and nothing done that she didn’t need.'
     : L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
     : 'Textbook. Level, balanced, and nothing opened that didn’t need opening.');
-  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made };
+  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made, block: blockOn(hoof) };
 }

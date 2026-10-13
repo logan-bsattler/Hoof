@@ -120,3 +120,17 @@ test('a saved call survives the reload; rows from before calls load; an unknown 
   d.history[0].call = 'abattoir';
   assert.equal(parseRound(JSON.stringify(d)), null);
 });
+
+test('the block a cow went off in survives the reload; a malformed one is refused (J2)', () => {
+  const route = newRoute();
+  const herd = startVisit(route, FARMS[0].id);
+  recordCow(route, herd[0], { failed: false, grade: 'Clean', gait: 'sound', block: { claw: 2, kind: 'wood' } });
+  const store = memory();
+  saveRound(route, store);
+  assert.deepEqual(loadRound(store), route);
+  const d = JSON.parse(store.getItem(SAVE_KEY));
+  d.history[0].blockClaw = 7;
+  assert.equal(parseRound(JSON.stringify(d)), null);
+  d.history[0].blockClaw = 2; d.history[0].blocked = 'concrete';
+  assert.equal(parseRound(JSON.stringify(d)), null);
+});

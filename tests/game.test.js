@@ -6,7 +6,7 @@ import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, soundClaw, insideClaw 
 import { CASE_B, makeCase, dealCase, dealMods, temperament } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { stepsFor, stepLabel } from '../src/steps.js';
-import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
+import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, applyPry, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase, judgeBlood } from '../src/scoring.js';
 
@@ -901,4 +901,57 @@ test('double sole: left on, or blocked, costs; pared and trimmed is Textbook wit
   h.block = soundClaw(cd);
   const b = scoreCase(h.metrics(), idealSession(cd), h, cd);
   assert.ok(b.notes.some((n) => n.includes('new sole is sound')), b.notes.join(' | '));
+});
+
+// ------------------------------------------------------------------ WP9 J2 an old block still on
+test('old block: on from the start, the claw under it untrimmable, three knife taps pry it off', () => {
+  const cd = makeCase('routine', 9, { oldBlock: { claw: CLAW.OUTER, kind: 'rubber' } });
+  assert.equal(cd.steps[0], 'unblock');
+  const h = new Hoof(cd);
+  assert.equal(h.block, CLAW.OUTER);
+  const [x, y] = findCell(h, (i) => h.claw[i] === CLAW.OUTER && (h.zone[i] & Z.LIVE) && !(h.zone[i] & (Z.HEEL | Z.DEAD)));
+  const i = h.cellAt(x, y);
+  const before = h.thick[i];
+  assert.ok(applyStroke(h, 'knife', x, y, 20).blockedSkip, 'the knife slides off the block');
+  assert.equal(h.thick[i], before);
+  assert.equal(h.mud[i], 0, 'no muck got under it');
+  // A tap on the other claw does nothing.
+  const [ox, oy] = findCell(h, (j) => h.claw[j] === CLAW.INNER);
+  assert.equal(applyPry(h, ox, oy), null);
+  const done = () => evaluateSteps(h.metrics(), newSession(), h, 1).status[0].done;
+  assert.deepEqual(applyPry(h, x, y), { taps: 1, off: false });
+  assert.deepEqual(applyPry(h, x, y), { taps: 2, off: false });
+  assert.equal(done(), false);
+  assert.deepEqual(applyPry(h, x, y), { taps: 3, off: true });
+  assert.equal(h.block, CLAW.NONE);
+  assert.equal(done(), true);
+  assert.equal(applyPry(h, x, y), null, 'nothing left to pry');
+  // A wood block comes on as wood.
+  const w = new Hoof(makeCase('toenecrosis', 9, { oldBlock: { claw: CLAW.INNER, kind: 'wood' } }));
+  assert.equal(w.blockKind, 'wood');
+});
+
+test('old block: left on costs 20 (not the needless-block note); off and trimmed is Textbook', () => {
+  const cd = makeCase('routine', 9, { oldBlock: { claw: CLAW.OUTER, kind: 'rubber' } });
+  const left = new Hoof(cd);
+  idealTrim(left);
+  const r = scoreCase(left.metrics(), idealSession(cd), left, cd);
+  assert.ok(r.notes.some((n) => n.startsWith('An old block left on')), r.notes.join(' | '));
+  assert.ok(!r.notes.some((n) => n.includes('no block needed')), 'not charged twice');
+  assert.equal(r.parts.correctness, 80);
+  assert.notEqual(r.gait, 'sound');
+  assert.deepEqual(r.block, { claw: CLAW.OUTER, kind: 'rubber' }, 'the record says she went off in it');
+  const off = new Hoof(cd);
+  off.oldBlock.on = false; off.block = CLAW.NONE;
+  idealTrim(off);
+  const ok = scoreCase(off.metrics(), idealSession(cd), off, cd);
+  assert.equal(ok.grade, 'Textbook', ok.notes.join(' | '));
+  assert.equal(ok.block, null);
+  // A recheck re-blocked: the new block on the sound claw is what she needs.
+  const re = makeCase('ulcer', 9, { oldBlock: { claw: soundClaw(makeCase('ulcer', 9)), kind: 'rubber' } });
+  const h = new Hoof(re);
+  h.oldBlock.on = false; h.block = CLAW.NONE;
+  idealTrim(h);
+  const g = scoreCase(h.metrics(), idealSession(re), h, re);
+  assert.equal(g.grade, 'Textbook', g.notes.join(' | '));
 });

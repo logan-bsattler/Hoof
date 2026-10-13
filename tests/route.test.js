@@ -11,7 +11,7 @@ import {
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
   farmCows, healedBack, backLine, TIERS, tierFor, tierMods, farmById,
 } from '../src/route.js';
-import { Hoof } from '../src/hoof.js';
+import { Hoof, CLAW } from '../src/hoof.js';
 
 const tag = (cd) => cd.subtitle.split(' · ')[0];
 const result = (grade, gait = 'sound') => ({ failed: false, grade, gait });
@@ -399,4 +399,43 @@ test('a calving cow comes back fresh next visit, as a routine trim, however she 
     assert.ok(!back.calving, 'fresh now, not due again');
     assert.match(backLine(back), /calved/);
   }
+});
+
+// ------------------------------------------------------------------ WP9 J2 an old block still on
+test('old block: a blocked cow is recorded so; a recheck comes back wearing it, a healed one half the time', () => {
+  const farm = farmById('hollins');
+  let rechecks = 0, healedOn = 0, healedOff = 0;
+  for (let run = 0; run < 12; run++) {
+    const route = newRoute();
+    route.rep = farm.rep;
+    // Visits to move the seeds along, so each run's second visit is a different day.
+    for (let v = 0; v < run; v++) { startVisit(route, farm.id).forEach((cd) => recordCow(route, cd, result('Clean'))); endVisit(route); }
+    const herd = startVisit(route, farm.id);
+    // Every cow goes off in a block on her outer claw; the first one lame.
+    herd.forEach((cd, k) => recordCow(route, cd, { ...result('Clean', k ? 'sound' : 'lame'), block: { claw: CLAW.OUTER, kind: 'rubber' } }));
+    endVisit(route);
+    assert.equal(route.history.at(-1).blocked, 'rubber');
+    assert.equal(route.history.at(-1).blockClaw, CLAW.OUTER);
+    const next = visitCases(farm, run + 2, route.history);
+    for (const cd of next.filter((c) => c.back)) {
+      if (cd.back.outcome === 'recheck') {
+        rechecks++;
+        assert.deepEqual(cd.oldBlock, { claw: CLAW.OUTER, kind: 'rubber' }, 'a recheck still has it on');
+      } else if (cd.oldBlock) healedOn++;
+      else healedOff++;
+      if (cd.oldBlock) {
+        assert.equal(cd.steps[0], 'unblock');
+        assert.match(backLine(cd), /still wearing the block from visit/);
+        assert.equal(new Hoof(cd).block, CLAW.OUTER);
+      } else assert.ok(!cd.steps.includes('unblock'));
+    }
+  }
+  assert.ok(rechecks >= 12, `${rechecks} rechecks`);
+  assert.ok(healedOn > 0 && healedOff > 0, `healed cows: ${healedOn} still blocked, ${healedOff} not`);
+  // A cow with no block on record never comes back wearing one.
+  const route = newRoute();
+  route.rep = farm.rep;
+  startVisit(route, farm.id).forEach((cd, k) => recordCow(route, cd, result('Clean', k ? 'sound' : 'lame')));
+  endVisit(route);
+  assert.ok(visitCases(farm, 2, route.history).every((cd) => !cd.oldBlock));
 });

@@ -315,7 +315,15 @@ export class Renderer {
   block(hoof, ghostClaw = 0, ghostKind = 'rubber') {
     const c = this.ctx;
     const press = Math.min(1, (this.time - this.placed.block) / 0.25);
-    if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block, false, hoof.side), 1, press, hoof.blockKind);
+    // Last visit's block, still on (J2): already pressed home, worn, and loosening with each tap.
+    const ob = hoof.oldBlock?.on ? hoof.oldBlock : null;
+    if (ob) {
+      c.save();
+      const pts = clawPolygon(hoof.block, false, hoof.side);
+      if (ob.taps) { const [x, y] = pts[0]; c.translate(x, y); c.rotate(0.012 * ob.taps); c.translate(-x, -y); }
+      drawBlock(c, hoof.block, pts, 1, 1, hoof.blockKind, true);
+      c.restore();
+    } else if (hoof.block) drawBlock(c, hoof.block, clawPolygon(hoof.block, false, hoof.side), 1, press, hoof.blockKind);
     if (ghostClaw && ghostClaw !== hoof.block) drawBlock(c, ghostClaw, clawPolygon(ghostClaw, false, hoof.side), 0.4, 1, ghostKind);
   }
 

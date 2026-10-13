@@ -407,8 +407,8 @@ function blockFrame(clawPts) {
 
 // Black rubber block, tread out: a raised rim, circular lugs and diagonal bars,
 // with glue squeezing out at the edge. `press` 0..1 animates it being pressed on.
-// kind 'wood' draws the taller wood block instead (WP8.4).
-export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber') {
+// kind 'wood' draws the taller wood block instead (WP8.4). worn: weeks of walking on it (WP9 J2).
+export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber', worn = false) {
   const f = blockFrame(clawPts);
   const s = 1.06 - 0.06 * press;
   c.save();
@@ -433,6 +433,7 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber
   c.clip();
   if (kind === 'wood') {
     woodFace(c, f, rand);
+    if (worn) wornFace(c, f, rand);
     c.restore();
     c.restore();
     return;
@@ -477,8 +478,44 @@ export function drawBlock(c, claw, clawPts, alpha = 1, press = 1, kind = 'rubber
     c.fillStyle = `rgba(200,180,140,${0.1 + rand() * 0.2})`;
     c.fillRect(f.cx + (rand() - 0.5) * f.rx * 1.6, f.cy + (rand() - 0.5) * f.ry * 1.6, 1 + rand(), 1 + rand());
   }
+  if (worn) wornFace(c, f, rand);
   c.restore();
   c.restore();
+}
+
+// Weeks of walking on it: the toe end scuffed flat and pale, muck ground into the tread,
+// and a dark line where the glue has started to let go at the edge.
+function wornFace(c, f, rand) {
+  // Worn flat towards the toe (the bottom of the frame), where she lands.
+  c.fillStyle = lin(c, f.cx, f.cy + f.ry, f.cx, f.cy - f.ry * 0.2, [[0, 'rgba(150,140,125,0.55)'], [1, 'rgba(150,140,125,0)']]);
+  superellipse(c, f.cx, f.cy, f.rx, f.ry);
+  c.fill();
+  // Muck packed into the tread.
+  for (let k = 0; k < 22; k++) {
+    const x = f.cx + (rand() - 0.5) * f.rx * 1.7, y = f.cy + (rand() - 0.5) * f.ry * 1.7;
+    c.fillStyle = `rgba(${70 + rand() * 30 | 0},${52 + rand() * 20 | 0},${30 + rand() * 12 | 0},${0.35 + rand() * 0.4})`;
+    c.beginPath(); c.ellipse(x, y, 3 + rand() * 9, 2 + rand() * 5, rand() * TAU, 0, TAU); c.fill();
+  }
+  // Scratches from the yard floor, running heel to toe.
+  c.strokeStyle = 'rgba(220,210,190,0.18)';
+  c.lineWidth = 0.8;
+  for (let k = 0; k < 18; k++) {
+    const x = f.cx + (rand() - 0.5) * f.rx * 1.5, y = f.cy + (rand() - 0.5) * f.ry * 1.4;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + (rand() - 0.5) * 4, y + 8 + rand() * 16); c.stroke();
+  }
+  // The glue letting go: a dark gap round part of the rim.
+  c.strokeStyle = 'rgba(10,8,6,0.7)';
+  c.lineWidth = 2.2;
+  const a0 = rand() * TAU;
+  c.beginPath();
+  for (let k = 0; k <= 24; k++) {
+    const a = a0 + (k / 24) * 1.6;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const px = f.cx + (f.rx - 1.5) * Math.sign(ca) * Math.abs(ca) ** (2 / 2.6);
+    const py = f.cy + (f.ry - 1.5) * Math.sign(sa) * Math.abs(sa) ** (2 / 2.6);
+    k ? c.lineTo(px, py) : c.moveTo(px, py);
+  }
+  c.stroke();
 }
 
 // The wood block's face: squarer than the rubber one, tan with grain running heel to toe,

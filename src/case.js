@@ -86,6 +86,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, looseHorn, dec
 //   lesionSize, lesionAt     0..1 within the condition's size and position bands
 //   temper     0 calm .. 1 lively (0.5 = usual)
 //   calving    true: a routine cow close to calving, to be left till dry-off (WP9 J1)
+//   oldBlock   { claw, kind }: last visit's block, still glued on (WP9 J2)
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).
 // With no mods she comes out exactly as before the variations existed.
 export function makeCase(condition, seed, mods = {}) {
@@ -105,8 +106,9 @@ export function makeCase(condition, seed, mods = {}) {
   const growth = mods.growth ?? 1;
   const hi = between(3.5, 5.5), lo = between(1.8, 3.0);
   const excess = { [big]: hi * growth, [small]: lo * growth };
-  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, ...over } = mods;
+  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, ...over } = mods;
   const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });
+  if (oldBlock) return { ...cd, oldBlock, steps: ['unblock', ...cd.steps] };
   return calving && condition === 'routine' ? closeToCalving(cd) : cd;
 }
 

@@ -7,6 +7,7 @@
 
 import { FARMS, newRoute, farmById, isOpen } from './route.js';
 import { CONDITIONS, CALLS } from './conditions.js';
+import { CLAW } from './hoof.js';
 
 export const SAVE_KEY = 'truehoof.round.v1';
 
@@ -15,10 +16,12 @@ const farmIds = new Set(FARMS.map((f) => f.id));
 const count = (v) => Number.isFinite(v) && v >= 0;
 // How she left the crush (WP8.1); missing on rows saved before it.
 const callOk = (c) => c == null || Object.hasOwn(CALLS, c);
+// The block she went off in (WP9 J2); missing on rows saved before it, or with no block.
+const blockOk = (h) => h.blocked == null || (['rubber', 'wood'].includes(h.blocked) && [CLAW.OUTER, CLAW.INNER].includes(h.blockClaw));
 // A past cow is dealt again on a return visit, so every field that deal reads must be one it knows.
 const cowOk = (h) => isObj(h) && farmIds.has(h.farm) && typeof h.tag === 'string' && Number.isInteger(h.seed) &&
   Object.hasOwn(CONDITIONS, h.condition) && (h.side === 'LH' || h.side === 'RH') &&
-  ['hind', 'front'].includes(h.foot ?? 'hind') && Number.isInteger(h.visit) && h.visit >= 1 && callOk(h.call);
+  ['hind', 'front'].includes(h.foot ?? 'hind') && Number.isInteger(h.visit) && h.visit >= 1 && callOk(h.call) && blockOk(h);
 // A day summary row, as recordCow writes it.
 const rowOk = (r) => isObj(r) && typeof r.tag === 'string' && typeof r.title === 'string' && typeof r.grade === 'string' &&
   typeof r.gait === 'string' && count(r.points) && typeof r.lame === 'boolean' && [null, 'recheck', 'healed', 'calved'].includes(r.back) && callOk(r.call);
