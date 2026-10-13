@@ -47,8 +47,9 @@ export const CFG = {
     // capGive: knife travel over a closed ulcer cap (px) before it gives; capLift: how far round
     // the blade the cap tears away with the core when it does, in ulcer radii. flat: the stamp
     // falloff above which the blade cuts at full depth; the cap and open core answer only to that.
-    knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4 },
-    grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15 },
+    knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4, wall: 0.5 },
+    grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15, wall: 0.7 },
+    // wall (knife, grinder): cut-rate multiplier on living wall, harder horn than the sole.
     // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take.
     nippers: { radius: 17, liveBite: 3.5, liveCore: 0.4, spacing: 16, jawDepth: 22 },
     rasp:    { radius: 26, smooth: 0.02, rate: 0.003 },

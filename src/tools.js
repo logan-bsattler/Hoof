@@ -71,10 +71,12 @@ function newEvents() {
 }
 
 // Remove `depth` mm from cell i, honouring the near-target resistance.
-function cut(hoof, i, depth, ev, resist, resistThin = resist) {
+// `wall` scales the cut on living wall: the wall is harder horn than the sole.
+function cut(hoof, i, depth, ev, resist, resistThin = resist, wall = 1) {
   const z = hoof.zone[i];
   const t = hoof.thick[i];
   if (t <= 0) return 0;
+  if ((z & Z.WALL) && !(z & Z.DEAD)) depth *= wall;
   if (z & Z.LIVE) {
     if (t < CFG.sole.thin || (z & Z.ULCER)) depth *= resistThin;
     // The horn firms up over the last `ramp` mm, so a steady hand can stop on target.
@@ -204,7 +206,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
       if (pareTract(hoof, i, ev)) return;
       if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
       // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
-      const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist);
+      const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist, cfg.resist, cfg.wall);
       // A clean knife pass leaves a smooth surface.
       hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
     });
@@ -244,7 +246,7 @@ export function applyGrind(hoof, x, y, dt) {
       hoof.rough[i] = 0.8;
       return;
     }
-    const d = cut(hoof, i, cfg.rate * dt * f, ev, cfg.resist, cfg.resistThin);
+    const d = cut(hoof, i, cfg.rate * dt * f, ev, cfg.resist, cfg.resistThin, cfg.wall);
     // The disc leaves swirl marks the rasp has to true up.
     hoof.rough[i] += (0.45 - hoof.rough[i]) * Math.min(1, d * 2);
   });
