@@ -3,6 +3,7 @@
 
 import { CFG, tolOf } from './config.js';
 import { CLAW, CLAW_NAME, LOOSE, Z, distToPath, firstClaw, secondClaw, soundClaw } from './hoof.js';
+import { CALLS } from './conditions.js';
 
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 // 100 at `good` or better, 0 at `bad`, linear between.
@@ -14,6 +15,8 @@ export function newSession() {
     firstCutClaw: null, dirtyCuts: 0, grinderLesion: false,
     blockAttempts: [], blockBeforeDx: false,
     dishBeforeLevel: false, stepDoneAt: {}, blood: false, nicks: 0, cleftCuts: 0,
+    // How she left the crush: null (released) or a CALLS id. cuts: strokes that took horn off.
+    call: null, cuts: 0,
   };
 }
 
@@ -82,6 +85,18 @@ export function scoreCase(m, session, hoof, caseDef) {
     };
   }
 
+  // The right call on a cow to be left (J1): full marks for the call, less any horn she didn't
+  // need taken off (10 a stroke, at most 30).
+  if (caseDef.call === 'leave' && session.call === 'leave') {
+    const parts = { balance: 100, correctness: 100, restraint: 100 - Math.min(30, 10 * session.cuts), finish: 100 };
+    const W = CFG.weights;
+    const total = Math.round(W.balance * parts.balance + W.correctness * parts.correctness + W.restraint * parts.restraint + W.finish * parts.finish);
+    const g = CFG.grades.find((gr) => total >= gr.min);
+    notes.push(session.cuts ? 'Right call, but you’d started on her. A cow that close to calving is left alone.'
+      : 'Textbook. The right call, and nothing done that she didn’t need.');
+    return { failed: false, total, grade: g.name, medal: g.medal, gait: CALLS.leave.gait, mobility: null, parts, notes, call: 'leave' };
+  }
+
   // Balance: level claws, right height, toe length, heel preserved.
   const level = ramp(Math.abs(m.levelDiff), 0.3, 3);
   // A wider band early on the route (WP7.6) widens the full-marks height by the same slack.
@@ -130,6 +145,18 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (need.open && session.grinderLesion) { correctness -= 10; notes.push('Grinder over the lesion. Use the knife near the ulcer.'); }
   if (session.dirtyCuts > 0) { correctness -= 10; notes.push('You cut into a dirty foot. Clean first, then cut.'); }
   if (session.dishBeforeLevel) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }
+  // The call (WP8.1): a cow that needs the pen or the vet and is released, or sent the wrong way.
+  const want = caseDef.call ?? null, made = session.call ?? null;
+  const referral = (c) => c === 'pen' || c === 'vet';
+  if (referral(want) && made !== want) {
+    if (referral(made)) {
+      correctness -= 15;
+      notes.push(want === 'vet' ? 'The pen was right, but she needs the vet as well.' : 'The vet wasn’t needed: soft bedding in the hospital pen was enough.');
+    } else {
+      correctness -= want === 'vet' ? 25 : 15;
+      notes.push(caseDef.callNote ?? (want === 'vet' ? 'This one needs the vet.' : 'This one needed the hospital pen.'));
+    }
+  }
   correctness = clamp(correctness);
 
   // Restraint: the golden rule. Err on the side of caution.
@@ -174,6 +201,12 @@ export function scoreCase(m, session, hoof, caseDef) {
     const k = CFG.grades.findIndex((gr) => gr.name === CFG.nick.capGrade);
     if (k > 0) total = Math.min(total, CFG.grades[k - 1].min - 1);
   }
+  // The over-cautious call: a cow sent off the line who only needed her foot seen to. And a cow
+  // due to be left (close to calving) who was trimmed or sent to the pen instead.
+  const needsWork = CFG.grades.find((gr) => gr.name === 'Needs work');
+  const capped = (note) => { total = Math.min(total, CFG.grades[CFG.grades.indexOf(needsWork) - 1].min - 1); notes.unshift(note); };
+  if (!want && made) capped(`She didn’t need ${CALLS[made].noun}. ${caseDef.plan}`);
+  else if (want === 'leave' && made !== 'leave') capped(caseDef.leaveNote ?? 'She was due any day: she’d have waited for dry-off.');
   const g = CFG.grades.find((gr) => total >= gr.min);
 
   // How she walks off: balance plus whether the ulcer is relieved.
@@ -185,13 +218,16 @@ export function scoreCase(m, session, hoof, caseDef) {
     : (hoof.block === sound ? 60 : 0) + (lesionOpened(m, hoof) ? 40 : 0);
   const gaitScore = 0.5 * balance + 0.5 * relief;
   const blockedSore = !!L && hoof.block === L.claw;
-  const gait = blockedSore ? 'lame'
+  const walked = blockedSore ? 'lame'
     : gaitScore >= 75 ? 'sound' : gaitScore >= 50 ? 'tender' : 'lame';
+  // A cow sent off the line doesn't walk off: no gait, no mobility score, and she isn't lame.
+  const gait = made ? CALLS[made].gait : walked;
 
   // AHDB mobility score: a block on the sore claw is the worst case, severely impaired.
-  const mobility = blockedSore ? CFG.mobility.blockedSore : CFG.mobility[gait];
+  const mobility = made ? null : blockedSore ? CFG.mobility.blockedSore : CFG.mobility[gait];
 
-  if (!notes.length) notes.push(L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
+  if (!notes.length) notes.push(made ? 'Textbook. The right call, and nothing done that she didn’t need.'
+    : L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
     : 'Textbook. Level, balanced, and nothing opened that didn’t need opening.');
-  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes };
+  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made };
 }

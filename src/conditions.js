@@ -41,6 +41,16 @@ export const FINDING = {
   },
 };
 
+// The other ways a cow leaves the crush besides release (WP8.1, D22): the hospital pen (soft
+// bedding near the parlour, no vet), the pen with the vet called, or back to the herd untrimmed
+// till dry-off. A condition's `call` says which one it needs (null: release her as usual).
+// `noun` finishes "she didn't need …"; `gait` is what the day sheet shows in place of the walk-off; `ticket` heads her result card.
+export const CALLS = {
+  pen: { label: 'Hospital pen', noun: 'the hospital pen', sub: 'Soft bedding near the parlour. No vet.', gait: 'to the pen', ticket: 'In the hospital pen, on soft bedding' },
+  vet: { label: 'Call the vet', noun: 'the vet', sub: 'Into the hospital pen, and the vet sees her today.', gait: 'to the vet', ticket: 'In the hospital pen for the vet' },
+  leave: { label: 'Leave her till dry-off', noun: 'her trim put off', sub: 'Back with the herd untrimmed. Trim her when she’s dry.', gait: 'left till dry-off', ticket: 'Back with the herd till dry-off' },
+};
+
 // The five-step functional trim every case shares (rasp after step 3).
 const TRIM = ['clean', 'diagnose', 'step1', 'step2', 'step3', 'finish'];
 

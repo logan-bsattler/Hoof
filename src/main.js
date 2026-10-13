@@ -7,6 +7,7 @@ import { CASE_B, dealCase, makeCase, temperament } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap } from './tools.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
 import { newSession, scoreCase, judgeBlood } from './scoring.js';
+import { CALLS } from './conditions.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
 import { fitCamera, toScene } from './view.js';
@@ -66,7 +67,7 @@ const game = {
   result: null,
   lastWarn: {},
   tutorial: null,       // a Tutorial during the guided first run, else null
-  ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false },
+  ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false, cut: false },
 };
 
 document.getElementById('routeReset').addEventListener('click', () => restartRound());
@@ -74,6 +75,7 @@ document.getElementById('routeReset').addEventListener('click', () => restartRou
 const ui = new UI({
   onTool: (id) => selectTool(id),
   onRelease: () => requestRelease(),
+  onCall: () => requestCall(),
   onRead: () => { if (game.state === 'play' && !game.session.diagnosis) diagnose(); },
   onToggleGuides: () => setGuides(!game.guides),
   onToggleSound: () => { game.sound = !game.sound; Sound.setEnabled(game.sound); ui.setToggle('btnSound', game.sound); },
@@ -241,7 +243,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (game.state !== 'play' || game.ptr.down) return;
   canvas.setPointerCapture(e.pointerId);
   const p = toLogical(e);
-  Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId });
+  Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId, cut: false });
   const mode = TOOLS[game.tool].mode;
   if (mode === 'bite') bite(p.x, p.y);
   if (mode === 'hold') {
@@ -532,6 +534,9 @@ function warnOnce(key, msg, kind = 'warn', gap = 4) {
   if (kind === 'warn') { Sound.warn(); buzz([20, 30, 20]); slip(); }
 }
 
+// The tools that take horn off (not the brush or the spray).
+const CUTTERS = new Set(['knife', 'grinder', 'nippers', 'rasp']);
+
 // Turn tool events into feedback, log entries, and failure.
 function handle(ev, x, y) {
   const s = game.session;
@@ -542,6 +547,8 @@ function handle(ev, x, y) {
     if (Math.random() < 0.5) particles.spawn('straw', x, y, '#c8a352');
   }
   if (ev.removed > 0.01) {
+    // One stroke that took horn off, however long the hold (a cow to be left counts them).
+    if (CUTTERS.has(tool) && !game.ptr.cut) { game.ptr.cut = true; s.cuts++; }
     if (tool === 'knife') {
       if (Math.random() < Math.min(1, ev.removed * 0.15)) particles.spawn('shaving', x, y, '#f4ead2');
       game.knifeAccum += ev.removed;
@@ -654,6 +661,28 @@ async function requestRelease() {
   game.state = 'walkoff';
 }
 
+// The other way off the line (WP8.1): the hospital pen, the vet, or left till dry-off. She goes
+// as she is, with no walk-off: her ticket says where she went.
+async function requestCall() {
+  if (game.state !== 'play') return;
+  document.body.classList.remove('steps-open');
+  releaseHold();
+  game.state = 'modal';
+  const r = await ui.modal(
+    `<h2>Send her off the line?</h2><p>She leaves the crush as she is now, whatever’s left undone.</p>
+     <ul class="calls">${Object.values(CALLS).map((c) => `<li><b>${c.label}.</b> ${c.sub}</li>`).join('')}</ul>`,
+    [...Object.entries(CALLS).map(([id, c]) => ({ id, label: c.label })), { id: 'back', label: 'Back' }],
+  );
+  game.state = 'play';
+  if (!CALLS[r]) return;
+  game.session.call = r;
+  game.metrics = game.hoof.metrics();
+  game.result = scoreCase(game.metrics, game.session, game.hoof, caseDef);
+  game.walkoff = null;
+  Sound.step();
+  showResults();
+}
+
 async function showResults() {
   game.state = 'results';
   const r = game.result;
@@ -668,7 +697,7 @@ async function showResults() {
   await ui.modal(
     `<div class="eyebrow">Trimmer’s ticket · ${route.visit ? farmById(route.visit.farm).name : `Case ${caseDef.id}`}</div>
      <h1 class="grade ${r.medal}">${r.grade}</h1>
-     <p class="sub">Score ${r.total} / 100 · walked off <b>${r.gait}</b>${newBest ? ' · <b>New best</b>' : ''}</p>
+     <p class="sub">Score ${r.total} / 100 · ${r.call ? `<b>${CALLS[r.call].ticket}</b>` : `walked off <b>${r.gait}</b>`}${newBest ? ' · <b>New best</b>' : ''}</p>
      ${earned ? repLine(earned) : ''}
      ${bars}
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,

@@ -246,7 +246,8 @@ export function cowPoints(result) {
 //   visits    { farmId: visits finished }
 //   best      { farmId: best day's earnings }
 //   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame,
-//             back } where back is 'recheck', 'healed' or null for a cow new to the farm
+//             back, call } where back is 'recheck', 'healed' or null for a cow new to the farm,
+//             and call is how she left the crush: null (released) or a CALLS id (WP8.1)
 //   visit     the day in progress, or null: { farm, n, k, rows }
 
 export function newRoute() {
@@ -280,10 +281,11 @@ export function recordCow(route, caseDef, result) {
   const { points, lame } = cowPoints(result);
   const tag = caseDef.subtitle.split(' · ')[0];
   const back = caseDef.back?.outcome ?? null;
-  v.rows.push({ tag, title: caseDef.title, grade: result.grade, gait: result.failed ? 'lame' : result.gait, points, lame, back });
+  const call = result.call ?? null;
+  v.rows.push({ tag, title: caseDef.title, grade: result.grade, gait: result.failed ? 'lame' : result.gait, points, lame, back, call });
   route.history.push({
     farm: v.farm, visit: v.n, tag, seed: caseDef.seed, condition: caseDef.condition,
-    foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back,
+    foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back, call,
   });
   v.k++;
   return { points, lame, back, last: v.k >= farmById(v.farm).cows };

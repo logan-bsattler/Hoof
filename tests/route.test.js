@@ -115,7 +115,7 @@ test('a day at a farm banks the cows’ points, the herd bonus, and opens the ne
   assert.equal(route.visits[FARMS[0].id], 1);
   assert.equal(route.best[FARMS[0].id], d.earned);
   assert.equal(route.history.length, herd.length);
-  assert.deepEqual(Object.keys(route.history[0]).sort(), ['back', 'condition', 'farm', 'foot', 'grade', 'lame', 'seed', 'side', 'tag', 'visit']);
+  assert.deepEqual(Object.keys(route.history[0]).sort(), ['back', 'call', 'condition', 'farm', 'foot', 'grade', 'lame', 'seed', 'side', 'tag', 'visit']);
   // The round is plain data, ready to save as JSON (WP7.7).
   assert.deepEqual(JSON.parse(JSON.stringify(route)), route);
 });
@@ -313,4 +313,15 @@ test('a visit deals its cows with the tier’s band; Case B itself is never chan
   assert.ok(startVisit(route, FARMS[4].id).every((cd) => cd.tolerance === TIERS[2].tolerance));
   // The tier leans the fresh cows only: with no tier the herd is as before.
   assert.deepEqual(visitCases(FARMS[1], 1).map(tag), visitCases(FARMS[1], 1, [], TIERS[0]).map(tag));
+});
+
+test('a cow sent off the line is recorded with her call, earns her grade and is not lame', () => {
+  const route = newRoute();
+  const herd = startVisit(route, FARMS[0].id);
+  const r = recordCow(route, herd[0], { failed: false, grade: 'Clean', gait: 'to the vet', call: 'vet' });
+  assert.deepEqual(r, { points: POINTS.Clean, lame: false, back: null, last: false });
+  assert.equal(route.visit.rows[0].call, 'vet');
+  assert.equal(route.history[0].call, 'vet');
+  recordCow(route, herd[1], result('Clean'));
+  assert.equal(route.history[1].call, null);
 });

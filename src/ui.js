@@ -11,7 +11,7 @@ const TOAST_MIN = 1200;   // ms a toast stays up before another may replace it
 const TOAST_STALE = 4000; // ms a queued toast may wait before it's dropped
 
 export class UI {
-  constructor({ onTool, onRelease, onRead, onToggleGuides, onToggleSound, onToggleLefty }) {
+  constructor({ onTool, onRelease, onCall, onRead, onToggleGuides, onToggleSound, onToggleLefty }) {
     this.toolButtons = {};
     const dock = $('tools');
     for (const id of TOOL_ORDER) {
@@ -45,6 +45,8 @@ export class UI {
     $('btnRead').addEventListener('click', onRead);
     $('btnReadBar').addEventListener('click', onRead);
     $('btnReleaseBar').addEventListener('click', onRelease);
+    $('btnCall').addEventListener('click', onCall);
+    $('btnCallBar').addEventListener('click', onCall);
     $('btnGuides').addEventListener('click', onToggleGuides);
     $('btnSound').addEventListener('click', onToggleSound);
     $('btnLefty').addEventListener('click', onToggleLefty);

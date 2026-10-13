@@ -52,6 +52,8 @@ function buildCase(condition, { seed, side, foot, excess, lesion, looseHorn, dec
     // The step ids this job needs, in order (see steps.js).
     steps: C.steps,
     requires: C.requires,
+    // How she should leave the crush: null (release), or a CALLS id (WP8.1).
+    call: C.call ?? null,
 
     // Excess sole (mm above target) on each claw. Outer hind claws overgrow most.
     excess,

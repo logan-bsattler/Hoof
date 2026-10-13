@@ -227,6 +227,13 @@ button.primary {
 button.primary.small { width: auto; padding: 6px 12px; font-size: 12px; }
 button.primary[hidden] { display: none; }
 #btnRead { margin-bottom: 8px; }
+/* The other way a cow leaves the crush (WP8.1): quieter than Release. */
+#btnCall, #btnCallBar { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+#btnCall { width: 100%; margin-top: 8px; padding: 8px 16px; }
+#btnCallBar { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+/* The call sheet: one row per call, its line underneath. */
+.calls { margin: 8px 0 0; padding-left: 18px; }
+.calls li { margin-bottom: 4px; }
 .modal ul.found { margin: 8px 0 12px; padding-left: 18px; }
 
 /* ---- modal ---- */

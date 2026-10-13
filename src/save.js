@@ -6,20 +6,22 @@
 // fresh round at farm 1. `storage` is passed in so the tests can use a stand-in.
 
 import { FARMS, newRoute, farmById, isOpen } from './route.js';
-import { CONDITIONS } from './conditions.js';
+import { CONDITIONS, CALLS } from './conditions.js';
 
 export const SAVE_KEY = 'truehoof.round.v1';
 
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const farmIds = new Set(FARMS.map((f) => f.id));
 const count = (v) => Number.isFinite(v) && v >= 0;
+// How she left the crush (WP8.1); missing on rows saved before it.
+const callOk = (c) => c == null || Object.hasOwn(CALLS, c);
 // A past cow is dealt again on a return visit, so every field that deal reads must be one it knows.
 const cowOk = (h) => isObj(h) && farmIds.has(h.farm) && typeof h.tag === 'string' && Number.isInteger(h.seed) &&
   Object.hasOwn(CONDITIONS, h.condition) && (h.side === 'LH' || h.side === 'RH') &&
-  ['hind', 'front'].includes(h.foot ?? 'hind') && Number.isInteger(h.visit) && h.visit >= 1;
+  ['hind', 'front'].includes(h.foot ?? 'hind') && Number.isInteger(h.visit) && h.visit >= 1 && callOk(h.call);
 // A day summary row, as recordCow writes it.
 const rowOk = (r) => isObj(r) && typeof r.tag === 'string' && typeof r.title === 'string' && typeof r.grade === 'string' &&
-  typeof r.gait === 'string' && count(r.points) && typeof r.lame === 'boolean' && [null, 'recheck', 'healed'].includes(r.back);
+  typeof r.gait === 'string' && count(r.points) && typeof r.lame === 'boolean' && [null, 'recheck', 'healed'].includes(r.back) && callOk(r.call);
 // The day in progress: the next visit to an open farm, with one row per cow done so far.
 const visitOk = (v, d) => isObj(v) && farmIds.has(v.farm) && isOpen(farmById(v.farm), d.rep) &&
   v.n === (d.visits[v.farm] ?? 0) + 1 && Number.isInteger(v.k) && v.k >= 0 && v.k <= farmById(v.farm).cows &&

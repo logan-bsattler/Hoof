@@ -106,3 +106,17 @@ test('starting the round over clears the save', () => {
   assert.equal(store.getItem(SAVE_KEY), null);
   assert.deepEqual(loadRound(store), newRoute());
 });
+
+test('a saved call survives the reload; rows from before calls load; an unknown call is refused', () => {
+  const route = newRoute();
+  const herd = startVisit(route, FARMS[0].id);
+  recordCow(route, herd[0], { failed: false, grade: 'Sound', gait: 'to the pen', call: 'pen' });
+  const store = memory();
+  saveRound(route, store);
+  assert.deepEqual(loadRound(store), route);
+  const d = JSON.parse(store.getItem(SAVE_KEY));
+  delete d.history[0].call; delete d.visit.rows[0].call;
+  assert.ok(parseRound(JSON.stringify(d)).visit, 'old rows without a call still load');
+  d.history[0].call = 'abattoir';
+  assert.equal(parseRound(JSON.stringify(d)), null);
+});

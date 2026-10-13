@@ -800,3 +800,45 @@ test('nipping the sole is a mistake; a toe bite that grazes the trim line is not
   const ev = applyBite(t, 250, 400);
   assert.ok(ev.nipLive && ev.nipSole, 'jaws on the living sole');
 });
+
+// WP8.1: the other ways off the line. Case B stands in for a cow that needs a call.
+test('a call on a cow who only needed her foot seen to caps at Needs work, with no walk-off', () => {
+  const cd = makeCase('routine', 7);
+  const h = new Hoof(cd);
+  idealTrim(h);
+  const r = scoreCase(h.metrics(), { ...idealSession(cd), call: 'vet' }, h, cd);
+  assert.equal(r.grade, 'Needs work');
+  assert.equal(r.call, 'vet');
+  assert.equal(r.gait, 'to the vet');
+  assert.equal(r.mobility, null);
+  assert.match(r.notes[0], /didn’t need the vet/);
+});
+
+test('a cow who needs the vet: released costs 25 Correctness, the pen 15, the vet nothing', () => {
+  const cd = { ...CASE_B, call: 'vet' };
+  const h = new Hoof(cd);
+  idealTrim(h);
+  const by = (call) => scoreCase(h.metrics(), { ...idealSession(cd), call }, h, cd);
+  assert.equal(by('vet').parts.correctness, 100);
+  assert.equal(by('vet').gait, 'to the vet');
+  assert.equal(by('pen').parts.correctness, 85);
+  assert.equal(by(null).parts.correctness, 75);
+  assert.ok(by(null).notes.includes('This one needs the vet.'));
+  // Leaving her is no referral either.
+  assert.equal(by('leave').parts.correctness, 75);
+});
+
+test('a cow to be left: the call scores full, strokes cost Restraint, a full trim is Needs work', () => {
+  const cd = { ...makeCase('routine', 7), call: 'leave' };
+  const h = new Hoof(cd);
+  const left = scoreCase(h.metrics(), { ...newSession(), call: 'leave' }, h, cd);
+  assert.equal(left.total, 100);
+  assert.equal(left.grade, 'Textbook');
+  assert.equal(left.gait, 'left till dry-off');
+  const started = scoreCase(h.metrics(), { ...newSession(), call: 'leave', cuts: 5 }, h, cd);
+  assert.equal(started.parts.restraint, 70);
+  idealTrim(h);
+  const trimmed = scoreCase(h.metrics(), idealSession(cd), h, cd);
+  assert.equal(trimmed.grade, 'Needs work');
+  assert.notEqual(trimmed.gait, 'left till dry-off');
+});
