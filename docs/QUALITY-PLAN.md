@@ -556,6 +556,32 @@ Cases where the right answer is a call, not a cut. They depend on 8.1's end-of-c
 | D25 | Old block removal | **Taken (2026-10-13):** Tap the block with the knife, 2–3 taps |
 | D26 | Add a "lame, but nothing in the foot" cow (Shearer's non-foot lameness: refer to the vet)? | **Taken (2026-10-13):** Not now; later, after J3, since it can feel like a trick |
 
+## WP10: hoof art realism, follow-ups (small–medium; scoped 2026-10-13 at `cbc2c14`)
+
+Continues the realism pass (`348b521`, `e6baf32`, `cbc2c14`: wet manure, waxy sole, crusted wall, ulcer-ring fix, heel flake, stained horn). Work in `src/hoofart.js`; judge in the art lab (`dev/artlab.html?stage=N&zoom=1.3`, plus `&crop=x,y,w,h` for close-ups) against `reference/hoof-video-capture/frames`.
+
+### 10.1 Measure the hoof build time (do first)
+- `HoofArt.build` runs once per hoof. The lab took about 34 s for four stages at S=3, and no "before" figure exists.
+- Time `build` + the first `compose` in the game at S=2 and S=3, on desktop and on a phone, and compare against `c3598f3` (before the pass).
+- If a case start hitches noticeably: precompute the noise fields once (they don't depend on the hoof), cache them across cases, or build them over a few frames.
+
+### 10.2 Ground-sole crosshatch
+- At 1.3 zoom, the ground sole still shows a faint woven texture. It's the surface on screen for most of a trim, so it matters most.
+- Try less per-pixel grain, and longer, smoother grinder arcs that don't restart at each stamp (the seams between passes show).
+
+### 10.3 Stain islands
+- Low spots the grinder skips stay as dark, ragged, stained islands (ref 0:35, 1:25 left claw). They also tell the player where the sole is low.
+- `nIsle` already raises the stain depth; make the islands bigger and darker, with the crisp broken edge the stain already has.
+
+### 10.4 Dirty hoof: less even (agreed 2026-10-13)
+- Manure is uniformly pebbled. Add large-scale coverage variation: thick clumps toward the heel and the gap, thinner smears, and a few patches where tan horn shows through (ref 0:15).
+
+### 10.5 Pocket size varies per cow (agreed 2026-10-13)
+- The opened ulcer is smaller than the reference. Rather than one bigger size, vary `lesion.r` per cow (for example 10–16) through the light variations (WP2.3 / 7.3), so some pockets are big jobs and some small.
+- Check the probe text, `lesionOpened`, the tint threshold and scoring still hold at both ends of the range; add the range to the variation sweep.
+
+Dropped: the straight knife-dish shadows. They come from the art lab's ruler-straight scripted strokes, not from play.
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
