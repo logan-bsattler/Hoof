@@ -135,6 +135,7 @@ function newCase() {
   game.walkoff = null;
   game.result = null;
   game.weepT = 0;
+  game.weepAt = null;
   game.blockKind = 'rubber';
   ui.setIconKind('block', '');
   // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
@@ -369,7 +370,8 @@ function tap(x, y) {
     if (r.kind === 'lesion' && !game.session.diagnosis) {
       // The weeping hole: squeezing it pushes fluid and bubbles out. A white-line track is
       // still sealed under the wall: she just flinches. A false sole just sounds hollow.
-      const L = caseDef.lesion;
+      // With a lesion on each claw (J3), it's the one on the claw tested.
+      const L = hoof.lesionOn(hoof.claw[i]) ?? caseDef.lesion;
       if (L.type === 'doublesole') { Sound.tock(); buzz(5); }
       else { Sound.spring(); buzz([10, 40, 20]); }
       if (L.type === 'doublesole') {
@@ -405,11 +407,13 @@ const WRAP_MSG = {
   sound: () => caseDef.lesion?.type === 'dd' ? 'The pad and wrap go over the lesion, on the other claw.' : 'That’s the sound claw: it has the block. The pad and wrap go over the ulcer.',
   untreated: 'No wrap for this one. Pared out and drained, it heals best open to the air.',
   closed: 'Open the ulcer first. Pare the loose horn off it with the knife.',
-  unflushed: () => caseDef.lesion?.type === 'dd' ? 'Spray the raw patch in the cleft until it’s soaked before you cover it.' : 'Flush the opened ulcer with the spray bottle before you cover it.',
+  unflushed: () => caseDef.lesion?.type === 'dd' ? 'Spray the raw patch in the cleft until it’s soaked before you cover it.'
+    : caseDef.lesions ? 'Flush this claw’s opened lesion with the spray bottle before you cover it.' : 'Flush the opened ulcer with the spray bottle before you cover it.',
   nothing: 'She’s sound: nothing to pad or wrap.',
   nowrap: 'No wrap for foot rot. Spray it and let the vet see her.',
   early: 'Finish the trim first. The wrap goes on last, just before she’s released.',
-  done: 'She’s wrapped. Release her.',
+  done: () => caseDef.call ? 'She’s wrapped. Make the call.' : 'She’s wrapped. Release her.',
+  other: 'That claw’s wrapped. Now the other one.',
 };
 
 function dress(claw) {
@@ -421,11 +425,11 @@ function dress(claw) {
   }
   buzz(15);
   if (r.stage === 1) {
-    renderer.placedNow('pad');
+    renderer.placedNow('pad', r.claw);
     Sound.pad();
     ui.toast('Pad pressed on over the treated sole. Now the wrap.', 'good');
   } else {
-    renderer.placedNow('wrap');
+    renderer.placedNow('wrap', r.claw);
     Sound.wrap();
     ui.toast('Wrapped. Pink means treated: everyone will know to check her.', 'good');
   }
@@ -487,6 +491,8 @@ function placeBlock(claw) {
   game.shake = 4;
   if (!caseDef.lesion) {
     ui.toast('She’s sound. A block only goes on to rest a sore claw.', 'warn', 4000);
+  } else if (hoof.lesions().length > 1) {
+    ui.toast('No block: both claws are sore. It puts her whole weight on the other bad one.', 'warn', 4500);
   } else if (!caseDef.requires?.block) {
     ui.toast('No block for this one: the trouble is in the skin of the cleft, not under a claw.', 'warn', 4000);
   } else if (claw === caseDef.lesion.claw) {
@@ -501,11 +507,13 @@ function placeBlock(claw) {
   slip();
 }
 
-// The pressure-release beat, once per cow: the ulcer opened or the abscess drained.
-function releasePressure(msg) {
-  if (game.session.released) return;
-  game.session.released = true;
-  const W = lesionSpot(caseDef.lesion);
+// The pressure-release beat, once per lesion: the ulcer opened or the abscess drained.
+function releasePressure(msg, L = caseDef.lesion) {
+  const done = (game.session.released ??= {});
+  if (done[L.claw]) return;
+  done[L.claw] = true;
+  game.weepAt = L;
+  const W = lesionSpot(L);
   Sound.release();
   Sound.bubbles();
   buzz([15, 30, 40]);
@@ -528,14 +536,20 @@ function strainCap(strain, x, y) {
 // The cap gives: horn and core come away in one piece and the pocket floods. The knife comes
 // off with it, so a sawing stroke can't run on into the raw core underneath.
 function popCap(x, y) {
-  const L = caseDef.lesion;
+  const L = lesionAt(x, y);
   releaseHold();
   Sound.crack();
   jolt(5);
   particles.spawn('flake', L.x, L.y, '#d9c79c', 14);
   particles.spawn('flake', x, y, '#cdb98c', 6);
   renderer.weep(L.x, L.y, 4, 'pus');
-  releasePressure('It gave! Pus out, pressure off: you can almost hear her sigh. Now pare the loose edge from outside the ring.');
+  releasePressure('It gave! Pus out, pressure off: you can almost hear her sigh. Now pare the loose edge from outside the ring.', L);
+}
+
+// The lesion nearest (x, y): on a J3 pair, the one under the tool.
+function lesionAt(x, y) {
+  const ls = game.hoof.lesions();
+  return ls.reduce((a, b) => (Math.hypot(b.x - x, b.y - y) < Math.hypot(a.x - x, a.y - y) ? b : a), ls[0]);
 }
 
 // Knife into the opened ulcer: it's raw tissue now, and she lets you know.
@@ -545,7 +559,7 @@ function carveOpenUlcer(x, y) {
   jolt(5);
   buzz([30, 40, 30]);
   Sound.moo(true);
-  const L = caseDef.lesion;
+  const L = lesionAt(x, y);
   renderer.weep(L.x + (x - L.x) * 0.4, L.y + (y - L.y) * 0.4, 1.5, 'blood');
   warnOnce('lesion', 'She felt that! It’s open: that’s raw tissue. Pare the rim, not the ulcer.', 'warn', 4);
 }
@@ -636,7 +650,7 @@ function handle(ev, x, y) {
     if (game.temper.kicks) Sound.moo(true);
     warnOnce('flinchTip', 'She flinched: the sole’s getting thin under there.', 'info', 8);
   }
-  if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.');
+  if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.', game.hoof.lesions().find((l) => l.pocket) ?? caseDef.lesion);
   if (ev.offTrack) warnOnce('offTrack', caseDef.lesion?.type === 'foreign' ? 'Nothing opens from here. Start right on the mark and work outward.' : 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
   if (ev.cleftCut) {
     s.cleftCuts++;
@@ -702,7 +716,7 @@ async function requestRelease() {
     renderer.block(hoof);
     renderer.dressing(hoof);
   };
-  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrap >= 2, side: hoof.side, foot: caseDef.foot, hoof, drawFoot });
+  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrapped, side: hoof.side, foot: caseDef.foot, hoof, drawFoot });
   game.state = 'walkoff';
 }
 
@@ -990,7 +1004,7 @@ function frame(now) {
     // The opened pocket keeps weeping for a while.
     if (game.weepT > 0) {
       game.weepT -= dt;
-      const W = lesionSpot(caseDef.lesion);
+      const W = lesionSpot(game.weepAt ?? caseDef.lesion);
       if (Math.random() < dt * 5) renderer.weep(W.x, W.y, 0.5);
     }
     game.scrubLevel = Math.max(0, game.scrubLevel - dt * 4);

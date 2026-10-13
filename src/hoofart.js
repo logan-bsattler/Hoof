@@ -389,7 +389,7 @@ export class HoofArt {
         const c = cls[p];
         if (!c || c > 2) continue;
         if ((px - cx) ** 2 + (py - cy) ** 2 > R * R) continue;
-        if (hoof && ((hoof.block === c) || (hoof.wrap && hoof.wrapClaw === c))) continue;
+        if (hoof && ((hoof.block === c) || hoof.wrappedOn(c) > 0)) continue;
         const fresh = this.markT[p] !== type;
         this.markT[p] = type;
         if (moving || type !== MARK.GRINDER) this.markA[p] = qa;
@@ -464,10 +464,12 @@ export class HoofArt {
     const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
     const rot = L?.type === 'footrot';
     const lesionC = L?.claw ?? CLAW.NONE, heelC = LH.claw;
-    // The ulcer art keys off dL (distance to the ulcer) and Lr; with no ulcer, dL stays huge.
-    const ulcerC = L?.type === 'ulcer' ? L.claw : CLAW.NONE, Lr = ulcerC ? L.r : 0;
+    // The ulcer art keys off dL (distance to the claw's ulcer) and Lr; with no ulcer, dL stays
+    // huge. Each claw can carry its own (a J3 pair).
+    const ulcerOn = { [CLAW.OUTER]: null, [CLAW.INNER]: null };
+    for (const l of hoof.lesions()) if (l.type === 'ulcer') ulcerOn[l.claw] = l;
     // The white-line track's box: pixels outside it skip the per-pixel path distance.
-    const T = L?.type === 'whiteline' ? L : null;
+    const T = hoof.lesions().find((l) => l.type === 'whiteline') ?? null;
     const PU = L?.type === 'foreign' ? L : null;
     const NE = L?.type === 'toenecrosis' ? L : null, necroF = this.necroF;
     const DS = L?.type === 'doublesole' ? L : null, doubleF = this.doubleF;
@@ -478,7 +480,7 @@ export class HoofArt {
         Math.max(...xs, K.x + K.r * 1.8) + m, Math.max(...ys, K.y + K.r * 1.8) + m];
     }
     const heelY = GEOM.heelY;
-    const decoys = (hoof.caseDef.findings ?? []).filter((f) => f.kind !== L?.type);
+    const decoys = (hoof.caseDef.findings ?? []).filter((f) => !hoof.isLesionFinding(f));
 
     let i0 = 0, i1 = 0, i2 = 0, i3 = 0, w0 = 0, w1 = 0, w2 = 0, w3 = 0;
     const sm = (a) => a[i0] * w0 + a[i1] * w1 + a[i2] * w2 + a[i3] * w3;
@@ -589,7 +591,8 @@ export class HoofArt {
           gx += (reliefOut[1] / cell) * RELIEF;
           gy += (reliefOut[2] / cell) * RELIEF;
           sheen = 1 - 0.6 * r;
-          const dL = c === ulcerC ? Math.hypot(lx - L.x, ly - L.y) : 1e9;
+          const UL = ulcerOn[c], Lr = UL ? UL.r : 0;
+          const dL = UL ? Math.hypot(lx - UL.x, ly - UL.y) : 1e9;
           let decoyDark = 0;
 
           // 1. Ivory sole, coloured by thickness.
@@ -641,7 +644,7 @@ export class HoofArt {
 
           // 2. Bruise streaks around the ulcer, running toward the toe.
           if (dL < Lr * 4.2) {
-            const fall = (1 - dL / (Lr * 4.2)) * (ly > L.y - Lr * 0.5 ? 1 : 0.45);
+            const fall = (1 - dL / (Lr * 4.2)) * (ly > UL.y - Lr * 0.5 ? 1 : 0.45);
             const br = smoothstep(0.5, 0.78, nStreak[p] / 255) * fall * 0.8;
             R += (222 - R) * br; G += (112 - G) * br; B += (124 - B) * br;
           }
@@ -907,7 +910,7 @@ export class HoofArt {
 
           // White-line abscess: a dark seam of packed grit in the white line, the pared groove
           // that follows it in from the wall, and the drained pocket at its end.
-          if (c === lesionC && T && lx > tb[0] && lx < tb[2] && ly > tb[1] && ly < tb[3]) {
+          if (T && c === T.claw && lx > tb[0] && lx < tb[2] && ly > tb[1] && ly < tb[3]) {
             const dT = distToPath(lx, ly, T.path).d, K = T.pocket, dP = Math.hypot(lx - K.x, ly - K.y);
             const lf = sm(looseF);
             // Sealed: a ragged dark line, thinner than the track, and a faint grey shadow over

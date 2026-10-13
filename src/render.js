@@ -152,8 +152,9 @@ export class Renderer {
     drawStrap(c);
 
     // Colour-blind-safe lesion marker once it's been diagnosed.
-    if (diagnosed && hoof.wrap < 1 && hoof.caseDef.lesion) {
-      const L = hoof.caseDef.lesion;
+    // One per lesion (both claws on a J3 pair), until its claw is padded.
+    if (diagnosed) for (const L of hoof.lesions()) {
+      if (hoof.wrappedOn(L.claw) >= 1) continue;
       c.save();
       c.setLineDash([4, 3]);
       c.strokeStyle = '#ff6b5b';
@@ -332,6 +333,17 @@ export class Renderer {
     const c = this.ctx;
     const L = hoof.caseDef.lesion;
     if (!L) return;
+    if (hoof.lesions().length > 1) {
+      // A lesion on each claw (J3): each claw is padded and wrapped on its own.
+      for (const l of hoof.lesions()) {
+        const w = hoof.wrapAt[l.claw], pts = clawPolygon(l.claw, false, hoof.side);
+        const at = (what) => this.placed[what + l.claw] ?? this.placed[what];
+        if (w >= 1) drawPad(c, l, pts, Math.min(1, (this.time - at('pad')) / 0.2));
+        if (w >= 2) drawWrap(c, pts, 1, Math.min(1, (this.time - at('wrap')) / 0.6));
+        else if (!w && ghostClaw === l.claw) drawPad(c, l, pts, 0.35);
+      }
+      return;
+    }
     if (hoof.wrap >= 1) {
       const pts = clawPolygon(hoof.wrapClaw, false, hoof.side);
       drawPad(c, L, pts, Math.min(1, (this.time - this.placed.pad) / 0.2));
@@ -341,7 +353,11 @@ export class Renderer {
     }
   }
 
-  placedNow(what) { this.placed[what] = this.time; }
+  // `claw`: which claw, when a pair (J3) is dressed claw by claw.
+  placedNow(what, claw) {
+    this.placed[what] = this.time;
+    if (claw) this.placed[what + claw] = this.time;
+  }
 
   labels(hoof) {
     const c = this.ctx;

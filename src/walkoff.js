@@ -117,9 +117,9 @@ export class Walkoff {
     c.fill(this.contact);
     c.restore();
     c.globalAlpha = k;
-    const L = lesionSpot(this.hoof.caseDef.lesion);
     c.textAlign = 'center';
-    if (L) {
+    // Every lesion is off the floor (both, on a J3 pair).
+    for (const L of this.hoof.lesions().map(lesionSpot)) {
       c.setLineDash([5, 4]);
       c.strokeStyle = '#8fd0ff';
       c.lineWidth = 2;
