@@ -47,7 +47,7 @@ export const FARMS = [
   {
     id: 'toplane', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 180,
     intro: 'Mary wants her old girls done front and back. Front feet grow the other way round: mind which claw goes first.',
-    mix: { routine: 0.35, ulcer: 0.35, whiteline: 0.3 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5,
+    mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5,
   },
   {
     id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', cows: 5, rep: 270,
@@ -57,7 +57,7 @@ export const FARMS = [
   {
     id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', cows: 5, rep: 380,
     intro: 'A big, busy unit. Priya’s heifers have never been in a crush before, and they let you know it.',
-    mix: { ulcer: 0.3, whiteline: 0.25, dd: 0.25, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2,
+    mix: { ulcer: 0.2, whiteline: 0.2, dd: 0.2, puncture: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2,
   },
   {
     id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', cows: 6, rep: 500,

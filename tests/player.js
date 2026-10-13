@@ -98,6 +98,20 @@ export function makePlayer(hoof, opts = {}) {
       }
       return p;
     },
+    // Puncture: pare straight down on the mark, then widen in short pulls from its centre,
+    // a ring at a time, until it drains. Never wider than the pocket.
+    funnel() {
+      const K = L.pocket;
+      if (L.shape === 'line') p.drag('knife', [L.a, L.b, L.a], 50);
+      else p.drag('knife', [[L.x - 2, L.y], [L.x + 2, L.y], [L.x - 2, L.y]], 40);
+      for (const r of [K.r * 0.45, K.r * 0.8]) {
+        for (let a = 0; a < 12 && !hoof.drained; a++) {
+          const t = (a / 12) * 2 * Math.PI;
+          p.drag('knife', [[K.x, K.y], [K.x + r * Math.cos(t), K.y + r * Math.sin(t)]], 50);
+        }
+      }
+      return p;
+    },
   };
   return p;
 }

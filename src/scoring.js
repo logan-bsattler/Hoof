@@ -49,12 +49,14 @@ function decoysDug(hoof, caseDef) {
 // Sole cells beside the white-line track dug well below target: hunting for the pus
 // instead of following the line to it.
 function soleDugBesideTrack(hoof, L) {
-  if (L?.type !== 'whiteline') return 0;
+  if (L?.type !== 'whiteline' && L?.type !== 'foreign') return 0;
   let n = 0;
   for (let i = 0; i < hoof.n; i++) {
     if (hoof.claw[i] !== L.claw || hoof.tract[i] || !(hoof.zone[i] & Z.LIVE) || (hoof.zone[i] & (Z.DISH | Z.HEEL))) continue;
     const x = hoof.cellX(i), y = hoof.cellY(i);
-    const near = distToPath(x, y, L.path).d < L.w + 14 || Math.hypot(x - L.pocket.x, y - L.pocket.y) < L.pocket.r + 14;
+    // A puncture's hunting ground is round the pocket; the white line's runs the track's length.
+    const near = L.type === 'foreign' ? Math.hypot(x - L.pocket.x, y - L.pocket.y) < L.pocket.r + 10
+      : distToPath(x, y, L.path).d < L.w + 14 || Math.hypot(x - L.pocket.x, y - L.pocket.y) < L.pocket.r + 14;
     if (near && hoof.thick[i] < hoof.zoneTarget(i) - 1) n++;
   }
   return n;
@@ -65,7 +67,7 @@ export function lesionOpened(m, hoof) {
   const L = hoof.caseDef.lesion;
   // Digital dermatitis is skin: there is nothing to open.
   if (!L || L.type === 'dd') return true;
-  return L.type === 'whiteline' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
+  return L.type === 'whiteline' || L.type === 'foreign' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
 }
 
 // Flushed, padded and wrapped (sprayed only, where the condition wants no wrap: foot rot).
@@ -127,10 +129,11 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (!L && hoof.block) { correctness -= 20; notes.push('She was sound: no block needed. It only tips her onto one claw.'); }
   else if (L && !need.block && hoof.block) { correctness -= 20; notes.push('No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.'); }
   if (L && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
-  if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${L.type === 'whiteline' ? 'abscess' : 'ulcer'} is still carrying weight.`); }
+  if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${caseDef.noun ?? 'ulcer'} is still carrying weight.`); }
   if (need.open && !lesionOpened(m, hoof)) {
     correctness -= 20;
-    notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
+    notes.push(L.type === 'whiteline' ? 'The track was never pared out to the pus. The abscess is still under pressure.' :
+      L.type === 'foreign' ? 'The puncture was never pared down to the pus. It’s still under pressure.' : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
   if (trim && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
   if (trim && session.firstCutClaw === secondClaw(caseDef)) {
@@ -190,7 +193,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (needless) notes.push(caseDef.trimNote ?? 'This foot wasn’t to be trimmed today.');
   const restraint = clamp(100 - needless - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
   if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
-  if (hunted) notes.push('You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
+  if (hunted) notes.push(L.type === 'foreign' ? 'You opened a crater round the puncture. A narrow funnel straight down on the mark is all it needs.' : 'You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 

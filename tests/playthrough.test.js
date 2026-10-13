@@ -121,6 +121,13 @@ function playthrough(cd, quiet = false) {
     hoof.block = soundClaw(cd);
     s.blockAttempts.push(hoof.block);
     until('drain', () => {});
+  } else if (L?.type === 'foreign') {
+    // Step 4: a narrow funnel down on the mark until it drains, then block the sound claw.
+    for (let k = 0; k < 6 && !hoof.drained; k++) p.funnel();
+    assert.ok(hoof.drained, `puncture drained (${(hoof.metrics().looseRemain[LOOSE.TRACT] * 100).toFixed(0)}% closed)`);
+    hoof.block = soundClaw(cd);
+    s.blockAttempts.push(hoof.block);
+    until('funnel', () => {});
   } else if (cd.requires.open) {
     // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
     // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.

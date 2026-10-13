@@ -462,6 +462,7 @@ export class HoofArt {
     const ulcerC = L?.type === 'ulcer' ? L.claw : CLAW.NONE, Lr = ulcerC ? L.r : 0;
     // The white-line track's box: pixels outside it skip the per-pixel path distance.
     const T = L?.type === 'whiteline' ? L : null;
+    const PU = L?.type === 'foreign' ? L : null;
     let tb = null;
     if (T) {
       const K = T.pocket, m = T.w * 2.2, xs = T.path.map((q) => q[0]), ys = T.path.map((q) => q[1]);
@@ -760,6 +761,36 @@ export class HoofArt {
               wetness = Math.max(wetness, open);
               // A lifted flap edge catches the light on the horn side of the rim.
               if (open > 0.05 && open < 0.5) { R += 30 * (1 - open); G += 28 * (1 - open); B += 22 * (1 - open); }
+            }
+          }
+
+          // Puncture: a crisp, too-regular dark dot or ruled line with a glint of whatever went
+          // in; opened, a pale funnel stepping down to grey pus on the mark.
+          if (c === lesionC && PU && Math.abs(lx - PU.x) < PU.pocket.r * 2 && Math.abs(ly - PU.y) < PU.pocket.r * 2) {
+            const K = PU.pocket, dP = Math.hypot(lx - K.x, ly - K.y);
+            const dM = PU.shape === 'line' ? distToPath(lx, ly, [PU.a, PU.b]).d - PU.w * 0.6 : Math.hypot(lx - PU.x, ly - PU.y) - PU.r;
+            // How closed the puncture's own horn is here: the loose field blends with sound horn
+            // at its rim, so read it against the tract's footprint.
+            const lf = Math.min(1, sm(looseF) / Math.max(0.05, sm(tractF)));
+            const mark = smoothstep(0.5, -0.5, dM) * lf;
+            const pool = smoothstep(K.r * 1.2, K.r * 0.4, dP) * 0.1 * lf;
+            R *= 1 - pool; G *= 1 - pool; B *= 1 - pool * 0.8;
+            if (mark > 0) {
+              R += (36 - R) * mark; G += (30 - G) * mark; B += (27 - B) * mark;
+              const glint = PU.shape === 'line' ? smoothstep(0.9, 0.97, ngr) * smoothstep(-0.4, -1.2, dM)
+                : smoothstep(1.3, 0.3, Math.hypot(lx - PU.x + 1.5, ly - PU.y + 1.5));
+              spec += 80 * glint * mark;
+            }
+            const tf = fieldAt(tractF, lx + (nIsle[p] / 255 - 0.5) * 3, ly + (nStain[p] / 255 - 0.5) * 3);
+            const open = smoothstep(0.65, 0.25, lf) * smoothstep(0.25, 0.55, tf);
+            if (open > 0) {
+              // Paler toward the rim, shadowed as it steps down, grey pus at the bottom on the mark.
+              const down = smoothstep(K.r, 0, dP);
+              let cr = 230 - 40 * down - 8 * ngr, cg = 212 - 44 * down - 8 * ngr, cb = 178 - 40 * down - 6 * ngr;
+              const pus = smoothstep(1.5, -0.5, dM) * (0.75 + 0.3 * ncv);
+              cr += (78 - cr) * pus; cg += (74 - cg) * pus; cb += (64 - cb) * pus;
+              R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
+              wetness = Math.max(wetness, open * (0.3 + 0.6 * pus));
             }
           }
 

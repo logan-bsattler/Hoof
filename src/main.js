@@ -594,7 +594,7 @@ function handle(ev, x, y) {
     warnOnce('flinchTip', 'She flinched: the sole’s getting thin under there.', 'info', 8);
   }
   if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.');
-  if (ev.offTrack) warnOnce('offTrack', 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
+  if (ev.offTrack) warnOnce('offTrack', caseDef.lesion?.type === 'foreign' ? 'Nothing opens from here. Start right on the mark and work outward.' : 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
   if (ev.cleftCut) {
     s.cleftCuts++;
     // She flinches once per warning, not on every stamp of the blade.

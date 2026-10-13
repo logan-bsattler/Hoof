@@ -164,6 +164,8 @@ function workCap(hoof, x, y, amount, ev) {
 
 // How far below its trim target the pared-out track and the opened pocket sit (mm).
 const GROOVE = { [TRACT.ENTRY]: 1.5, [TRACT.TRACK]: 1.5, [TRACT.POCKET]: 2.5 };
+// A puncture is pared as a funnel: deepest on the mark, shallower round it.
+const FUNNEL = { [TRACT.ENTRY]: 2.5, [TRACT.POCKET]: 1.5 };
 
 // Knife on the white-line tract. Under-run horn lifts away only where it joins an opened cell,
 // so the track has to be followed from the wall. Elsewhere it is ordinary sole: false, cut it.
@@ -174,7 +176,7 @@ function pareTract(hoof, i, ev) {
     return false;
   }
   clearLoose(hoof, i, ev);
-  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - GROOVE[hoof.tract[i]]);
+  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - (hoof.caseDef.lesion.type === 'foreign' ? FUNNEL : GROOVE)[hoof.tract[i]]);
   if (!hoof.drained && hoof.tract[i] === TRACT.POCKET) {
     let n = 0, open = 0;
     for (let j = 0; j < hoof.n; j++) if (hoof.tract[j] === TRACT.POCKET) { n++; if (!hoof.loose[j]) open++; }
@@ -311,7 +313,7 @@ export function applySpray(hoof, x, y, dt) {
     if (blocked(hoof, i, ev)) return;
     hoof.mud[i] = Math.max(0, hoof.mud[i] - cfg.rinse * dt * f);
     // Opened ulcer tissue, or the raw skin of DD or foot rot in the cleft, soaks it up.
-    const opened = (hoof.looseInit[i] === LOOSE.ULCER && !hoof.loose[i]) || !!(hoof.zone[i] & (Z.DD | Z.ROT));
+    const opened = ((hoof.looseInit[i] === LOOSE.ULCER || hoof.looseInit[i] === LOOSE.TRACT) && !hoof.loose[i]) || !!(hoof.zone[i] & (Z.DD | Z.ROT));
     const a = Math.min(1 - hoof.tint[i], (opened ? cfg.rate : cfg.hornRate) * dt * f);
     hoof.tint[i] += a;
     ev.sprayed += a;
@@ -332,6 +334,7 @@ export function applyWrap(hoof, claw, m, ready) {
   if (claw !== L.claw) return { ok: false, reason: 'sound' };
   if (hoof.wrap >= 2) return { ok: false, reason: 'done' };
   if (L.type === 'ulcer' && m.looseRemain[LOOSE.ULCER] > 0.1) return { ok: false, reason: 'closed' };
+  if (L.type === 'foreign' && !hoof.drained) return { ok: false, reason: 'closed' };
   if (m.lesionTint < CFG.treat.tintMin) return { ok: false, reason: 'unflushed' };
   if (!ready) return { ok: false, reason: 'early' };
   hoof.wrapClaw = claw;

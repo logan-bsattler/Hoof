@@ -26,6 +26,11 @@ export const FINDING = {
     probeText: 'She flinches all along this dark line. Something’s tracking under the wall.',
     diagnosedText: 'The white-line track. Pare along it from the wall until it drains.',
   },
+  foreign: {
+    look: 'a small, too-neat dark mark mid-sole', feel: 'a sharp flinch on the mark only',
+    probeText: 'She flinches hard, but only right on the mark. It’s too neat for a stain: something went in here.',
+    diagnosedText: 'A puncture. Pare a narrow funnel straight down until it drains: no crater.',
+  },
   dd: {
     look: 'raw red patch in the heel cleft', feel: 'very sore to the touch',
     probeText: 'She snatches the foot away. Raw, strawberry-red skin in the cleft, sore to the lightest touch.',
@@ -114,6 +119,22 @@ function placeTract(rand, side, claw, v = {}) {
   for (let k = 1; k < path.length; k++) len += Math.hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]);
   // x, y, r: the entry, where the dark line shows at the wall. w: half-width of the track.
   return { claw, x: path[0][0], y: path[0][1], r: 8, w: 4.5, len, path, pocket };
+}
+
+// A puncture mid-sole: a perfect small dot, or a short ruled line, too regular for a stain.
+// x, y: the mark's centre. r: the dot's radius, or for a line its half-length, with ends a, b
+// and half-width w. pocket: the pus under it, a little wider than the mark.
+function placePuncture(rand, side, claw, v = {}) {
+  const y = band(rand, 345, 430, v.at);
+  const [l, r] = clawSpan(claw, y, side);
+  const x = l + (r - l) * band(rand, 0.42, 0.58);
+  const line = rand() < 0.5;
+  const ang = rand() * Math.PI, hl = 6 + 2 * (v.size ?? rand());
+  const L = { claw, x, y, shape: line ? 'line' : 'dot', r: line ? hl : 4.5, w: 2.2 };
+  L.a = [x - Math.cos(ang) * hl, y - Math.sin(ang) * hl];
+  L.b = [x + Math.cos(ang) * hl, y + Math.sin(ang) * hl];
+  L.pocket = { x, y, r: band(rand, 8.5, 10, v.size) + (line ? 2 : 0) };
+  return L;
 }
 
 // Digital dermatitis on `claw`'s side of the heel cleft, between the bulbs: a round raw patch
@@ -302,6 +323,58 @@ export const CONDITIONS = {
         howto: '<li><b>Follow</b> the dark line in from the wall with the knife: it leads to the pus.</li>',
         misreadNote: 'Misread the lesion. A dark line along the wall that she flinches at is a white-line abscess.',
         plan: `Plan: functional trim (steps 1–3), rasp, then pare along the dark line from the wall until it drains, and block the sound ${sound} claw.`,
+      };
+    },
+  },
+
+  // Case F "Something Sharp" (WP8.3): a puncture. The tell is the shape: too regular for a
+  // stain. The job is a narrow funnel straight down to the pus, not a crater.
+  puncture: {
+    caseId: 'F',
+    title: 'Something Sharp',
+    noun: 'puncture',
+    weight: 0.12,
+    steps: [...TRIM, 'funnel', 'step5', 'treat'],
+    requires: { open: true, block: true, treat: true },
+    diagnosis: 'foreign',
+
+    place(rand, side, v = {}) {
+      const sore = rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
+      const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
+      const lesion = placePuncture(rand, side, sore, v);
+      const looseHorn = placeHeelHorn(rand, at, otherClaw(sore));
+      const decoys = placeDecoys(rand, at, side, [{ ...lesion, r: lesion.pocket.r + 6 }, looseHorn], v);
+      return { lesion, looseHorn, decoys };
+    },
+
+    copy({ cow, limb, lesion }) {
+      const sore = CLAW_NAME[lesion.claw], sound = CLAW_NAME[soundClaw({ lesion })];
+      return {
+        intro:
+          `#${cow} came in off the track lame on the ${limb}, and she’s been pointing the toe. ` +
+          'Clean it and look hard at every mark: some are just stains.',
+        diagnosisPrompt: 'She’s sore on this foot. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'foreign', label: 'Foreign body',
+            feedback: `Right. A neat ${lesion.shape === 'line' ? 'line' : 'hole'} in the ${sore} sole: something went in, and the pus is under it.`,
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer sits at the sole/heel junction and springs. This is a neat mark mid-sole: a puncture.',
+          },
+          {
+            id: 'whiteline', label: 'White-line abscess',
+            feedback: 'A white-line abscess tracks in from the wall. This mark is mid-sole and too neat: a puncture.',
+          },
+          {
+            id: 'bruise', label: 'Sole bruise',
+            feedback: 'A bruise is a blurry patch and stays firm. This is too regular, and she flinches on it: a puncture.',
+          },
+        ],
+        howto: '<li><b>Too neat to be a stain?</b> A perfect dot or straight line is something driven in. Pare a narrow funnel down to it.</li>',
+        misreadNote: 'Misread the lesion. A perfectly round dot or ruled line mid-sole that she flinches on is a puncture.',
+        plan: `Plan: functional trim (steps 1–3), rasp, then pare a narrow funnel straight down on the mark until it drains, block the sound ${sound} claw, flush and wrap the ${sore} claw.`,
       };
     },
   },

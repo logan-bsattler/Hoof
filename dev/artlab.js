@@ -48,6 +48,11 @@ const STAGES = Q.has('cond') ? [
   ['Dirty', () => session()],
   ['Brushed', () => session().brushAll()],
   ['Brushed, lesion sprayed', () => sprayLesion(session().brushAll())],
+  ...(L?.type === 'foreign' ? [['Ground, funnel pared', () => {
+    const s = session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
+    for (let k = 0; k < 6 && !s.hoof.drained; k++) s.funnel();
+    return s;
+  }]] : []),
 ] : [
   ['Dirty (0:15)', () => session()],
   ['Brushed, first grinder passes (0:35)', () => session().brushAll().nip().grind(CLAW.OUTER, 330, 470, 1)],

@@ -58,6 +58,12 @@ export const STEPS = [
     tip: 'Start where the dark line meets the wall and pare along it with the knife until it drains. Follow the line: don’t dig into the sole. Then glue the block on the SOUND claw.',
     done: (m, s, hoof) => hoof.drained && hoof.block === soundClaw(hoof.caseDef),
   },
+  // Puncture: a narrow funnel straight down on the mark until it drains, then the block.
+  {
+    id: 'funnel', label: '4 · Pare a funnel to the pus, block the sound claw', tool: 'knife',
+    tip: 'Pare straight down on the mark with the knife, widening only as far as you must, until it drains. No crater. Then glue the block on the SOUND claw.',
+    done: (m, s, hoof) => hoof.drained && hoof.block === soundClaw(hoof.caseDef),
+  },
   {
     id: 'step5', label: '5 · Remove loose heel horn', tool: 'knife',
     tip: (cd) => `There’s a curl of loose horn at the ${CLAW_NAME[cd.looseHorn.claw]} heel. Flick it off with the knife and leave the heel itself alone.`,

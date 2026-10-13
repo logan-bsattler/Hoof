@@ -27,7 +27,7 @@ export const CLAW_NAME = { 1: 'outer', 2: 'inner' };
 export const LOOSE = { NONE: 0, ULCER: 1, HEEL: 2, TRACT: 3 };
 
 // Which loose group carries each lesion kind.
-export const LESION_LOOSE = { ulcer: LOOSE.ULCER, whiteline: LOOSE.TRACT };
+export const LESION_LOOSE = { ulcer: LOOSE.ULCER, whiteline: LOOSE.TRACT, foreign: LOOSE.TRACT };
 
 // The white-line tract, per cell: where it starts at the wall, the track, the abscess pocket.
 export const TRACT = { NONE: 0, ENTRY: 1, TRACK: 2, POCKET: 3 };
@@ -341,6 +341,7 @@ export class Hoof {
     // Lesion: a core of exposed corium hidden under a cap of loose horn.
     const L = cd.lesion;
     if (L?.type === 'whiteline') this.buildTract(L);
+    else if (L?.type === 'foreign') this.buildPuncture(L);
     else if (L?.type === 'dd') this.stampExact(L.x, L.y, L.r, (i) => {
       // Digital dermatitis is skin, not loose horn: the raw patch sits on the cleft.
       if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.DD;
@@ -391,6 +392,21 @@ export class Hoof {
       const { d, u } = distToPath(x, y, L.path);
       if (!inPocket && d > L.w) continue;
       this.tract[i] = inPocket ? TRACT.POCKET : u * L.len < 8 ? TRACT.ENTRY : TRACT.TRACK;
+      this.loose[i] = this.looseInit[i] = LOOSE.TRACT;
+      this.zone[i] &= ~Z.DISH;
+    }
+  }
+
+  // Puncture: the mark itself is the ENTRY (a dot, or a ruled line), the pus under it the POCKET.
+  // The tract rules then make the knife open it from the mark outward: a funnel, not a crater.
+  buildPuncture(L) {
+    const P = L.pocket;
+    for (let i = 0; i < this.n; i++) {
+      if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== L.claw || this.edge[i] < 2.5) continue;
+      const x = this.cellX(i), y = this.cellY(i);
+      const onMark = L.shape === 'line' ? distToPath(x, y, [L.a, L.b]).d <= L.w + 1 : Math.hypot(x - L.x, y - L.y) <= L.r;
+      if (!onMark && Math.hypot(x - P.x, y - P.y) > P.r) continue;
+      this.tract[i] = onMark ? TRACT.ENTRY : TRACT.POCKET;
       this.loose[i] = this.looseInit[i] = LOOSE.TRACT;
       this.zone[i] &= ~Z.DISH;
     }
@@ -490,7 +506,7 @@ export class Hoof {
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
-      looseN: { 1: 0, 2: 0, 3: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0 }, tintSum: 0, ddN: 0, ddTint: 0,
+      looseN: { 1: 0, 2: 0, 3: 0 }, looseLeft: { 1: 0, 2: 0, 3: 0 }, tintSum: 0, tractTint: 0, ddN: 0, ddTint: 0,
       thinCells: 0, overWB: 0, wbN: 0, overDish: 0, dishN: 0,
       triCut: 0, triN: 0, heelRemoved: 0, heelN: 0, blood: 0,
     };
@@ -517,6 +533,7 @@ export class Hoof {
         m.looseN[lg]++;
         if (this.loose[i]) m.looseLeft[lg]++;
         if (lg === LOOSE.ULCER) m.tintSum += this.tint[i];
+        else if (lg === LOOSE.TRACT) m.tractTint += this.tint[i];
       }
       // The skin lesions the spray soaks: the DD patch, or the foot-rot split.
       if (z & (Z.DD | Z.ROT)) { m.ddN++; m.ddTint += this.tint[i]; }
@@ -570,7 +587,8 @@ export class Hoof {
       3: m.looseN[3] ? m.looseLeft[3] / m.looseN[3] : 0,
     };
     // How well the opened ulcer (or the DD patch, or the foot-rot split) has been flushed with the spray (0..1).
-    m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER] : 0;
+    m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER]
+      : m.looseN[LOOSE.TRACT] ? m.tractTint / m.looseN[LOOSE.TRACT] : 0;
     m.levelDiff = claws[CLAW.INNER].wbMean - claws[CLAW.OUTER].wbMean;
     m.heelRemovedMean = m.heelN ? m.heelRemoved / m.heelN : 0;
     return m;
