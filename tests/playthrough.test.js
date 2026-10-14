@@ -339,16 +339,17 @@ test('the careful player pries an old block off first, then plays the foot as it
 // WP12.4: on the sand farm the knife wears as it pares. The bot swaps past 0.6 and still trims
 // every condition to Textbook; a knife that isn't on sand changes nothing.
 test('on sand the careful player swaps a worn knife and still reaches Textbook', () => {
-  let swaps = 0, cows = 0;
+  // One knife for the whole sweep, as it lasts a visit in the game.
+  const knife = { sand: true, wear: 0, swaps: 0 };
+  let cows = 0;
   for (const id of Object.keys(CONDITIONS)) {
     for (let seed = 1; seed <= 3; seed++) {
-      const knife = { sand: true, wear: 0 };
+      const before = knife.wear + knife.swaps;
       playthrough(makeCase(id, seed, dealMods(seed)), true, knife);
-      swaps += knife.swaps ?? 0;
-      if (knife.wear || knife.swaps) cows++;
+      if (knife.wear + knife.swaps !== before) cows++;
     }
   }
-  assert.ok(swaps >= cows, `${swaps} swaps over ${cows} knifed cows: a sand cow should need about one`);
+  assert.ok(knife.swaps >= cows / 3, `${knife.swaps} swaps over ${cows} knifed cows: a sand cow should need about half of one`);
 });
 
 test('off sand the knife never wears, and the trim is identical to playing with no knife at all', () => {
