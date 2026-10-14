@@ -765,6 +765,80 @@ Both follow the 7.2 recipe: a `CONDITIONS` entry with `place`/`copy`, its `FINDI
 | D41 | If one-claw swelling doesn't read at phone size, say which claw in the intro? | **Taken (2026-10-14):** Yes, as a fallback only |
 | D42 | Deep sepsis: trim and block the sound claw and refer, or refer only (no trim, like foot rot)? | **Taken (2026-10-14):** Trim and block the sound claw, then refer. It's what a trimmer can do for her before the vet comes, and it makes the two vet cases play differently. Refer-only would make them the same play with a different read |
 
+## WP14: restraint round the lesion, and when to stop (medium; scoped 2026-10-14 at `d41ffba`)
+
+The Tier 1 ideas from Nate's lives (`docs/NOTES-NATE-LIVES.md`, "Top ideas"), plus the one Tier 2 fix. **Recommendation: build 14.1 first.** It is Nate's biggest change in 23 years, and the code has a real gap there: the horn round an opened ulcer is not scored at all today. 14.2 and 14.3 sharpen the read; 14.4 is a one-line deck fix that can ship any time.
+
+None of these adds a condition, so the 7.2 recipe doesn't apply. Two add optional fields to a history row (`stripped`, `pits`); `cowOk` in save.js ignores unknown fields, so old saves load and new ones stay valid. Shipping after each step with the bot sweep, as before.
+
+### Fact checks (done 2026-10-14, by reading the code)
+| Check | Finding | Consequence |
+|---|---|---|
+| Is the horn round an opened ulcer scored? | **No.** `buildLesion` sets `keepOut` on every cell within `1.75r + 14·√0.6` px of the ulcer (the cap plus a knife's reach), and `metrics()` leaves `keepOut` cells out of `wbMean`, `overWB` and `triCut`. Only `thinCells` (under 3 mm, capped at −30 across the foot) and blood catch a stripped ring. | 14.1 needs a new ring metric. Nothing scores the ring today, so this adds a cost without double-counting one. |
+| Is the same lesson scored for the white line and the puncture? | **Yes.** `soleDugBesideTrack` costs Restraint −25 for sole dug more than 1 mm under target beside the track or round the pocket ("hunted"). | 14.1 covers the ulcer only (single and J3 pair). Toe necrosis and double sole are pared back on purpose, and 13.3’s hole takes no blade at all, so they stay out. |
+| What does a returning cow carry? | `recordCow` writes grade, lame, call, `blocked`/`blockClaw`. `returnCase` brings a lame cow back as a recheck (lesion r + 2, block still on, J2), and a cow that went off sound comes back healed and routine. | A stripped surround has to be recorded (`stripped: true`) and has to override "healed": the cow who walked off fine comes back lame. |
+| What are the decoys today? | `DECOY_KINDS = ['stain', 'bruise']`. `placeDecoys` puts them mid-sole (`at(claw, 30–120)`, y 285–470, r 10–13). `DECOY_DEPTH` is stain 1 mm, bruise 2.5 mm, and hoofart fades each mark out by that much horn removed. The probe says "firm" for both. | **A stain already fades as you pare,** after 1 mm. What "fades as you pare" adds is the *place*: by the wall, where a white-line track would start. Pigment is a decoy with no depth limit. |
+| What does digging a decoy cost? | `decoysDug`: Restraint −25 for each decoy whose cells sit more than 0.75 mm (mean) under target. It measures from target, or from her start on a thin cow. | All three new decoys score through `decoysDug` with no new branch. 14.2 adds notes per kind, not new costs. |
+| When does a cut bleed? | `cut()` in tools.js: when a cell reaches 0.05 mm. The sole warms to pink below 7 mm (`SOLE_RAMP`). | A tempting bruise only needs thinner horn under it: start its cells near target, so the pink and the blood come early. |
+| Does the bot touch decoys? | **No.** `tests/player.js` never aims at a decoy; it levels over them. | The new kinds can't break the sweep, as long as levelling over them stays inside the target band. A pigment mark left at sole height costs nothing. |
+| Is there a walk-in? | **No.** walkoff.js draws the exit only, and from the side (she walks right). The intro is a text card (main.js `game.state = 'intro'`). | A toe-out shows from behind, not the side, so 14.3 is new art, not a reuse of the walk-off. |
+| Which claw does the lesion land on? | Ulcer, white line and toe necrosis land on `v.big` (outer on a hind foot). The puncture picks a claw 50/50. | On a hind foot the toe-out shows on most ulcer, white-line and toe-necrosis cows, and on half the punctures. |
+| What does Hollins deal? | `{routine .5, whiteline .3, ulcer .2}`, 4 cows, so the deck is 2 routine, 1 white line, 1 ulcer. route.test.js:62 asserts exactly that. Puncture first appears at Top Lane (rep 180). | 14.4 moves the puncture’s first appearance to farm 2 (rep 30). D51 asks whether that’s too early. |
+
+### 14.1 Leave a ring round the ulcer (medium)
+- **What it is:** free the ulcer (cut away its loose cap), but leave a ring of sound sole round it. If the block comes off, that ring is all she stands on. Nate stopped getting "she can't walk" calls once he did this (April 1:38:28), and he takes the rest at the recheck once the horn has firmed (March 37:39).
+- **The ring:** cells on the lesion's claw that are live sole, not ulcer core and not cap (`looseInit !== LOOSE.ULCER`), from the cap's edge (1.75r) out to 1.75r + 8 px (two cells). `metrics()` gains `ringMean` (mean thickness) and `ringThin` (share under 4 mm), per lesion for the J3 pair.
+- **Measure first:** run the bot over 50 ulcer seeds (and J3) and log `ringMean` and `ringThin` for its Textbook trims. The knife is 14 px across, so opening the cap does nick the ring. The threshold has to sit clear of what a careful trim leaves. Proposed default: stripped when `ringMean < 5 mm` or `ringThin > 0.3`. Set it from the measurement, as 10.1 did for the build time.
+- **Scoring:** a stripped ring costs Restraint −20 (once per lesion, cap −30 on a pair). The note: "You stripped the horn round the ulcer. Free the loose horn, but leave a ring of sound sole: if her block comes off, that ring is all she stands on." It sits alongside the existing open check: an unopened cap still costs Correctness −20, so the lesson is "enough, not more".
+- **Return (D44, D45):** `recordCow` writes `stripped: true` when the ring was stripped. A stripped cow who went off in a block always comes back a recheck, even if she walked off sound. The block is gone, not still on (an exception to J2), the lesion is r + 2 as for any recheck, and her mood is 'hurt'. Back line: "She threw her block ten days on and stood on the bare sole round the ulcer. Dev rang you back." (the name is `farm.farmer`).
+- **The tidy at the recheck (D46):** not modelled. A cow done right comes back healed and routine, and the routine trim is the tidy.
+- **Cost:** medium. A ring pass in `metrics()`, one scoring branch, one history field, one `returnCase` branch and its back line. No art.
+- **Check:** game test: a cap opened with a wide circle of knife strokes round it is stripped, and the bot's trim isn't. Route test: a stripped, blocked, sound cow comes back a recheck with no block on. The sweep stays at Textbook on ulcer and J3.
+
+### 14.2 Decoys that teach when to stop (medium)
+Three new kinds in `DECOY_KINDS`, each with a `FINDING`, a `DECOY_DEPTH` and its art in hoofart's decoy loop. The testers stay honest (they never call a decoy sore); the art does the tempting. Each kind gets its own dug note, so the player learns which mark fooled them.
+- **Fade (`fade`):** a short dark line at the abaxial white line, drawn like a track's entry (like `buildTract`'s first 8 px), 1.5 mm deep. One or two passes and it's gone. Placed by a new branch in `placeDecoys` that hugs the wall, clear of any real track. Probe: "Firm. A dark nick at the wall, but she doesn't mind it." Dug note: "That mark by the wall was a passing flaw: it went with one pass. Chasing it only takes wall and leaves a hole." (NYE 1:14:13)
+- **Pigment (`pigment`):** a dark grey-black stripe running in from the wall, with no hole and no halo. Its depth is unlimited: it never fades, however much is pared. Probe: "Firm, and dark all the way through." Dug note: "The colour didn't change as you pared: that's pigment, not a lesion. If it doesn't change, leave it." (March 47:30)
+- **Tempting bruise (`haem`):** a pinkish, streaked patch shaded like a track that runs somewhere, 4 mm deep, so it outlasts the levelling. The horn under it starts at T + 0.3 mm instead of her usual excess, so levelling barely touches it, and any paring on it turns pink at once and bleeds soon after. Probe: "Tender, but no give. Bruised, not soft." Dug note: "That was a bruise with the corium right under it. Pink means stop." (Oct 1:00:30)
+- **Who gets them (D47):** proposed, from Top Lane on (rep 180) the decoy pool is all five kinds. Willow Bank, Hollins and Brackenford keep stain and bruise, so new players learn the plain "firm means leave it" first. The pool rides on the farm (`farm.decoyKinds`), and `placeDecoys` keeps drawing from it in turns, as now.
+- **Off-target pits (D48):** a dug decoy is recorded on the history row as `pits: [{ claw, x, y }]` (at most two). When she comes back, healed or recheck, each pit is a `pit` decoy at the same spot: a small, dark, round hole like an ulcer's cap with no spring. Probe: "Firm. An old pared hole, packed with black." Its intro says nothing, so the player meets their own mistake as a new decoy. Nothing changes on the day itself apart from the note. (NYE 1:13:11)
+- **Cost:** medium. Most of it is art: four marks in hoofart's decoy loop, checked in the art lab at phone size. The scoring needs only notes. The tempting bruise also needs `makeCase` to lower the horn under it (a `stampExact` after the excess is laid).
+- **Check:** game tests: a fade decoy is gone after 1.5 mm; a pigment one is still drawn at 5 mm; one knife stroke on a tempting bruise after levelling turns pink, and three bleed. Sweep: the bot stays Textbook with each kind forced (`decoyKinds: [kind]`), since it never digs them. Route test: a dug decoy comes back as a pit.
+
+### 14.3 Toe-out on the walk-in (medium)
+- **What it is:** on a hind foot with a sore outer claw, she stands and walks a little duck-footed, toe turned out, to put her weight on the inner claw (NYE 1:38:35, autumn 22:11). It's a read before the testers.
+- **Art (D49):** a small rear-view sketch of her hind legs on the intro card, a canvas about 160 × 120: hocks, cannons and both hind feet from behind. Every hind cow gets it, so its presence isn't a tell. A cow with a sore outer claw on that foot has it turned out about 15°, with the hock in a touch. A sound or inner-claw cow stands square. The left hind is on the viewer's left. New code in walkoff.js (it already draws legs and hooves) or a small `stance.js`.
+- **Who toes out:** hind foot, lesion on the outer claw, and the claw sore: ulcer, white line, puncture, toe necrosis, and 13.3's deep sepsis when it's built. DD, foot rot, thin sole, both claws (J3) and the non-foot cow stand square. Front feet stand square too: the front-foot tell (crossed legs) is a later idea.
+- **False positives (D50):** proposed none for now. A sound cow never toes out, so the cue can be learned before it's tested. Nate's metabolic toe-out that settles on its own is a later variation.
+- **Feedback:** the result card adds one line when she toed out: "She was toeing out on the walk-in: that's the outer claw talking." The field guide pages for those conditions get the same line.
+- **Cost:** medium. All new art and one rule (`stance(caseDef)`), with no scoring and no grid change.
+- **Check:** phone check (375 × 667): the turned foot reads at a glance against a square one, in the art lab with both sides. Unit test for `stance()` over the conditions above. The sweep is untouched.
+
+### 14.4 Hollins deals the wrong mix (tiny)
+- **What it is:** a pasture herd gets stones, punctures, sticks and foot rot, and *fewer* ulcers than housed cows (Nate's pasture videos, ×4). Hollins deals an ulcer.
+- **Change:** Hollins's mix becomes `{routine .5, whiteline .3, puncture .2}`, so the deck is 2 routine, 1 white line, 1 puncture. Its intro already says the lane is all stones; add "and the odd nail in the gateway". Update route.test.js:62.
+- **Effects:** the puncture's first appearance moves from Top Lane (rep 180) to Hollins (rep 30), on the Apprentice tier with guides on. Farm 2 then brings two lesions the player hasn't met (white line, puncture) instead of one. Old saves are fine: a Hollins ulcer cow still comes back as an ulcer, since `returnCase` reads her own record. A Hollins visit in progress when the update lands re-deals a different herd on reload (`visitHerd` deals from the mix); that's acceptable.
+- **Not taken:** foot rot at Hollins. It's the right condition for pasture, but it needs the vet call, which the road introduces at Marsh End.
+- **Cost:** tiny. One data line, one copy line, one test.
+- **Check:** the deck test, and the full route tests.
+
+### Build order (D43)
+14.1 → 14.2 → 14.3, shipping after each with the sweep. 14.4 is independent and can ship first or ride along with any step. 14.1 goes first because it's the strongest lesson and needs no art. 14.2 next because it reuses the decoy pipe. 14.3 last, being all new art.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D43 | Build order: ring (14.1), decoys (14.2), toe-out (14.3), with the Hollins fix (14.4) any time? | Yes |
+| D44 | A stripped ring costs Restraint −20 (cap −30 on a pair), with the threshold set from the bot measurement (starting at ring mean under 5 mm, or more than 30% under 4 mm)? | Yes |
+| D45 | A stripped cow who went off in a block: always back as a recheck with the block thrown, or only half the time (a block doesn't always come off)? | Always. A teaching game needs the lesson to land every time, and "half the time" reads as luck |
+| D46 | Model Nate's second stage (tidy the ring at the recheck), or let the healed cow's routine trim stand for it? | Let the routine trim stand for it. A real tidy needs a "firmed-up ring" state for little extra play |
+| D47 | New decoy kinds from Top Lane on, with stain and bruise only at the first three farms? | Yes |
+| D48 | Off-target pits: come back as a black-pit decoy on her next visit? | Yes. It shows the cost Nate names (a dug hole refills black) without a new on-the-day mechanic |
+| D49 | Toe-out: a rear-view stance sketch on the intro card, or a line of intro copy? | The sketch. Copy would tell the player the answer; the point is to notice |
+| D50 | Toe-out: never on a sound cow for now (no false positives)? | Yes. Add the metabolic toe-out as a later variation once the cue is learned |
+| D51 | Hollins: swap its ulcer for a puncture, which brings the puncture in at rep 30 instead of 180? | Yes. The farm's intro already sets it up, and the guides are on at that tier. If two new lesions on farm 2 feel like too much, swap the white line for the puncture instead and keep the ulcer |
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
