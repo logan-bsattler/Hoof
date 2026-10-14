@@ -390,9 +390,21 @@ export class HoofArt {
     const cx = (x - X0) * S, cy = (y - Y0) * S, R = r * S * 0.92;
     const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(w - 1, Math.ceil(cx + R));
     const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(h - 1, Math.ceil(cy + R));
-    // The disc's rim sweeps arcs that run along the pass, bowing to one side.
-    const ml = Math.hypot(dx, dy) || 1;
-    const ax = Math.round(cx - (dy / ml) * R * ARC_R), ay = Math.round(cy + (dx / ml) * R * ARC_R);
+    // The disc's rim sweeps arcs that run along the pass, bowing to one side. One centre serves
+    // the whole pass, so the arcs run on unbroken from stamp to stamp; a new pass (a jump, a
+    // turn, or the arcs swinging too far round the centre) starts a fresh one.
+    const ml = Math.hypot(dx, dy) || 1, ux = dx / ml, uy = dy / ml;
+    let ax, ay;
+    if (type === MARK.GRINDER && moving) {
+      const P = this.pass, far = R * ARC_R;
+      const keep = P && P.R === R && Math.hypot(cx - P.x, cy - P.y) < R &&
+        ux * P.ux + uy * P.uy > 0.75 && Math.abs(Math.hypot(cx - P.ax, cy - P.ay) - far) < R * 1.2;
+      if (keep) { P.x = cx; P.y = cy; ax = P.ax; ay = P.ay; }
+      else {
+        ax = Math.round(cx - uy * far); ay = Math.round(cy + ux * far);
+        this.pass = { x: cx, y: cy, ux, uy, ax, ay, R };
+      }
+    }
     const hoof = this.hoof;
     for (let py = y0; py <= y1; py++) {
       for (let px = x0; px <= x1; px++) {
@@ -458,6 +470,20 @@ export class HoofArt {
           if (k) { a[i] = s / k; nx[i] = 1; }
         }
         ok.set(nx);
+      }
+      // The grinder takes horn cell by cell, and the overlap of its passes leaves rows; a real
+      // disc levels as it goes. A 1-2-1 smoothing (rows, then columns) takes out that cell-scale
+      // egg-crate and keeps the broad form. The ulcer core keeps its crisp rim.
+      const tmp = this.rg.tmp ??= new Float32Array(n);
+      const zone = hoof.zone;
+      for (const step of [1, cols]) {
+        tmp.set(a);
+        for (let i = cols; i < n - cols; i++) {
+          if (cc[i] !== c || zone[i] & Z.ULCER) continue;
+          const l = i - step, r = i + step;
+          if (zone[l] & Z.ULCER || zone[r] & Z.ULCER) continue;
+          a[i] = 0.25 * tmp[l] + 0.5 * tmp[i] + 0.25 * tmp[r];
+        }
       }
     }
     return this.rg;
@@ -687,8 +713,10 @@ export class HoofArt {
               const ax = px - arcX[p], ay = py - arcY[p];
               const sr = Math.sqrt(ax * ax + ay * ay) || 1;
               const f = sr / GPER, ring = Math.floor(f), ph = (f - ring) * 6.2832;
+              // Fades on a broad, round noise: the streak field runs lengthwise and would chop the
+              // arcs into columns across a sideways pass (a woven look).
+              const fade = 0.3 + 0.7 * smoothstep(0.3, 0.7, ns);
               const hv = hash[ring & 1023];
-              const fade = 0.35 + 0.65 * (nStreak[p] / 255);
               const amp = (hv < 0 ? 1 : 0.35 + hv) * (0.3 + 1.2 * r) * fade;
               const sl = -Math.sin(ph) * amp * 0.05;
               gx += (ax / sr) * sl; gy += (ay / sr) * sl;

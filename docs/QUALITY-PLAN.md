@@ -594,6 +594,8 @@ The case start is already sliced behind the loading bar (24 ms a frame; noise fi
 - At 1.3 zoom, the ground sole still shows a faint woven texture. It's the surface on screen for most of a trim, so it matters most.
 - Try less per-pixel grain, and longer, smoother grinder arcs that don't restart at each stamp (the seams between passes show).
 
+**10.2 status (2026-10-13): done, pending Ben's eye in play.** The weave had three sources. (1) Each grinder stamp re-centred its arcs, so they jumped every stamp: `mark()` now keeps one arc centre per pass (`this.pass`, reset on a jump, a turn of more than ~40°, or the arcs swinging too far round the centre). (2) The arc fade read `nStreak`, which is stretched lengthwise, so it cut sideways passes into columns: it now reads the broad `nStain`. (3) The relief itself had a cell-scale egg-crate and pass rows: `reliefGrid()` now applies a 1-2-1 smoothing (rows, then columns) per claw, skipping the ulcer core so the cavity rim stays crisp. Visual only; the thickness the game scores is unchanged. `reference/perf/shot.mjs` (git-ignored) renders a lab stage to a full-res PNG for close comparison (`node reference/perf/shot.mjs src ground 70,330,150,150 out.png`).
+
 ### 10.3 Stain islands
 - Low spots the grinder skips stay as dark, ragged, stained islands (ref 0:35, 1:25 left claw). They also tell the player where the sole is low.
 - `nIsle` already raises the stain depth; make the islands bigger and darker, with the crisp broken edge the stain already has.
