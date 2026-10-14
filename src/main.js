@@ -16,6 +16,8 @@ import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
 import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
+import { Guide } from './guide.js';
+import { drawToolIcon } from './toolart.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
 import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
@@ -71,6 +73,26 @@ const game = {
 };
 
 document.getElementById('routeReset').addEventListener('click', () => restartRound());
+
+// The field guide (WP11.2). Opened mid-cow it pauses her: the frame loop skips the 'guide'
+// state, so no fidget, flinch or clock, and closing puts her back exactly where she was.
+// Not over the walk-off, a score card or any other card.
+const guide = new Guide(drawToolIcon);
+function openGuide() {
+  if (guide.isOpen || !['title', 'route', 'play'].includes(game.state)) return;
+  const was = game.state;
+  if (was === 'play') {
+    releaseHold();
+    game.state = 'guide';
+  }
+  guide.open(route, () => { if (game.state === 'guide') game.state = was; });
+}
+document.getElementById('btnBook').addEventListener('click', openGuide);
+const titleBook = document.getElementById('titleBook');
+titleBook.addEventListener('click', openGuide);
+// The title card starts the game on any pointerup or Enter: not on its guide button.
+titleBook.addEventListener('pointerup', (e) => e.stopPropagation());
+titleBook.addEventListener('keydown', (e) => e.stopPropagation());
 
 const ui = new UI({
   onTool: (id) => pickTool(id),
@@ -342,6 +364,7 @@ canvas.addEventListener('pointerleave', (e) => { if (!game.ptr.down && e.pointer
 
 window.addEventListener('keydown', (e) => {
   if (game.state !== 'play') return;
+  if (e.key === 'b' || e.key === 'B') { openGuide(); return; }
   const t = TOOL_ORDER.find((id) => TOOLS[id].key === e.key);
   if (t) pickTool(t);
   else if (e.key === 'g' || e.key === 'G') document.getElementById('btnGuides').click();
@@ -960,6 +983,8 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  // The guide pauses her: nothing moves and no clock runs while it's open.
+  if (game.state === 'guide') { requestAnimationFrame(frame); return; }
   game.time += dt;
   game.shake = Math.max(0, game.shake - dt * 25);
   // No case is dealt until the title card is tapped, and the road map covers the canvas between visits.
