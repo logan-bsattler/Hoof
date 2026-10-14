@@ -446,3 +446,47 @@ test('old block: a blocked cow is recorded so; a recheck comes back wearing it, 
   endVisit(route);
   assert.ok(visitCases(farm, 2, route.history).every((cd) => !cd.oldBlock));
 });
+
+test('known kicker: about one visit in three past Hollins, at most one a visit, and she stays one (WP12.2)', () => {
+  for (const f of FARMS.slice(0, 2)) for (let v = 1; v <= 30; v++) assert.ok(!visitCases(f, v).some((cd) => cd.kicker), `${f.name} has no kickers`);
+  const farm = farmById('greystone');
+  let visits = 0;
+  for (let v = 1; v <= 60; v++) {
+    const kickers = visitCases(farm, v).filter((cd) => cd.kicker);
+    assert.ok(kickers.length <= 1, 'at most one a visit');
+    for (const cd of kickers) {
+      assert.ok(cd.temper >= CFG.temper.kickFrom, `she kicks: temper ${cd.temper}`);
+      assert.match(cd.traits, /she kicks/);
+    }
+    visits += kickers.length;
+  }
+  assert.ok(visits >= 12 && visits <= 28, `kicker visits ${visits} of 60`);
+
+  // Recorded, and she comes back a kicker.
+  const route = newRoute();
+  route.rep = farm.rep;
+  let herd = startVisit(route, farm.id);
+  for (let v = 1; !herd.some((cd) => cd.kicker); v++) {
+    assert.ok(v < 30, 'a kicker turns up');
+    herd.forEach((cd) => recordCow(route, cd, result('Clean')));
+    endVisit(route);
+    herd = startVisit(route, farm.id);
+  }
+  const k = herd.find((cd) => cd.kicker);
+  herd.forEach((cd) => recordCow(route, cd, result('Needs work', cd === k ? 'lame' : 'sound')));
+  assert.equal(route.history.at(-herd.length + herd.indexOf(k)).kicker, true);
+  endVisit(route);
+  const next = startVisit(route, farm.id);
+  const again = next.find((cd) => tag(cd) === tag(k));
+  assert.ok(again?.kicker && again.temper >= CFG.temper.kickFrom, 'a known kicker comes back one');
+  assert.ok(next.filter((cd) => cd.kicker).length <= 1);
+});
+
+test('footbath: every farm has one; no footbath raises the DD share, a good one cuts it (WP12.3)', async () => {
+  const { FOOTBATH, farmMix } = await import('../src/route.js');
+  for (const f of FARMS) assert.ok(FOOTBATH[f.footbath], `${f.name} has a footbath`);
+  const marsh = farmById('marshend');
+  assert.ok(farmMix(marsh).dd > marsh.mix.dd);
+  assert.ok(farmMix({ ...marsh, footbath: 'good' }).dd < marsh.mix.dd);
+  assert.equal(farmMix(farmById('greystone')).dd, farmById('greystone').mix.dd);
+});

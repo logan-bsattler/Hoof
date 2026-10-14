@@ -669,10 +669,14 @@ All four come from Nate's AMA (`docs/NOTES-NATE-AMA.md`, lines 28–37). None ch
 - **No new mechanic:** the warning is the feature. It tells the player to work in short strokes on that cow. A "go gently" mechanic is not planned (see D33).
 - **Tests:** deal (route), and the visit-card line.
 
+**Status (2026-10-14): done.** `farm.kicker` is 0.33 from Brackenford on. `visitCases` draws from the visit's own seed (stream 888) whether there is a kicker, and which new cow it is, and skips it when a known kicker is already coming back. `makeCase` takes `mods.kicker`: it floors her temper at `kickFrom`, sets `cd.kicker`, and her traits line says so in place of the "flighty" one. History rows carry `kicker: true`, and `returnCase` keeps it. The visit card says “Mind #N: she kicks.” (checked in the preview at Marsh End, visit 1). A route test covers none before Brackenford, at most one a visit, about 1 visit in 3 over 60 Greystone visits, and her return.
+
 ### 12.3 Footbath quality drives DD (small)
 - **Source:** Nate 1:33:41. No DD in 20 years on one farm, 30 of 50 cows on a farm with no footbath.
 - **Change:** `farm.footbath: 'none' | 'poor' | 'good'`, shown on the visit card and the road map. It scales the `dd` weight in the mix (none ×1.5, poor ×1, good ×0.25; the deck renormalises). Proposed: Marsh End none, Coldharbour none, Greystone poor, Ridgeway good; the others good. These farms' DD shares come out close to today's, so pacing barely moves. Check the herd decks in the route tests.
 - **Copy:** the farm intro or the visit card says it in Nate's terms ("the footbath's been dry since spring").
+
+**Status (2026-10-14): done, with one change to D34.** `FOOTBATH` and `farmMix()` in route.js scale `dd` (none ×1.5, poor ×1, good ×0.25) for both the deck and `farmMods`. The visit card and the road map name the footbath. **Ridgeway is poor, not good:** with good, its deck lost its only DD cow (rounding to whole cows), which broke the deck test and the "close to today" aim. A herd bought in last month fits a footbath that isn't running yet. Because decks round, the shares move no deck except that one: today the footbath is mostly a visible cause. It would bite if the footbath changed between visits (an idea, not planned). 137 tests, sw v42.
 
 ### 12.4 Sand dulls the knife (medium)
 - **Source:** Nate 50:07, 51:00. He sharpens every day and carries 7 knives; sand and gravel dull them fast.

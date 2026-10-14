@@ -22,10 +22,11 @@ export function temperament(t = 0.5) {
 }
 
 // One line for the intro about anything out of the ordinary with this cow.
-function traitsLine({ temper, mud, growth, foot }) {
+function traitsLine({ temper, mud, growth, foot, kicker }) {
   const bits = [];
   if (foot === 'front') bits.push('A front foot: the inner claw is the long one here, so the outer claw goes first.');
-  if (temper >= 0.7) bits.push('She’s a flighty one: expect her to shift about.');
+  if (kicker) bits.push('The farmer warned you: she kicks. Short strokes, and keep clear of her heel.');
+  else if (temper >= 0.7) bits.push('She’s a flighty one: expect her to shift about.');
   else if (temper <= 0.3) bits.push('She’s a calm old girl and stands well.');
   if (mud >= 1.25) bits.push('She’s come off a wet yard, caked to the dewclaws.');
   else if (mud <= 0.8) bits.push('Off clean straw: not much muck on her.');
@@ -34,7 +35,7 @@ function traitsLine({ temper, mud, growth, foot }) {
 }
 
 // Everything a case needs, written out from where things are on the foot.
-function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth }) {
+function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker }) {
   const C = CONDITIONS[condition];
   const cow = 100 + (((seed - 100) % 900) + 900) % 900; // ear tag #100–#999; seed 214 is #214
   const leg = side === 'RH' ? 'right' : 'left';
@@ -67,7 +68,9 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     // (1 covered; above 1 caked harder, below 1 patchy).
     temper,
     mud,
-    traits: traitsLine({ temper, mud, growth, foot }),
+    traits: traitsLine({ temper, mud, growth, foot, kicker }),
+    // A known kicker (WP12.2): the farmer names her on the visit card.
+    ...(kicker ? { kicker: true } : {}),
 
     // The hidden lesion, its kind named by the condition's diagnosis (null on a sound foot).
     lesion: L,
@@ -93,6 +96,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
 //   temper     0 calm .. 1 lively (0.5 = usual)
 //   calving    true: a routine cow close to calving, to be left till dry-off (WP9 J1)
 //   oldBlock   { claw, kind }: last visit's block, still glued on (WP9 J2)
+//   kicker     true: a known kicker; her temper is floored where kicks start (WP12.2)
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).
 // With no mods she comes out exactly as before the variations existed.
 export function makeCase(condition, seed, mods = {}) {
@@ -113,6 +117,7 @@ export function makeCase(condition, seed, mods = {}) {
   const hi = between(3.5, 5.5), lo = between(1.8, 3.0);
   const excess = { [big]: hi * growth, [small]: lo * growth };
   const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, ...over } = mods;
+  if (over.kicker) over.temper = Math.max(over.temper ?? 0.5, CFG.temper.kickFrom);
   const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });
   if (oldBlock) return { ...cd, oldBlock, steps: ['unblock', ...cd.steps] };
   return calving && condition === 'routine' ? closeToCalving(cd) : cd;

@@ -27,50 +27,51 @@ export const HERD_BONUS = 5;
 // growth scales the excess horn, mud 1 = usual muck, temper 0 calm .. 1 lively.
 // `mix` sets each visit's share of conditions (dealt as a deck, see herdDeck); `front` is the
 // share of front feet. `calving` is the chance a routine cow is close to calving and should be
-// left till dry-off (WP9 J1).
+// left till dry-off (WP9 J1). `kicker` is the chance a visit has one known kicker among its new
+// cows (WP12.2). `footbath` none|poor|good scales the DD share (FOOTBATH, WP12.3).
 export const FARMS = [
   {
-    id: 'willowbank', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
+    id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
     intro: 'Ruth keeps a dozen old Holsteins on deep straw. She’ll show you round: a quiet herd to learn on.',
     mix: { routine: 0.67, ulcer: 0.33 }, growth: [0.85, 1.1], mud: [0.7, 1.0], temper: [0.1, 0.35], front: 0,
     // The first cow is the hand-built sole ulcer, with the guided trim on offer.
     first: CASE_B, firstMods: CASE_B_MODS,
   },
   {
-    id: 'hollins', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30,
+    id: 'hollins', footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30,
     intro: 'Dev grazes his herd out until the frosts. Their feet wear well on grass, but the lane to the parlour is all stones.',
     mix: { routine: 0.5, whiteline: 0.3, ulcer: 0.2 }, growth: [0.75, 1.0], mud: [0.8, 1.15], temper: [0.2, 0.5], front: 0,
   },
   {
-    id: 'brackenford', name: 'Brackenford', farmer: 'the Pryce brothers', housing: 'freestall', cows: 4, rep: 100,
+    id: 'brackenford', footbath: 'good', name: 'Brackenford', farmer: 'the Pryce brothers', housing: 'freestall', cows: 4, rep: 100,
     intro: 'Eighty cows housed all year on concrete. The Pryces want the lame ones sorted before the vet comes Friday.',
-    mix: { ulcer: 0.35, whiteline: 0.25, doublesole: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.85, 1.2], temper: [0.25, 0.6], front: 0, calving: 0.5,
+    mix: { ulcer: 0.35, whiteline: 0.25, doublesole: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.85, 1.2], temper: [0.25, 0.6], front: 0, calving: 0.5, kicker: 0.33,
   },
   {
-    id: 'toplane', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 180,
+    id: 'toplane', footbath: 'good', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 180,
     intro: 'Mary wants her old girls done front and back. Front feet grow the other way round: mind which claw goes first.',
-    mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5, calving: 0.5,
+    mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5, calving: 0.5, kicker: 0.33,
   },
   {
-    id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', cows: 5, rep: 270,
+    id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', footbath: 'none', cows: 5, rep: 270,
     intro: 'The yard at Marsh End never dries out, and the slurry scraper broke in March. Expect muck, and what lives in it.',
-    mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5,
+    mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5, kicker: 0.33,
   },
   {
-    id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', cows: 5, rep: 380,
+    id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', footbath: 'poor', cows: 5, rep: 380,
     intro: 'A big, busy unit. Priya’s heifers have never been in a crush before, and they let you know it.',
-    mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5,
+    mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5, kicker: 0.33,
   },
   {
-    id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', cows: 6, rep: 500,
+    id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', footbath: 'none', cows: 6, rep: 500,
     intro: 'Nobody’s trimmed at Coldharbour for two years. Long feet, a wet yard and cows that don’t want handling.',
-    mix: { ulcer: 0.2, dd: 0.15, whiteline: 0.15, footrot: 0.15, doublesole: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25, calving: 0.5,
+    mix: { ulcer: 0.2, dd: 0.15, whiteline: 0.15, footrot: 0.15, doublesole: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25, calving: 0.5, kicker: 0.33,
     decoys: [1, 3],
   },
   {
-    id: 'ridgeway', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
+    id: 'ridgeway', footbath: 'poor', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
     intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
-    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, twoclaw: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5,
+    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, twoclaw: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5, kicker: 0.33,
     decoys: [1, 3],
   },
 ];
@@ -97,6 +98,20 @@ export function tierMods(tier, mods) {
   return out;
 }
 
+// What the footbath does to the DD share (Nate 1:33:41: none in 20 years on one farm, 30 of 50 on
+// a farm with no footbath). The card says it in words.
+export const FOOTBATH = {
+  none: { dd: 1.5, text: 'No footbath' },
+  poor: { dd: 1, text: 'Footbath, rarely changed' },
+  good: { dd: 0.25, text: 'Good footbath' },
+};
+
+// The farm's mix with its footbath applied to DD.
+export function farmMix(farm) {
+  const k = FOOTBATH[farm.footbath]?.dd ?? 1;
+  return farm.mix.dd ? { ...farm.mix, dd: farm.mix.dd * k } : farm.mix;
+}
+
 export const farmById = (id) => FARMS.find((f) => f.id === id);
 export const isOpen = (farm, rep) => rep >= farm.rep;
 
@@ -113,9 +128,10 @@ export function cowSeed(farm, visit, k) {
 export function farmMods(farm, seed) {
   const rand = mulberry32(seed ^ 0x2f1a);
   const between = ([a, b]) => a + rand() * (b - a);
-  const ids = Object.keys(farm.mix);
-  let r = rand() * ids.reduce((a, id) => a + farm.mix[id], 0);
-  const condition = ids.find((id) => (r -= farm.mix[id]) < 0) ?? ids[0];
+  const mix = farmMix(farm);
+  const ids = Object.keys(mix);
+  let r = rand() * ids.reduce((a, id) => a + mix[id], 0);
+  const condition = ids.find((id) => (r -= mix[id]) < 0) ?? ids[0];
   const mods = {
     foot: rand() < farm.front ? 'front' : 'hind',
     growth: between(farm.growth),
@@ -132,9 +148,10 @@ export function farmMods(farm, seed) {
 // to the condition listed first), so Willow Bank is always 1 ulcer and 2 routine and Hollins
 // always brings its white line. Independent draws gave streaks that broke the early ramp.
 export function herdDeck(farm) {
-  const ids = Object.keys(farm.mix);
-  const total = ids.reduce((a, id) => a + farm.mix[id], 0);
-  const share = ids.map((id) => (farm.mix[id] / total) * farm.cows);
+  const mix = farmMix(farm);
+  const ids = Object.keys(mix);
+  const total = ids.reduce((a, id) => a + mix[id], 0);
+  const share = ids.map((id) => (mix[id] / total) * farm.cows);
   const n = share.map(Math.floor);
   const order = ids.map((_, i) => i).sort((a, b) => (share[b] - n[b]) - (share[a] - n[a]) || a - b);
   for (let k = 0, left = farm.cows - n.reduce((a, b) => a + b, 0); k < left; k++) n[order[k]]++;
@@ -201,6 +218,7 @@ export function returnCase(farm, h, visit, k) {
   // half the time (the farmer never got round to it), drawn from the visit's own seed.
   const stillOn = h.blocked && ((h.lame || h.recheck) || mulberry32(cowSeed(farm, visit, 500 + k))() < 0.5);
   if (stillOn) cow.oldBlock = { claw: h.blockClaw, kind: h.blocked };
+  if (h.kicker) cow.kicker = true;
   if (!h.lame && !h.recheck) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
     return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: h.calving ? 'calved' : 'healed' } };
@@ -254,6 +272,9 @@ export function visitCases(farm, visit = 1, history = [], tier = null) {
   const tags = new Set(history.filter((h) => h.farm === farm.id).map((h) => h.tag));
   for (const cd of cases) tags.add(cd.subtitle.split(' · ')[0]);
   const deck = visitDeck(farm, visit);
+  // At most one known kicker a visit (WP12.2): a new cow, and none if one is already coming back.
+  const kr = mulberry32(cowSeed(farm, visit, 888));
+  const kickAt = farm.kicker && kr() < farm.kicker && !cases.some((cd) => cd.kicker) ? cases.length + Math.floor(kr() * (farm.cows - cases.length)) : -1;
   let d = 0;
   for (let k = 0; cases.length < farm.cows; k++) {
     let cd;
@@ -261,7 +282,7 @@ export function visitCases(farm, visit = 1, history = [], tier = null) {
     else {
       const seed = cowSeed(farm, visit, k);
       const { condition, mods } = farmMods(farm, seed);
-      cd = makeCase(deck[d] ?? condition, seed, tierMods(tier, mods));
+      cd = makeCase(deck[d] ?? condition, seed, { ...tierMods(tier, mods), ...(cases.length === kickAt ? { kicker: true } : {}) });
     }
     if (tags.has(cd.subtitle.split(' · ')[0])) continue;
     tags.add(cd.subtitle.split(' · ')[0]);
@@ -327,6 +348,7 @@ export function recordCow(route, caseDef, result) {
     foot: caseDef.foot, side: caseDef.side, grade: result.grade, lame, back, call,
     ...(CONDITIONS[caseDef.condition]?.recheck ? { recheck: true } : {}),
     ...(caseDef.calving ? { calving: true } : {}),
+    ...(caseDef.kicker ? { kicker: true } : {}),
     // The block she went off in (J2), so a return visit can find it still on.
     ...(result.block ? { blocked: result.block.kind, blockClaw: result.block.claw } : {}),
   });

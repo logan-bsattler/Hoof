@@ -19,7 +19,7 @@ import { Tutorial } from './tutorial.js';
 import { Guide } from './guide.js';
 import { drawToolIcon } from './toolart.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
-import { FARMS, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
+import { FARMS, FOOTBATH, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
@@ -862,6 +862,8 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const back = herdNow.filter((cd) => cd.back);
   // Cows close to calving (J1): the farmer says so, and that's the only cue.
   const due = herdNow.filter((cd) => cd.calving);
+  // A known kicker (WP12.2): the farmer warns you.
+  const kicker = herdNow.find((cd) => cd.kicker);
   const tags = (list) => list.map((cd) => `<b>${cd.subtitle.split(' · ')[0].replace('Holstein ', '')}</b>`).join(', ');
   const rechecks = back.filter((cd) => cd.back.outcome === 'recheck');
   // A black toe is due back whatever happened (WP8.4); the rest came back lame.
@@ -872,11 +874,12 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const pick = await ui.modal(
     `<div class="eyebrow">${HOUSING[farm.housing]} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
      <h1>${farm.name}</h1>
-     <p class="sub">${farmer} · ${farm.cows} cows waiting${back.length ? ` · ${back.length} you’ve trimmed before` : ''}</p>
+     <p class="sub">${farmer} · ${farm.cows} cows waiting · ${FOOTBATH[farm.footbath].text.toLowerCase()}${back.length ? ` · ${back.length} you’ve trimmed before` : ''}</p>
      <p>${farm.intro}</p>
      ${lame.length ? `<p class="back recheck">${farmer} wants a second look at ${tags(lame)}: lame after last time.</p>` : ''}
      ${toes.length ? `<p class="back recheck">${tags(toes)} ${toes.length === 1 ? 'is' : 'are'} due back for the toe recheck: a black toe is never done in one visit.</p>` : ''}
      ${due.map((cd) => `<p class="back">${farmer} mentions ${tags([cd])}’s due to calve in ${cd.calving} days.</p>`).join('')}
+     ${kicker ? `<p class="back recheck">“Mind ${tags([kicker])}: she kicks.”</p>` : ''}
      ${calved.length ? `<p class="back healed">${tags(calved)} ${calved.length === 1 ? 'has' : 'have'} calved since last time and ${calved.length === 1 ? 'is' : 'are'} due ${calved.length === 1 ? 'her' : 'their'} trim.</p>` : ''}
      ${healed ? `<p class="back healed">${healed === 1 ? 'One cow' : `${healed} cows`} from last time ${healed === 1 ? 'is' : 'are'} back for ${healed === 1 ? 'her' : 'their'} next trim.</p>` : ''}`,
     fromMap
@@ -911,7 +914,7 @@ function showRoute() {
     const sore = farmCows(route.history, f.id).filter((h) => h.lame).length;
     li.className = `stop ${on ? 'open' : 'locked'}${f === suggest ? ' suggest' : ''}${visits ? ' visited' : ''}`;
     const meta = on
-      ? `${HOUSING[f.housing]} · ${f.cows} cows${visits ? ` · best day +${route.best[f.id]}` : ''}${sore ? ` · ${sore} to recheck` : ''}`
+      ? `${HOUSING[f.housing]} · ${FOOTBATH[f.footbath].text.toLowerCase()} · ${f.cows} cows${visits ? ` · best day +${route.best[f.id]}` : ''}${sore ? ` · ${sore} to recheck` : ''}`
       : `Opens at reputation ${f.rep}`;
     // Where the help turns down: the farm each tier opens with.
     const step = TIERS.find((t) => t.rep > 0 && t.rep === f.rep);
