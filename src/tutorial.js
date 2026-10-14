@@ -94,7 +94,7 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'openUlcer', tool: 'knife', title: 'Open the ulcer',
-      text: 'Work the knife back and forth across the dark circle. The cap holds, then gives, and the knife comes off. Then pare the loose edge with the knife on the ring, not inside it: the open ulcer is raw.',
+      text: 'Work the knife back and forth across the dark circle. The cap holds, then gives, and the knife comes off. Then pare the loose edge with the knife on the ring, not inside it: the open ulcer is raw. Free it, but don’t strip the sole round it: if her block comes off, that ring is all she stands on.',
       target: { kind: 'ring', x: L.x, y: L.y, r: pareR },
       measure: (m) => m.looseRemain[LOOSE.ULCER], goal: 0.1,
       done: (m) => m.looseRemain[LOOSE.ULCER] < 0.1,

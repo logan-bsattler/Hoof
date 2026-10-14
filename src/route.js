@@ -199,8 +199,9 @@ export const healedBack = (farm) => Math.max(1, Math.floor(farm.cows / 3));
 export function returningCows(farm, visit, history) {
   if (visit < 2) return [];
   const cows = farmCows(history, farm.id);
-  // A recheck: lame last time, or a condition that always comes back (toe necrosis, WP8.4).
-  const recheck = (h) => h.lame || h.recheck;
+  // A recheck: lame last time, a condition that always comes back (toe necrosis, WP8.4), or a
+  // stripped ulcer whose block came off (WP14.1).
+  const recheck = (h) => h.lame || h.recheck || threwBlock(h);
   // A cow left (or trimmed) close to calving always comes back fresh for her trim (J1).
   const calved = (h) => h.calving && !recheck(h);
   const well = cows.filter((h) => !recheck(h) && !calved(h));
@@ -210,6 +211,10 @@ export function returningCows(farm, visit, history) {
   return [...cows.filter(recheck), ...cows.filter(calved), ...healed].slice(0, farm.cows);
 }
 
+// She went off blocked with the ring round her ulcer stripped (WP14.1): the block always comes off,
+// and she's left standing on bare sole.
+const threwBlock = (h) => !!(h.stripped && h.blocked);
+
 // One cow back again, from her last record. She keeps her tag, foot and temperament (shifted by
 // how last time went: cows remember the crush, WP12.1); the horn and muck are this visit's.
 export function returnCase(farm, h, visit, k) {
@@ -218,13 +223,15 @@ export function returnCase(farm, h, visit, k) {
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
   const mood = remembers(h);
   if (base.temper !== undefined) cow.temper = Math.min(1, Math.max(0, base.temper + (CFG.temper.remember[mood] ?? 0)));
-  const back = { visit: h.visit, grade: h.grade, was: h.condition, ...(mood ? { mood } : {}) };
+  const threw = threwBlock(h);
+  const back = { visit: h.visit, grade: h.grade, was: h.condition, ...(mood ? { mood } : {}), ...(threw ? { threw: farm.farmer } : {}) };
   // She went off in a block (J2): a recheck always comes back still wearing it; a healed cow
-  // half the time (the farmer never got round to it), drawn from the visit's own seed.
-  const stillOn = h.blocked && ((h.lame || h.recheck) || mulberry32(cowSeed(farm, visit, 500 + k))() < 0.5);
+  // half the time (the farmer never got round to it), drawn from the visit's own seed. One she
+  // threw (WP14.1) is gone.
+  const stillOn = h.blocked && !threw && ((h.lame || h.recheck) || mulberry32(cowSeed(farm, visit, 500 + k))() < 0.5);
   if (stillOn) cow.oldBlock = { claw: h.blockClaw, kind: h.blocked };
   if (h.kicker) cow.kicker = true;
-  if (!h.lame && !h.recheck) {
+  if (!h.lame && !h.recheck && !threw) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
     return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: h.calving ? 'calved' : 'healed' } };
   }
@@ -238,7 +245,7 @@ export function returnCase(farm, h, visit, k) {
 // How she took last time: 'hurt' if she went off lame (a blood fail is lame), 'easy' after a
 // Textbook or Clean job, else nothing.
 export function remembers(h) {
-  if (h.lame) return 'hurt';
+  if (h.lame || threwBlock(h)) return 'hurt';
   return h.grade === 'Textbook' || h.grade === 'Clean' ? 'easy' : null;
 }
 
@@ -260,6 +267,7 @@ function backText(cd, b, was, last) {
     if (b.was === 'thinsole') return `Back for a recheck. ${last}, and she went off sore: her soles were thin to start with. Still toes only, and leave the sole be.`;
     if (b.was === 'dds') return `Back for a recheck. ${last}, and she went off with nobody calling the vet. That claw is worse: it still needs the vet, not the knife.`;
     if (b.was === 'nonfoot') return `Back for a recheck. ${last}, and she went off lame with nobody calling the vet. She’s no better, and it still isn’t in the foot.`;
+    if (b.threw) return `Back for a recheck. ${last}. She threw her block ten days on and stood on the bare sole round the ulcer. ${b.threw[0].toUpperCase()}${b.threw.slice(1)} rang you back.`;
     if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
     return was.diagnosis === 'sound'
       ? `Back for a recheck. ${last}, and she went off sore. Go gently this time and she earns her points.`
@@ -316,7 +324,8 @@ export function cowPoints(result) {
 //   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame,
 //             back, call, blocked?, blockClaw? } where back is 'recheck', 'healed', 'calved' or null for a cow new to the farm,
 //             and call is how she left the crush: null (released) or a CALLS id (WP8.1);
-//             blocked is the kind of block she went off in ('rubber' | 'wood') and blockClaw its claw
+//             blocked is the kind of block she went off in ('rubber' | 'wood') and blockClaw its claw;
+//             stripped is set when the ring round her ulcer was stripped (WP14.1)
 //   visit     the day in progress, or null: { farm, n, k, rows }
 
 export function newRoute() {
@@ -360,6 +369,8 @@ export function recordCow(route, caseDef, result) {
     ...(caseDef.kicker ? { kicker: true } : {}),
     // The block she went off in (J2), so a return visit can find it still on.
     ...(result.block ? { blocked: result.block.kind, blockClaw: result.block.claw } : {}),
+    // The ring round her ulcer stripped (WP14.1): if she went off blocked, she throws it.
+    ...(result.stripped ? { stripped: true } : {}),
   });
   v.k++;
   return { points, lame, back, last: v.k >= farmById(v.farm).cows };

@@ -19,7 +19,7 @@ export const FINDING = {
   ulcer: {
     look: 'dark spot at the sole/heel junction', feel: 'springs under pressure',
     probeText: 'It springs under the testers. Something soft under there.',
-    diagnosedText: 'The ulcer. Open it up and keep weight off it.',
+    diagnosedText: 'The ulcer. Free the loose horn, leave a ring of sound sole round it, and keep weight off it.',
   },
   whiteline: {
     look: 'dark line along the wall', feel: 'flinches along the line',

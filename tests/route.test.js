@@ -490,3 +490,33 @@ test('footbath: every farm has one; no footbath raises the DD share, a good one 
   assert.ok(farmMix({ ...marsh, footbath: 'good' }).dd < marsh.mix.dd);
   assert.equal(farmMix(farmById('greystone')).dd, farmById('greystone').mix.dd);
 });
+
+test('a stripped ulcer in a block always comes back a recheck, block thrown, and she remembers it (WP14.1)', () => {
+  const farm = farmById('hollins');
+  const route = newRoute();
+  route.rep = farm.rep;
+  const herd = startVisit(route, farm.id);
+  // Every cow goes off sound in a block, the first with the ring round her ulcer stripped.
+  const ulcer = herd.find((cd) => cd.condition === 'ulcer');
+  assert.ok(ulcer, 'Hollins deals an ulcer');
+  for (const cd of herd) recordCow(route, cd, { ...result('Clean'), block: { claw: CLAW.INNER, kind: 'rubber' }, ...(cd === ulcer ? { stripped: true } : {}) });
+  endVisit(route);
+  const row = route.history.find((h) => h.tag === tag(ulcer));
+  assert.equal(row.stripped, true);
+  assert.equal(route.history.filter((h) => h.stripped).length, 1, 'only the stripped cow is marked');
+  const cd = visitCases(farm, 2, route.history).find((c) => tag(c) === tag(ulcer));
+  assert.ok(cd, 'she comes back');
+  assert.equal(cd.back.outcome, 'recheck');
+  assert.equal(cd.condition, 'ulcer');
+  assert.equal(cd.oldBlock, undefined, 'the block is gone');
+  assert.equal(cd.back.mood, 'hurt');
+  assert.match(backLine(cd), /threw her block ten days on .* Dev Hollins rang you back\./);
+  assert.ok(!backLine(cd).includes('still wearing'));
+  // Stripped but never blocked: nothing to throw, so she heals as any sound cow does.
+  const r2 = newRoute();
+  r2.rep = farm.rep;
+  startVisit(r2, farm.id).forEach((c) => recordCow(r2, c, { ...result('Clean'), ...(c.condition === 'ulcer' ? { stripped: true } : {}) }));
+  endVisit(r2);
+  const again = visitCases(farm, 2, r2.history).find((c) => tag(c) === tag(ulcer));
+  assert.ok(!again || again.back.outcome === 'healed');
+});

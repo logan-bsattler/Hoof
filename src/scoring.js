@@ -258,6 +258,9 @@ export function scoreCase(m, session, hoof, caseDef) {
   const dug = decoysDug(hoof, caseDef);
   // Hunting for the abscess through the sole instead of following the track.
   const hunted = soleDugBesideTrack(hoof, L) > 6;
+  // Stripping the ring of sound sole round an opened ulcer (WP14.1).
+  const stripped = (m.rings ?? []).filter((g) => g.stripped).length;
+  const ringCost = Math.min(CFG.ring.cap, stripped * CFG.ring.restraint);
   // Strokes on a foot that wasn't to be trimmed: 15 each, at most 30.
   const needless = trim ? 0 : Math.min(30, 15 * session.cuts);
   if (needless) notes.push(caseDef.trimNote ?? 'This foot wasn’t to be trimmed today.');
@@ -266,9 +269,10 @@ export function scoreCase(m, session, hoof, caseDef) {
   const deep = dds ? Math.min(30, 15 * (holes + swollenCuts)) : 0;
   if (dds && holes) notes.push('That’s the vet’s job now: the infection’s deep in the joint. No blade in the hole.');
   if (dds && swollenCuts) notes.push(`Leave the swollen ${CLAW_NAME[L.claw]} claw: trim the sound one. Every stroke on it hurt her.`);
-  const restraint = clamp(100 - needless - deep - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
+  const restraint = clamp(100 - needless - deep - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - ringCost - (session.cleftCuts ? 20 : 0));
   if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
   if (hunted) notes.push(L.type === 'foreign' ? 'You opened a crater round the puncture. A narrow funnel straight down on the mark is all it needs.' : 'You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
+  if (stripped) notes.push('You stripped the horn round the ulcer. Free the loose horn, but leave a ring of sound sole: if her block comes off, that ring is all she stands on.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
   if (triFrac > 0.1) notes.push('You cut into the toe triangle and took weight-bearing horn.');
 
@@ -324,5 +328,5 @@ export function scoreCase(m, session, hoof, caseDef) {
     : L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
     : thin ? 'Textbook. Toes back to length, and the thin sole left alone.'
     : 'Textbook. Level, balanced, and nothing opened that didn’t need opening.');
-  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made, block: blockOn(hoof) };
+  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made, block: blockOn(hoof), stripped: stripped > 0 };
 }

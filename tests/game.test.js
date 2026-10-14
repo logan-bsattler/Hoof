@@ -1128,3 +1128,69 @@ test('WP13.3: deep sepsis wants the sound claw trimmed and blocked, and every bl
   assert.equal(g.parts.correctness - rel.parts.correctness, 25);
   assert.equal(rel.gait, 'lame');
 });
+
+// WP14.1: a knife worked round and round just outside the cap, as a heavy hand frees an ulcer.
+// The wrap comes off for it and goes back on after.
+function stripRing(h, L, passes = 4) {
+  const [wrap, wrapAt] = [h.wrap, { ...h.wrapAt }];
+  h.wrap = 0; h.wrapAt[CLAW.OUTER] = h.wrapAt[CLAW.INNER] = 0;
+  const R = L.r * 1.75 + 4;
+  for (let k = 0; k < passes; k++) {
+    const orbit = [];
+    for (let a = 0; a <= 96; a++) orbit.push([L.x + R * Math.cos((a / 96) * 2 * Math.PI), L.y + R * Math.sin((a / 96) * 2 * Math.PI)]);
+    knifeAlong(h, orbit);
+  }
+  h.wrap = wrap; Object.assign(h.wrapAt, wrapAt);
+}
+
+test('ring: the sole round an opened ulcer is scored; stripping it costs restraint, once per ulcer (WP14.1)', () => {
+  const good = new Hoof(CASE_B);
+  idealTrim(good);
+  const gm = good.metrics();
+  assert.equal(gm.rings.length, 1);
+  assert.ok(gm.rings[0].mean >= T - 0.01 && !gm.rings[0].stripped, JSON.stringify(gm.rings));
+  const base = scoreCase(gm, idealSession(), good, CASE_B);
+  assert.equal(base.grade, 'Textbook');
+  assert.equal(base.stripped, false);
+
+  const h = new Hoof(CASE_B);
+  idealTrim(h);
+  stripRing(h, CASE_B.lesion);
+  const m = h.metrics();
+  assert.ok(m.rings[0].stripped, JSON.stringify(m.rings));
+  assert.equal(m.blood, 0, `stripped without drawing blood (${m.blood} cells, ring ${JSON.stringify(m.rings)})`);
+  const r = scoreCase(m, idealSession(), h, CASE_B);
+  assert.equal(r.stripped, true);
+  assert.ok(r.parts.restraint <= base.parts.restraint - CFG.ring.restraint, `restraint ${r.parts.restraint}`);
+  assert.ok(r.notes.some((n) => /stripped the horn round the ulcer/.test(n)), r.notes.join(' | '));
+  assert.ok(!r.notes.some((n) => /beside the track/.test(n)), 'not the white-line note');
+
+  // A sound foot or a white line has no ring to strip.
+  for (const id of ['routine', 'whiteline']) {
+    const w = new Hoof(makeCase(id, 1));
+    idealTrim(w);
+    assert.deepEqual(w.metrics().rings, []);
+  }
+});
+
+test('ring: both ulcers of a pair (J3) stripped cost the cap, not twice the cost (WP14.1)', () => {
+  let cd = null;
+  for (let seed = 1; seed < 200 && !cd; seed++) {
+    const c = makeCase('twoclaw', seed);
+    if (c.lesions.every((L) => L.type === 'ulcer')) cd = c;
+  }
+  assert.ok(cd, 'a pair of ulcers dealt');
+  const h = new Hoof(cd);
+  idealTrim(h);
+  const m = h.metrics();
+  const base = scoreCase(m, idealSession(cd), h, cd).parts.restraint;
+  const cost = (n) => {
+    const mm = { ...m, rings: m.rings.map((g, k) => ({ ...g, stripped: k < n })) };
+    return base - scoreCase(mm, idealSession(cd), h, cd).parts.restraint;
+  };
+  assert.equal(cost(1), CFG.ring.restraint);
+  assert.equal(cost(2), CFG.ring.cap);
+  // And the real knife strips both.
+  for (const L of cd.lesions) stripRing(h, L);
+  assert.equal(h.metrics().rings.filter((g) => g.stripped).length, 2, JSON.stringify(h.metrics().rings));
+});

@@ -718,9 +718,31 @@ export class Hoof {
     m.lesionTint = m.ddN ? m.ddTint / m.ddN : m.looseN[LOOSE.ULCER] ? m.tintSum / m.looseN[LOOSE.ULCER]
       : m.looseN[LOOSE.TRACT] ? m.tractTint / m.looseN[LOOSE.TRACT] : 0;
     if (this.lesions().length > 1) this.perClaw(m);
+    this.rings(m);
     m.levelDiff = claws[CLAW.INNER].wbMean - claws[CLAW.OUTER].wbMean;
     m.heelRemovedMean = m.heelN ? m.heelRemoved / m.heelN : 0;
     return m;
+  }
+
+  // The ring of sound sole round each ulcer's cap (WP14.1): live sole on its claw from the cap's
+  // edge (1.75r) out two cells. If her block comes off, it's all she stands on. m.rings holds
+  // one { claw, mean, thin, stripped } per ulcer: mean thickness (mm) and the share that's thin.
+  rings(m) {
+    const R = CFG.ring;
+    m.rings = [];
+    for (const L of this.lesions()) {
+      if (LESION_LOOSE[L.type] !== LOOSE.ULCER) continue;
+      const r0 = L.r * 1.75;
+      let n = 0, sum = 0, thin = 0;
+      this.stampExact(L.x, L.y, r0 + R.width, (i, d) => {
+        if (d <= r0 || this.claw[i] !== L.claw || !(this.zone[i] & Z.LIVE)) return;
+        if ((this.zone[i] & (Z.HEEL | Z.WALL | Z.ULCER)) || this.looseInit[i] === LOOSE.ULCER) return;
+        n++; sum += this.thick[i];
+        if (this.thick[i] < R.thin) thin++;
+      });
+      const mean = n ? sum / n : 0, share = n ? thin / n : 0;
+      m.rings.push({ claw: L.claw, mean, thin: share, stripped: n > 0 && (mean < R.stripMean || share > R.stripThin) });
+    }
   }
 
   // With a lesion on each claw (J3), each is judged on its own: how much of each lesion's loose

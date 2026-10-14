@@ -68,6 +68,12 @@ export const CFG = {
 
   nick: { maxCells: 3, restraint: 40, capGrade: 'Sound' },
 
+  // The ring of sound sole round an opened ulcer (WP14.1): `width` px out from the cap's edge;
+  // cells under `thin` mm count as thin. It's stripped when its mean is under `stripMean` mm or
+  // more than `stripThin` of it is thin (the careful hand leaves it at 7.1 mm or more, nothing
+  // thin, over 125 ulcers). A stripped ring costs `restraint` per ulcer, at most `cap`.
+  ring: { width: 8, thin: 4, stripMean: 5, stripThin: 0.3, restraint: 20, cap: 30 },
+
   // Cow temperament, 0 calm to 1 lively (0.5 is the old default cow). Each pair runs calm → lively.
   // flinchAt: the living sole (mm) she flinches at under a blade; kept under the dish target's
   // band so a correct dish never sets her off. shake: how hard every flinch jolts the view.
