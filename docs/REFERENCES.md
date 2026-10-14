@@ -17,6 +17,12 @@ Use them to check facts, not as copy: paraphrase any wording that reaches game t
 |---|---|---|
 | [`NOTES-NATE-AMA.md`](NOTES-NATE-AMA.md) | Paraphrased notes, with timestamps, from a 97-min live Q&A by Nate the Hoof Guy, a working Wisconsin trimmer | Where lesions sit and how to read them, block and wrap choices, cow behaviour, farm, route and economy flavour, and new condition ideas |
 
+| [`NOTES-NATE-LIVES.md`](NOTES-NATE-LIVES.md) | Paraphrased notes from Nate's other livestream Q&As (1 of 11 read so far), with a reading-status table | Lesion reading, cow handling, breed temperament, farm detective work, route/price, toe necrosis and ulcer recurrence |
+
+## YouTube captions (local only)
+
+`reference/youtube/<channel>/<videoId>.txt` holds title, link, description and auto-captions (20-second lines) for every video on Nate the Hoof Guy, The Hoof GP, Midwestern Hoof Trimmer, Keeping Cows Moovin, Cattle Lameness Academy, Seeds Hoof Trimming and Hoof Hero (Brett DeGroot), plus `_interviews-talks/` (podcasts and conference talks). `thumbs/` beside each has the `hqdefault` thumbnail. `_lists/` has the channel listings (id, length, views/age, title). Rebuild with `node _tools/list.mjs @handle videos > x.tsv` then `node _tools/fetch.mjs x.tsv <outdir> 1`. Grep these; paraphrase anything that reaches game text.
+
 ## Where to look, by plan item
 - **The five-step trim (steps.js, tutorial):** the field guide's "Trimming steps", the five-step protocol, and Shearer ch. 3.
 - **WP7.2 routine trim:** the field guide's pitfalls page, and the Shearer ch. 3 sections on over-trimming.
