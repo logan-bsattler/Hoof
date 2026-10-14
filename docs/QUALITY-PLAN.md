@@ -827,6 +827,8 @@ Three new kinds in `DECOY_KINDS`, each with a `FINDING`, a `DECOY_DEPTH` and its
 ### Build order (D43)
 14.1 → 14.2 → 14.3, shipping after each with the sweep. 14.4 is independent and can ship first or ride along with any step. 14.1 goes first because it's the strongest lesson and needs no art. 14.2 next because it reuses the decoy pipe. 14.3 last, being all new art.
 
+**Ben took the defaults for D43–D51 (2026-10-14). Ready to build, starting with 14.1's bot measurement.**
+
 ### Decisions for Ben
 
 | # | Decision | Default |
