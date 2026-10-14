@@ -543,3 +543,146 @@ Nate's 11 lives are done. More Nate would mostly repeat him, so the next reading
 Other sources, unchanged:
 - Nate's 459 regular videos are titled by case; titles alone map the lesion catalogue (rocks/gravel in the white line, punctures, nails/metal, double soles, heel-bulb separation, pedal-bone fracture (cow 6768), axial fissures, corkscrews, cross-claw, frostbite, dew-claw holes, "hangnails", toe ulcers, wall cracks).
 - Thumbnails for every video are in `reference/youtube/<channel>/thumbs/` for art reference.
+
+## Library passes: lesion frequency and art reference (2026-10-14)
+
+**Bottom line.** The game's lesion mix is close to what trimmers film, with three gaps: **stones
+in the sole/white line** (the most-titled problem after ulcers, and not in the game), **punctures**
+(under-dealt about 2.5x) and **DD** (over-dealt about 2.5x against titles, though titles undercount
+DD; see caveat). On art, the guide crops are drawn too **neat, round and small**: real lesions are
+ragged, follow the claw's anatomy (white line, heel cleft, toe tip) and mostly read dark-in-pale
+on a pared sole, not as shapes on mud.
+
+### 1. Lesion frequency from titles
+
+Method: 1,920 unique titles (`_lists/*.tsv` plus per-video .txt first lines; Nate 471, Hoof GP
+992, others 457), one regex per lesion, hand-checked for false hits (corkscrew vs screw, "rock
+hard", "toe nails", "high heels" taken out). 470 titles (24%) name a lesion; most Nate titles are
+teasers ("I GUESSED the WRONG SPOT") and name nothing. Counts are rough, ±10%.
+
+| Lesion | Titles (Nate / GP / other) | Share of the 8 in-game lesions, by titles | Share in game `mix` (cow-weighted over all 8 farms, routine/nonfoot/twoclaw left out) |
+|---|---|---|---|
+| Sole ulcer | 92 (8 / 51 / 33) | 40% | 30% |
+| White line | 50 (15 / 25 / 10) | 22% | 20% |
+| Puncture (nail, metal, wire, stone) | 46 (15 / 27 / 4) | 20% | 8% |
+| Double sole | 21 (8 / 3 / 10) | 9% | 7% |
+| DD (wart, hairy, digital) | 17 (8 / 1 / 8) | 7% | 19% |
+| Foot rot ("foul") | 3 (1 / 2 / 0) | 1% | 7% |
+| Toe necrosis | 3 (0 / 3 / 0) | 1% | 5% |
+| Thin sole | 0 | 0% | 4% |
+
+Read with care: titles track what is **dramatic to film**, not how often it occurs. DD is routine
+and treated in passing (spray, wrap), foot rot is a quick antibiotic or vet job, and a thin sole
+has nothing to cut, so all three get filmed less than they happen. Ulcers, white lines and
+punctures make good "reveal" videos. So puncture is the one game share that looks clearly low; the
+DD and foot-rot shares are defensible as they are.
+
+**Turn up often but aren't in the game** (title counts; example video ids):
+- **Stones/gravel packed in the sole or white line: 94** (Nate 31, GP 46). The biggest gap.
+  Pasture and lane farms; picked out with a hook or the knife tip; often what starts the
+  white-line abscess. `fPvys3VI1oM` "This Whiteline is LITTERED with ROCKS", `zAuVgPIIAfE`,
+  `KLAiqpyDBRU`, GP `6T89LyOYB6M`, midwestern `NdMbcaYy7JY`. Fits Hollins (stony lane), as a
+  decoy or as the cause under a white line.
+- **Abscess, site not named: 48**; **pus/burst/pressure release with no lesion named: 114.** The
+  "per-cow abscess stage" Top idea (sealed and squirts vs already burst) is what these titles sell.
+- **Wall cracks / fissures (axial, abaxial, toe): 48.** `Djf-peeRm7Q` axial fissure,
+  `Hvs30tpVPAA`, `VGDi9uc1HGQ` "TINY CRACK created a FALSE SOLE", HoofHero `eOURUpxiNeE`.
+- **Overgrown / long / curled feet: 29**, plus **corkscrew / cross-claw: 13** (`sE6E_U-0IbM`,
+  `lTwGV_-7iv4`). Mostly GP and midwestern restorations.
+- **Heel trouble (bulb separation, loose, cracked or burst heel): 20.** `K7c34ZKu74Y` "KNUCKLE
+  DEEP in HEEL BULB SEPARATION", `RNT__gsKTkI`, `1XPFTERrvrw`, GP `839QGJ3mlJg`, `wHT_8aXT4Ws`.
+- **Fracture (sole fracture, pedal bone): 18.** GP `LK8kyACok-Q`, `COnIFzilmMs`; Nate cow 6768
+  `XgJ-feioemo`; keepingcowsmoovin1 has seven.
+- **Hangnails / loose flaps of horn: 16.** `OqVxB8UwAiw`, `nQGEZjUXD2I`, GP `XvvRe_31ITM`.
+- **Dew claws (long, holed, infected): 14.** `zuHgWmAgeis` "This Dew Claw has a Hole In It",
+  GP `tZubs5pt2C0`, `vlqh-zDF0-s`.
+- **Bruising: 7** (`HNkK7lGOmSc`, midwestern `5db6LLTjr4Q`). Already a decoy in the game.
+- **Toe ulcer: 2** (Seeds `ZganD5DPwmE`, GP `kGZ2xeQBGG0`); **frostbite: 1** (`RVuxJU0j1Ng`);
+  **corn / interdigital growth: 1**. Rare in titles; low priority.
+
+### 2. Art reference: guide crops vs real thumbnails
+
+Thumbnails are 480x360; many GP thumbs are face shots, so fewer were usable. Each bullet is a
+possible `hoofart.js` change; the ids are the thumbs viewed.
+
+**Ulcer** (`assets/guide/ulcer.png`; viewed `p-0DFdkRLIM`, `JUaHQf_K218`, `dLdJNr2EkjE`,
+`NvkEoAzexiI`, GP `UnVJZhov3QA`, HoofHero `K6S5xJaGtsw`, `NVyiuNtsuy8`)
+- Position matches (sole/heel junction, axial half). Good.
+- The crop is a soft grey smudge on mud. A real unopened ulcer is a **crisp, near-black crater
+  with a ragged rim**, often packed with dirt and straw (`JUaHQf_K218`), about a quarter of the
+  claw's width. Change: a sharper dark core and a broken, rough edge instead of a blur.
+- Pared round it, real horn shows **yellow-orange staining** (old haemorrhage) fanning out from the
+  ulcer (`K6S5xJaGtsw`, `p-0DFdkRLIM`), and the opened core is **red-pink with a grey-brown dead
+  plug** in the middle (`NVyiuNtsuy8`). The bruise streaks exist in code; push them yellower, and
+  add a dark plug at the centre of the opened pocket.
+
+**White line** (`whiteline.png`; viewed `fPvys3VI1oM`, `F2iAhwAvHAI`, `-4I97OwPwRI`, GP
+`YPXtk8j-qro`, HoofHero `6Ofa1u0XCg4`, `eOURUpxiNeE`)
+- The crop draws the tract as a **pale, glowing outline**. Real white-line lesions are **dark**: a
+  black crack packed with dirt and grit running along the wall (`fPvys3VI1oM`), widening into a
+  black-brown pocket toward the heel. Change: near-black tract with grit flecks, no light rim.
+- The crop's tract is a clean right-angled polyline. Real ones wander and **widen in pockets**,
+  and the pocket is often a round dark-brown/amber blob of dead tissue (`F2iAhwAvHAI`). Change:
+  noise the path's width; make the end pocket rounder and amber.
+- Opened, real tissue is **pink-red marbled corium with white flecks** (`-4I97OwPwRI`), wider than
+  the crop suggests (up to a third of the claw near the heel).
+
+**Puncture** (`puncture.png`; viewed `CDDDXfhMpLQ`, `wlpIpbGtqvw`, `ioEK2h8jICw`, GP
+`pSk35NFBQoE`, `jOJsC0ndHWY`, midwestern `zkxWLRxhby4`)
+- The crop is a perfect black disc with a pale ring, mid-sole. Real: on the dirty sole the entry
+  is **usually invisible** (Nate circles an area with nothing showing, `CDDDXfhMpLQ`); pared, it's
+  a **small, irregular grey-brown spot or short slit with a brown stain halo** (`wlpIpbGtqvw`), not
+  a black hole. Change: smaller, off-round, dark grey-brown, a stain halo instead of the pale ring;
+  hidden under mud until the first pass.
+- Position: real ones sit in the **toe half and near the white line** more than dead centre
+  (`wlpIpbGtqvw`, `jOJsC0ndHWY`). Change: bias placement toward the toe and the abaxial edge.
+- Sometimes the object shows: a grey stone chip or a metal glint (`ioEK2h8jICw`, GP
+  `pSk35NFBQoE`). The glint exists; a stone variant would tie in with the stones gap above.
+
+**Double sole** (`doublesole.png`; viewed `YWK5Z3yX3l4`, `VGDi9uc1HGQ`, GP `9f9aPKolsDA`,
+`6hc7LtyRkQw`, midwestern `pIS2BRy0fiE`, `bTTAOqF4R-w`)
+- The crop is a round, chalky grey disc mid-sole, about a third of the claw. Real: the loose layer
+  is **claw-shaped and large**, from the heel most of the way to the toe (`pIS2BRy0fiE` outlines
+  it), and the same **yellow-tan** as the sole, not grey-white. Change: shape the patch from an
+  inset of the claw outline, cover 50–90% of the sole, tint it toward the sole colour.
+- Its edge reads as a **thin dark step or crack line** (`VGDi9uc1HGQ`), not a raised lumpy rim.
+- Under it, the gap often holds **dark debris, yellow serum or pus** (`YWK5Z3yX3l4`,
+  `9f9aPKolsDA`, `6hc7LtyRkQw`) above the waxy new sole. Change: a wet yellow-brown band at the
+  lift line.
+
+**DD** (`dd.png`; viewed `dJU6pRKTK0c`, `BDSrB3vUYLk`, HoofHero `d3Gt9SNML4g`, `pgoTHzFvbvA`,
+`80CcIEPHLcg`; `K4XvLitfwuI` shows only a wrap)
+- The crop is a thin bright-red crescent with white edges along the rim. Real: a **round-to-oval
+  patch 2–5 cm across** on the skin of the heel bulbs / heel cleft (`BDSrB3vUYLk`,
+  `dJU6pRKTK0c`). Change: rounder and larger, centred on the cleft between the bulbs.
+- Colour and texture: active ones are **strawberry red with a granular, pitted surface** and a
+  grey-white rim; chronic ones are **grey-brown knobbly "wart" fronds with long hairs**
+  (`d3Gt9SNML4g`). The crop's flat glossy red reads as paint. Change: pebble noise in the red, and
+  a chronic variant (grey-brown, papillary) as a second look.
+
+**Foot rot** (`footrot.png`; viewed `jo-rHn6Zm0k`, GP `SlsgTcKWhFk`, `0Dy5owmtOz0`)
+- The crop is a pink-red glow ringing both claws' walls. Real: the lesion is **in the
+  interdigital space**, a raw dark-red split in the skin between the claws with grey dead tissue
+  (`SlsgTcKWhFk`); the walls look normal. Swelling shows as the **claws spread apart** and puffy
+  skin above the coronary band. Change: a dark-red fissure down the cleft, a wider cleft gap; drop
+  or mute the red rim on the walls.
+- Only three titles: thin evidence.
+
+**Toe necrosis** (`toenecrosis.png`; viewed GP `x47uyPXbrVc`, `d4vdFGf0CB8`, `qX2xbRW9HJA`)
+- The crop is a flat black crumbly patch on the toe. Real: a **hole at the toe's white line** with
+  black rotten horn round it and **bright red raw corium or blood** in the middle (`x47uyPXbrVc`,
+  `d4vdFGf0CB8`); in bad cases the **toe tip is gone** and the wall is split up the front
+  (`qX2xbRW9HJA`). Change: a red core in the black patch, anchored at the toe tip's sole/wall
+  junction, and a missing tip at high severity.
+- Only three titles, all GP.
+
+**Thin sole** (`thinsole.png`; no titles name it, so proxies: `HNkK7lGOmSc` bruises, midwestern
+`5db6LLTjr4Q` bruising, `ZpAAK0PvIF4` short toes; GP `BKZK0jeT_0c` "how to avoid over trimming" is
+a face thumb)
+- The crop is two muddy brown claws with nothing to read. Real over-thin or bruised soles, once
+  cleaned, show **pink-red flushes through near-white horn** (`5db6LLTjr4Q`) and grinder swirls
+  down to a waxy, slightly translucent surface (`HNkK7lGOmSc`). `SOLE_RAMP` already goes pink
+  below 3.5 mm, so the gap is the crop, not the shader: take the guide crop after one cleaning
+  pass so the pink shows.
+
+Not covered: `twoclaw`, `nonfoot`, `routine` (no single lesion to compare).
