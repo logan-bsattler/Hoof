@@ -72,7 +72,8 @@ export const CFG = {
   // band so a correct dish never sets her off. shake: how hard every flinch jolts the view.
   // Above `fidgetFrom` she shifts her weight every `fidgetEvery` s or so while you work;
   // above `kickFrom` a shift knocks a held tool off the foot.
-  temper: { flinchAt: [2.4, 3.6], shake: [0.6, 1.5], fidgetFrom: 0.45, fidgetEvery: [16, 6], kickFrom: 0.8 },
+  // remember (WP12.1): a returning cow's shift after going off lame (or bled), or after a Textbook/Clean job.
+  temper: { flinchAt: [2.4, 3.6], shake: [0.6, 1.5], fidgetFrom: 0.45, fidgetEvery: [16, 6], kickFrom: 0.8, remember: { hurt: 0.15, easy: -0.1 } },
 
   // Treatment: how well-flushed the opened ulcer must be before it's padded and wrapped.
   treat: { tintMin: 0.6 },

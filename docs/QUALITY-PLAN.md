@@ -1,4 +1,4 @@
-# TRUE HOOF: quality plan (handoff for execution)
+**Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** # TRUE HOOF: quality plan (handoff for execution)
 
 Written 2026-10-10 from a full review at commit `ecf9eb9`. Line numbers are as of that commit, so re-check each one before editing.
 Review basis: every file in `src/`, `tests/`, `docs/` and `scripts/serve.mjs` was read; `npm test` passed 20/20; the intro and the first brushing were played on desktop. Nothing was tested on a real phone, so the mobile items come from reading the CSS and layout code.
@@ -661,6 +661,8 @@ All four come from Nate's AMA (`docs/NOTES-NATE-AMA.md`, lines 28–37). None ch
 - **Change:** her return temper shifts according to her last row. Lame or a blood fail: +0.15. Textbook or Clean and sound: −0.1. Anything else: unchanged. Clamp to 0–1, and apply the shift before the tier lean, as now. The intro adds a half-line when it moved ("She remembers last time: she won't walk in." / "She walks straight into the crush.").
 - **Tests:** route test that a lame row returns livelier and a Textbook row calmer. The bot sweep is unchanged (it plays fresh cows).
 
+**Status (2026-10-14): done.** `remembers(h)` in route.js reads her last row: 'hurt' if she went off lame (a blood fail counts as lame), 'easy' after Textbook or Clean. `returnCase` shifts her base temper by `CFG.temper.remember` (+0.15 or −0.1, clamped), and `back.mood` adds the half-line to her intro. The return-visit route test checks both directions. 135 tests, sw v41. A correctly left or referred cow scores Textbook, so she also comes back calmer. That fits: nothing hurt her.
+
 ### 12.2 A known kicker (small)
 - **Source:** Nate 1:21:18. Some cows are known for it.
 - **Change:** a `farm.kicker` chance (none at Willow Bank or Hollins; about 1 visit in 3 from Brackenford on, at most one cow a visit). That cow's temper is floored at `CFG.temper.kickFrom` (0.8), so she kicks, and the visit card names her ("Mind #233: she kicks."). Her intro repeats it. A returning kicker stays one (her seed decides).
@@ -679,16 +681,18 @@ All four come from Nate's AMA (`docs/NOTES-NATE-AMA.md`, lines 28–37). None ch
 - **Bot:** swaps whenever wear passes 0.6. Tests: wear rises and the swap resets it (game), and a sweep on the sand farm.
 - **Art:** a duller, scuffed blade in `toolart.js`, plus a small wear pip on the knife button.
 
+**Ben took the defaults for D31–D36 (2026-10-14). Ready to build.**
+
 ### Decisions for Ben
 
 | # | Decision | Default |
 |---|---|---|
-| D31 | Next batch: farm traits (WP12) before the later conditions (WP13)? | Yes, farm traits first |
-| D32 | Cows remember: lame or blood +0.15 temper, Textbook or Clean −0.1? | Yes, with a half-line in her intro |
-| D33 | Known kicker: a warning only, or also a "go gently" mechanic (short strokes calm her)? | Warning only |
-| D34 | Footbath: which farms get none/poor/good? | Marsh End and Coldharbour none, Greystone poor, the rest good |
-| D35 | Sand: make Greystone the sand farm, or add a new farm? | Greystone (no new farm) |
-| D36 | Fresh knife: tap the knife button again, free and unlimited? | Yes |
+| D31 | Next batch: farm traits (WP12) before the later conditions (WP13)? | **Taken (2026-10-14):** Yes, farm traits first |
+| D32 | Cows remember: lame or blood +0.15 temper, Textbook or Clean −0.1? | **Taken (2026-10-14):** Yes, with a half-line in her intro |
+| D33 | Known kicker: a warning only, or also a "go gently" mechanic (short strokes calm her)? | **Taken (2026-10-14):** Warning only |
+| D34 | Footbath: which farms get none/poor/good? | **Taken (2026-10-14):** Marsh End and Coldharbour none, Greystone poor, the rest good |
+| D35 | Sand: make Greystone the sand farm, or add a new farm? | **Taken (2026-10-14):** Greystone (no new farm) |
+| D36 | Fresh knife: tap the knife button again, free and unlimited? | **Taken (2026-10-14):** Yes |
 
 ## WP13: later conditions (outline only, not scoped)
 - **Deep digital sepsis** (call: vet). Swelling on **one** claw only, which plays off foot rot's swelling across both. It's a second vet case that can't be told apart without looking at the swelling. Cost: swelling is only in the copy today, not drawn, so it needs the first swelling art in hoofart.js, and foot rot should get the same art. Medium.

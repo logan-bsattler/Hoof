@@ -182,7 +182,10 @@ test('a return visit deals the lame cows back as rechecks, a few healed ones, th
   assert.equal(re.back.outcome, 'recheck');
   assert.equal(re.back.visit, 1);
   assert.deepEqual([re.condition, re.foot, re.side, re.seed], [was.condition, was.foot, was.side, was.seed]);
-  assert.equal(re.temper, was.temper, 'same cow, same temperament');
+  // Same cow, and she remembers going off lame: livelier, and the intro says so (WP12.1).
+  assert.equal(re.temper, Math.min(1, was.temper + 0.15), 'same cow, a little warier');
+  assert.equal(re.back.mood, 'hurt');
+  assert.match(backLine(re), /won’t walk in/);
   if (was.lesion) {
     assert.equal(re.lesion.claw, was.lesion.claw, 'the lesion is where it was');
     assert.ok(re.lesion.r >= was.lesion.r, `the lesion is no smaller: ${re.lesion.r} vs ${was.lesion.r}`);
@@ -200,6 +203,9 @@ test('a return visit deals the lame cows back as rechecks, a few healed ones, th
     assert.equal(cd.lesion, null);
     assert.deepEqual([cd.foot, cd.side], [old.foot, old.side]);
     assert.ok(backLine(cd).length > 0);
+    // A Clean job last time: she walks straight in, a little calmer.
+    assert.equal(cd.temper, Math.max(0, old.temper - 0.1));
+    assert.match(backLine(cd), /straight into the crush/);
   }
 
   // The rest are new to the farm: no tag it has seen before.

@@ -9,6 +9,7 @@
 import { CASE_B, CASE_B_MODS, makeCase } from './case.js';
 import { CONDITIONS } from './conditions.js';
 import { mulberry32 } from './noise.js';
+import { CFG } from './config.js';
 
 export const HOUSING = {
   pasture: 'Grazing herd',
@@ -187,14 +188,15 @@ export function returningCows(farm, visit, history) {
   return [...cows.filter(recheck), ...cows.filter(calved), ...healed].slice(0, farm.cows);
 }
 
-// One cow back again, from her last record. She keeps her tag, foot and temperament; the
-// horn and muck are this visit's.
+// One cow back again, from her last record. She keeps her tag, foot and temperament (shifted by
+// how last time went: cows remember the crush, WP12.1); the horn and muck are this visit's.
 export function returnCase(farm, h, visit, k) {
   const now = farmMods(farm, cowSeed(farm, visit, 100 + k)).mods;
   const { excess: _e, calving: _c, oldBlock: _o, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
-  if (base.temper !== undefined) cow.temper = base.temper;
-  const back = { visit: h.visit, grade: h.grade, was: h.condition };
+  const mood = remembers(h);
+  if (base.temper !== undefined) cow.temper = Math.min(1, Math.max(0, base.temper + (CFG.temper.remember[mood] ?? 0)));
+  const back = { visit: h.visit, grade: h.grade, was: h.condition, ...(mood ? { mood } : {}) };
   // She went off in a block (J2): a recheck always comes back still wearing it; a healed cow
   // half the time (the farmer never got round to it), drawn from the visit's own seed.
   const stillOn = h.blocked && ((h.lame || h.recheck) || mulberry32(cowSeed(farm, visit, 500 + k))() < 0.5);
@@ -210,13 +212,22 @@ export function returnCase(farm, h, visit, k) {
   return { ...makeCase(h.condition, h.seed, { ...base, ...cow, ...worse }), back: { ...back, outcome: 'recheck' } };
 }
 
+// How she took last time: 'hurt' if she went off lame (a blood fail is lame), 'easy' after a
+// Textbook or Clean job, else nothing.
+export function remembers(h) {
+  if (h.lame) return 'hurt';
+  return h.grade === 'Textbook' || h.grade === 'Clean' ? 'easy' : null;
+}
+
+const MOOD_LINE = { hurt: ' She remembers last time: she won’t walk in.', easy: ' She walks straight into the crush.' };
+
 // What the intro says about last time, for a cow that's been trimmed here before.
 export function backLine(cd) {
   const b = cd.back;
   if (!b) return '';
   const was = CONDITIONS[b.was];
   const last = `Visit ${b.visit}: ${b.grade}`;
-  const line = backText(cd, b, was, last);
+  const line = backText(cd, b, was, last) + (MOOD_LINE[b.mood] ?? '');
   return cd.oldBlock ? `${line} She’s still wearing the ${cd.oldBlock.kind === 'wood' ? 'wood ' : ''}block from visit ${b.visit}.` : line;
 }
 
