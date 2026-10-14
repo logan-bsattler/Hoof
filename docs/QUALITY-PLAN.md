@@ -1,4 +1,4 @@
-**Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** **Taken (2026-10-14):** # TRUE HOOF: quality plan (handoff for execution)
+# TRUE HOOF: quality plan (handoff for execution)
 
 Written 2026-10-10 from a full review at commit `ecf9eb9`. Line numbers are as of that commit, so re-check each one before editing.
 Review basis: every file in `src/`, `tests/`, `docs/` and `scripts/serve.mjs` was read; `npm test` passed 20/20; the intro and the first brushing were played on desktop. Nothing was tested on a real phone, so the mobile items come from reading the CSS and layout code.
@@ -748,16 +748,18 @@ Both follow the 7.2 recipe: a `CONDITIONS` entry with `place`/`copy`, its `FINDI
 - **Farm:** Marsh End, so the two vet cases sit side by side: {dd .2, footrot .2, dds .2, whiteline .2, routine .2}. Its footbath stays none, so DD still leans up (×1.5).
 - **Cost:** medium. Most of it is the step list, the scoring branch and the hole art. The swelling comes from 13.2.
 
+**Ben took the defaults for D37–D42 (2026-10-14). Ready to build.**
+
 ### Decisions for Ben
 
 | # | Decision | Default |
 |---|---|---|
-| D37 | Build order: thin sole, then swelling art, then deep sepsis? | Yes. Thin sole is small and needs no art, so it ships first |
-| D38 | Thin sole: under target (5.5–6.5 mm), or near target (~7 mm) as the outline said? | **Under target.** At 7 mm she's just a routine cow that's already done, which teaches nothing. Under target makes "leave the sole" the right call and needs the start-relative scoring |
-| D39 | Thin sole: no dish at all, or a light dish? | No dish. Dishing to 4.5 mm on a 5.5 mm sole is the over-trim the case is about |
-| D40 | Ridgeway takes the thin cow from its routine share, leaving routine at 0.1 | Yes. The thin cow is a routine foot apart from the trap, and the farm's intro already sets it up |
-| D41 | If one-claw swelling doesn't read at phone size, say which claw in the intro? | Yes, as a fallback only |
-| D42 | Deep sepsis: trim and block the sound claw and refer, or refer only (no trim, like foot rot)? | **Trim and block the sound claw, then refer.** It's what a trimmer can do for her before the vet comes, and it makes the two vet cases play differently. Refer-only would make them the same play with a different read |
+| D37 | Build order: thin sole, then swelling art, then deep sepsis? | **Taken (2026-10-14):** Yes. Thin sole is small and needs no art, so it ships first |
+| D38 | Thin sole: under target (5.5–6.5 mm), or near target (~7 mm) as the outline said? | **Taken (2026-10-14):** Under target. At 7 mm she's just a routine cow that's already done, which teaches nothing. Under target makes "leave the sole" the right call and needs the start-relative scoring |
+| D39 | Thin sole: no dish at all, or a light dish? | **Taken (2026-10-14):** No dish. Dishing to 4.5 mm on a 5.5 mm sole is the over-trim the case is about |
+| D40 | Ridgeway takes the thin cow from its routine share, leaving routine at 0.1 | **Taken (2026-10-14):** Yes. The thin cow is a routine foot apart from the trap, and the farm's intro already sets it up |
+| D41 | If one-claw swelling doesn't read at phone size, say which claw in the intro? | **Taken (2026-10-14):** Yes, as a fallback only |
+| D42 | Deep sepsis: trim and block the sound claw and refer, or refer only (no trim, like foot rot)? | **Taken (2026-10-14):** Trim and block the sound claw, then refer. It's what a trimmer can do for her before the vet comes, and it makes the two vet cases play differently. Refer-only would make them the same play with a different read |
 
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
