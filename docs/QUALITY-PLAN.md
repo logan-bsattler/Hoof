@@ -623,6 +623,29 @@ Dropped: the straight knife-dish shadows. They come from the art lab's ruler-str
 ### 11.2 A guide book (to scope)
 - A playtester asked for a manual: what each tool does, and the conditions you'll meet. To decide: open from the title and from a button in play (pause); one page per tool (from `TOOLS` name/hint plus a drawn icon from toolart) and per condition (title, look and feel from `FINDING`, the right call, with art-lab style crops). Unlock conditions as they're met on the route, or show them all? Kept short, no spoilers on reads the player hasn't made?
 
+**11.2 scope (2026-10-14), proposed; decisions D27–D30 below.**
+
+*What it is:* a "Field guide" overlay, a DOM panel over the canvas (like the visit card), not a new canvas scene. Two tabs: **Tools** and **Conditions**, plus a short **The trim** page (the five steps in plain words). One page per entry, with prev/next and a list. It closes back to exactly where the player was.
+
+*Where it opens:* a "Guide" button on the title screen (`showTitle`, main.js) and a book button in play. Opening it in play pauses the cow: no fidget, flinch timer or score clock while it's up. Check what pauses today; if nothing does, it becomes a small `paused` flag the frame loop respects.
+
+*Tool pages (9, all shown from the start):* the drawn icon from toolart.js at a large size, `TOOLS[id].name`, `hint`, and two or three lines on when to reach for it and what goes wrong (most of this is already in steps.js tips, e.g. not the grinder on the old sole). The key in brackets for desktop.
+
+*Condition pages (10):* title (`CONDITIONS[id].title`, e.g. "Pressure Point"), the plain name (sole ulcer), **look** and **feel** from `FINDING`, what to do (from `diagnosedText`), the right call (`CALLS[...].label`) and one art crop. Crops are pre-rendered PNGs from the art lab (shot.mjs-style, about 240×240, one per condition, under `assets/guide/`), not drawn live, so opening the guide costs nothing and needs no hoof build. About 10 small images; add them to the service worker's cache list.
+
+*Unlocks (default):* tools always open. A condition is locked ("Not met yet", silhouette, no text) until the player has finished a cow with it. Read straight from the saved route `history` (`h.condition`), so no save-format change. Case B / the guided run unlocks the ulcer. Nonfoot (D26) stays locked until met, since its page gives the trick away.
+
+*Spoiler rule:* a condition's page shows only what the game itself says after the cow (look, feel, what to do, the call). Never the decoy kinds or how to tell it apart from a near miss that hasn't been met.
+
+*Size:* medium. About 1 day: guide.js (data → pages), a CSS panel, two buttons, the pause flag, a crop script and 10 PNGs, tests (every tool and condition has a page; lock state follows history; a locked page leaks no text from `FINDING`). Then a preview check at 1280×900 and 375×667 (44 px buttons, 11 px text, scrolls inside the panel).
+
+| # | Decision | Default |
+|---|---|---|
+| D27 | Conditions unlock as met, or all open? | Unlock as met (tools always open); an "all" toggle after the route's first full round |
+| D28 | Art per condition: pre-rendered PNG crops, or a live mini hoof? | PNG crops (no build cost, no hitch in play) |
+| D29 | Open it mid-cow? | Yes, and it pauses her; but not during the walk-off or score card |
+| D30 | Include "The trim" page (five steps)? | Yes, short; it's what the guided run teaches, for players who skipped it |
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
