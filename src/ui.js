@@ -84,6 +84,18 @@ export class UI {
     this.drawIcons();
   }
 
+  // The knife's edge on a sand farm (WP12.4): a pip on its button, green when sharp, amber as it
+  // dulls, red once it wants changing. null hides it (no sand, no wear).
+  setWear(w) {
+    const b = this.toolButtons.knife;
+    let pip = b.querySelector('.wear');
+    if (w == null) { if (pip) pip.hidden = true; return; }
+    if (!pip) { pip = document.createElement('i'); pip.className = 'wear'; b.appendChild(pip); }
+    pip.hidden = false;
+    pip.dataset.edge = w > 0.6 ? 'dull' : w > 0.3 ? 'worn' : 'sharp';
+    pip.title = w > 0.6 ? 'Blunt: tap the knife again for a fresh one' : w > 0.3 ? 'Losing its edge' : 'Sharp';
+  }
+
   setTool(id) {
     for (const [k, b] of Object.entries(this.toolButtons)) b.classList.toggle('active', k === id);
     $('toolInfo').innerHTML = `<strong>${TOOLS[id].name}</strong> · ${TOOLS[id].hint}`;

@@ -991,3 +991,23 @@ test('D26: lame higher up the leg. A clean, firm foot, a scuffed toe, and the ve
   const snd = read(); snd.diagnosis = 'sound'; snd.diagnosisCorrect = false; snd.call = 'vet';
   assert.ok(scoreCase(hoof.metrics(), snd, hoof, cd).parts.correctness <= 85);
 });
+
+// ------------------------------------------------------------------ WP12.4 sand dulls the knife
+test('sand: the knife wears as it pares, a worn one cuts slower, and off sand it never wears', () => {
+  const pare = (knife) => {
+    const h = new Hoof(makeCase('routine', 4));
+    let removed = 0;
+    for (let x = 140; x < 260; x += 8) for (let y = 300; y < 480; y += 3) removed += applyStroke(h, 'knife', x, y, 3, knife).removed;
+    return removed;
+  };
+  const sharp = pare(null);
+  const plain = { sand: false, wear: 0 };
+  assert.equal(pare(plain), sharp, 'off sand the knife is just a knife');
+  assert.equal(plain.wear, 0);
+  const sand = { sand: true, wear: 0 };
+  const fresh = pare(sand);
+  assert.ok(sand.wear > 0.2 && fresh < sharp, `wear ${sand.wear.toFixed(2)}, ${fresh.toFixed(0)} vs ${sharp.toFixed(0)}`);
+  const worn = { sand: true, wear: 1 };
+  assert.ok(pare(worn) < sharp * 0.7, 'a worn blade takes far less');
+  assert.equal(worn.wear, 1, 'wear tops out at 1');
+});

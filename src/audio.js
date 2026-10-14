@@ -246,6 +246,11 @@ export const Sound = {
     if (sample(['knife1', 'knife2', 'knife3'], { gain: 0.32, jitter: 0.08, minGap: 0.08 })) return;
     burst({ dur: 0.07, freq: 3800 + Math.random() * 1200, q: 1.4, type: 'bandpass', gain: 0.22 });
   },
+  // A fresh knife out of the pouch (WP12.4): a short ring of steel.
+  swap() {
+    burst({ dur: 0.05, freq: 5200, q: 3, gain: 0.16 });
+    tone({ freq: 2400, to: 2650, dur: 0.09, type: 'triangle', gain: 0.05, delay: 0.04 });
+  },
   snip() {
     if (sample('snip', { gain: 0.4, jitter: 0.1 })) return;
     burst({ dur: 0.04, freq: 2600, q: 0.8, type: 'highpass', gain: 0.3 });

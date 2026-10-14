@@ -15,8 +15,12 @@ export const HOUSING = {
   pasture: 'Grazing herd',
   straw: 'Straw yard',
   freestall: 'Freestall on concrete',
+  sand: 'Sand-bedded freestalls',
   wet: 'Wet yard',
 };
+
+// Sand in the stalls gets into the horn and takes the edge off a knife (Nate 50:07).
+export const onSand = (farm) => farm?.housing === 'sand';
 
 // Reputation per cow by grade. A lame walk-off earns nothing, whatever the grade.
 export const POINTS = { Textbook: 10, Clean: 7, Sound: 4, 'Needs work': 1, Failed: 0 };
@@ -28,7 +32,8 @@ export const HERD_BONUS = 5;
 // `mix` sets each visit's share of conditions (dealt as a deck, see herdDeck); `front` is the
 // share of front feet. `calving` is the chance a routine cow is close to calving and should be
 // left till dry-off (WP9 J1). `kicker` is the chance a visit has one known kicker among its new
-// cows (WP12.2). `footbath` none|poor|good scales the DD share (FOOTBATH, WP12.3).
+// cows (WP12.2). `footbath` none|poor|good scales the DD share (FOOTBATH, WP12.3). Housing
+// 'sand' wears the knife (onSand, WP12.4).
 export const FARMS = [
   {
     id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
@@ -58,8 +63,8 @@ export const FARMS = [
     mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5, kicker: 0.33,
   },
   {
-    id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'freestall', footbath: 'poor', cows: 5, rep: 380,
-    intro: 'A big, busy unit. Priya’s heifers have never been in a crush before, and they let you know it.',
+    id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'sand', footbath: 'poor', cows: 5, rep: 380,
+    intro: 'A big, busy unit on sand-bedded stalls. Priya’s heifers have never been in a crush before, and they let you know it.',
     mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5, kicker: 0.33,
   },
   {

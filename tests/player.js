@@ -10,8 +10,10 @@ const DT = 1 / 60;
 // opts.onStamp(tool, x, y, dx, dy): after every tool stamp (the art lab marks its overlay here).
 // opts.onEvent(ev, tool, x, y): every events object the tools return.
 // opts.onAction(): after each drag or nip pass (the art lab syncs its buffers here).
+// opts.knife: the blade in hand, { sand, wear } (WP12.4). The bot takes a fresh one past 0.6 wear
+// and counts the swaps in knife.swaps.
 export function makePlayer(hoof, opts = {}) {
-  const { onStamp, onEvent, onAction } = opts;
+  const { onStamp, onEvent, onAction, knife = null } = opts;
   const L = hoof.caseDef.lesion;
   const emit = (ev, tool, x, y) => { if (onEvent) onEvent(ev, tool, x, y); return ev; };
 
@@ -42,7 +44,10 @@ export function makePlayer(hoof, opts = {}) {
           let ev;
           if (tool === 'grinder') ev = applyGrind(hoof, x, y, DT);
           else if (tool === 'spray') ev = applySpray(hoof, x, y, DT);
-          else ev = applyStroke(hoof, tool, x, y, Math.hypot(dx, dy));
+          else {
+            if (tool === 'knife' && knife?.wear > 0.6) { knife.wear = 0; knife.swaps = (knife.swaps ?? 0) + 1; }
+            ev = applyStroke(hoof, tool, x, y, Math.hypot(dx, dy), knife);
+          }
           emit(ev, tool, x, y);
           if (onStamp) onStamp(tool, x, y, dx, dy);
           px = x; py = y;

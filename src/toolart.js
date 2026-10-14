@@ -36,8 +36,9 @@ function dropShadow(c, blur = 8, dx = 4, dy = 6, a = 0.45) {
 }
 
 // Hoof knife: a short hooked blade on a wooden handle. `ang` points along the handle,
-// which leads the stroke (the knife is drawn toward you).
-export function drawKnife(c, x, y, ang) {
+// which leads the stroke (the knife is drawn toward you). `wear` 0..1 (sand, WP12.4) dulls the
+// steel, fades the bright edge and scuffs the blade.
+export function drawKnife(c, x, y, ang, wear = 0) {
   c.save();
   c.translate(x, y);
   c.rotate(ang);
@@ -65,7 +66,20 @@ export function drawKnife(c, x, y, ang) {
   c.lineTo(31, 3);
   c.closePath();
   c.fill();
-  c.strokeStyle = 'rgba(255,255,255,0.8)';
+  if (wear > 0) {
+    // Grey-brown film of sand and horn over the steel, then short scratches along the blade.
+    c.fillStyle = `rgba(120,108,92,${0.55 * wear})`;
+    c.fill();
+    c.strokeStyle = `rgba(60,52,44,${0.7 * wear})`;
+    c.lineWidth = 0.5;
+    c.beginPath();
+    for (let k = 0; k < Math.round(7 * wear); k++) {
+      const sx = 8 + ((k * 37) % 21), sy = -1.8 + ((k * 13) % 9) * 0.5;
+      c.moveTo(sx, sy); c.lineTo(sx + 2.5, sy + 0.6);
+    }
+    c.stroke();
+  }
+  c.strokeStyle = `rgba(255,255,255,${0.8 * (1 - 0.85 * wear)})`;
   c.lineWidth = 0.6;
   c.beginPath(); c.moveTo(30, -2.4); c.lineTo(6, -2); c.stroke();
   c.restore();

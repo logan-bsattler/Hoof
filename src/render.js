@@ -523,7 +523,7 @@ export class Renderer {
     const grip = CFG.touch.grip / this.cssScale;
     const gx = Math.cos(touchAngle()) * grip, gy = Math.sin(touchAngle()) * grip;
     switch (tool) {
-      case 'knife': drawKnife(c, ptr.x, ptr.y, g ?? f.ang); break;
+      case 'knife': drawKnife(c, ptr.x, ptr.y, g ?? f.ang, this.knifeWear ?? 0); break;
       case 'grinder': drawGrinder(c, ptr.x, ptr.y, f.spin, ptr.down, r, g ?? undefined); break;
       case 'brush': drawBrush(c, ptr.x, ptr.y, g ?? 0.5 + Math.sin(f.ang) * 0.2); break;
       case 'nippers': drawNippers(c, ptr.x, ptr.y, 1 - f.biteT, g ?? undefined); break;

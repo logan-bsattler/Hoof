@@ -19,7 +19,7 @@ import { Tutorial } from './tutorial.js';
 import { Guide } from './guide.js';
 import { drawToolIcon } from './toolart.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
-import { FARMS, FOOTBATH, HOUSING, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
+import { FARMS, FOOTBATH, HOUSING, onSand, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
@@ -53,6 +53,8 @@ const game = {
   metrics: null,
   steps: null,
   tool: 'brush',
+  // The knife in hand (WP12.4): it wears only on a sand farm, and lasts the visit until swapped.
+  knife: { sand: false, wear: 0 },
   guides: true,
   sound: true,
   shake: 0,
@@ -162,6 +164,9 @@ function newCase() {
   game.weepAt = null;
   game.blockKind = 'rubber';
   ui.setIconKind('block', '');
+  game.knife.sand = !!route.visit && onSand(farmById(route.visit.farm));
+  if (!game.knife.sand) game.knife.wear = 0;
+  showWear();
   // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
   renderer.tol = tolOf(caseDef);
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
@@ -258,7 +263,20 @@ function pickTool(id) {
     ui.toast(game.blockKind === 'wood' ? 'Wood block: taller, for a claw that has to stay right off the floor.' : 'Rubber block: the usual one.', 'info', 2600);
     return;
   }
+  // On sand, picking the knife again swaps in a sharp one (WP12.4). Free: the skill is noticing.
+  if (id === 'knife' && game.tool === 'knife' && game.state === 'play' && game.knife.sand) {
+    game.knife.wear = 0;
+    showWear();
+    Sound.swap();
+    ui.toast('Fresh knife.', 'info', 1400);
+    return;
+  }
   selectTool(id);
+}
+
+function showWear() {
+  ui.setWear(game.knife.sand ? game.knife.wear : null);
+  renderer.knifeWear = game.knife.wear;
 }
 
 function selectTool(id) {
@@ -314,9 +332,10 @@ canvas.addEventListener('pointermove', (e) => {
       for (let s = 1; s <= steps; s++) {
         const x = ptr.x + (dx * s) / steps, y = ptr.y + (dy * s) / steps;
         renderer.stroke(game.tool, x, y, dx / steps, dy / steps);
-        handle(applyStroke(game.hoof, game.tool, x, y, dist / steps), x, y);
+        handle(applyStroke(game.hoof, game.tool, x, y, dist / steps, game.knife), x, y);
         if (game.state !== 'play' || !ptr.down) break;
       }
+      if (game.tool === 'knife' && game.knife.sand) showWear();
       game.scrubLevel = Math.min(1, game.scrubLevel + dist / 60);
     } else if (mode === 'bite') {
       ptr.biteAccum += dist;
@@ -880,6 +899,7 @@ async function showVisit(farm, { fromMap = true } = {}) {
      ${toes.length ? `<p class="back recheck">${tags(toes)} ${toes.length === 1 ? 'is' : 'are'} due back for the toe recheck: a black toe is never done in one visit.</p>` : ''}
      ${due.map((cd) => `<p class="back">${farmer} mentions ${tags([cd])}’s due to calve in ${cd.calving} days.</p>`).join('')}
      ${kicker ? `<p class="back recheck">“Mind ${tags([kicker])}: she kicks.”</p>` : ''}
+     ${onSand(farm) ? '<p class="back">Sand in the stalls means grit in the horn: it takes the edge off a knife fast. Tap the knife again for a fresh one.</p>' : ''}
      ${calved.length ? `<p class="back healed">${tags(calved)} ${calved.length === 1 ? 'has' : 'have'} calved since last time and ${calved.length === 1 ? 'is' : 'are'} due ${calved.length === 1 ? 'her' : 'their'} trim.</p>` : ''}
      ${healed ? `<p class="back healed">${healed === 1 ? 'One cow' : `${healed} cows`} from last time ${healed === 1 ? 'is' : 'are'} back for ${healed === 1 ? 'her' : 'their'} next trim.</p>` : ''}`,
     fromMap
@@ -888,6 +908,7 @@ async function showVisit(farm, { fromMap = true } = {}) {
   );
   if (pick !== 'go') { showRoute(); return; }
   herd = startVisit(route, farm.id);
+  game.knife.wear = 0; // sharpened every morning
   saveRound(route);
   caseDef = herd[0];
   showIntro();

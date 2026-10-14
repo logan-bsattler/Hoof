@@ -47,7 +47,8 @@ export const CFG = {
     // capGive: knife travel over a closed ulcer cap (px) before it gives; capLift: how far round
     // the blade the cap tears away with the core when it does, in ulcer radii. flat: the stamp
     // falloff above which the blade cuts at full depth; the cap and open core answer only to that.
-    knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4, wall: 0.5, pryTaps: 3 },
+    // dull: the cut rate left at full wear on a sand farm (WP12.4); wearPer: wear per mm of horn pared (a cow’s trim pares about 1700).
+    knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4, wall: 0.5, pryTaps: 3, dull: 0.55, wearPer: 0.0008 },
     grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15, wall: 0.7 },
     // wall (knife, grinder): cut-rate multiplier on living wall, harder horn than the sole.
     // pryTaps: knife taps that lever an old block off (WP9 J2).

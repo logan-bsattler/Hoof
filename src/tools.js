@@ -217,8 +217,10 @@ export function applyPry(hoof, x, y) {
   return { taps: ob.taps, off: !ob.on };
 }
 
-// Stroke tools: called with the distance travelled since the last stamp.
-export function applyStroke(hoof, tool, x, y, dist) {
+// Stroke tools: called with the distance travelled since the last stamp. `knife` is the blade in
+// hand, { sand, wear }: on a sand farm (WP12.4) the horn it pares wears it, and a worn blade cuts
+// slower. Elsewhere, or without one, the knife stays sharp.
+export function applyStroke(hoof, tool, x, y, dist, knife = null) {
   const ev = newEvents();
   const cfg = CFG.tools[tool];
   if (tool === 'brush') {
@@ -230,6 +232,7 @@ export function applyStroke(hoof, tool, x, y, dist) {
   } else if (tool === 'knife') {
     // Flat-of-blade cells on a closed cap, per claw.
     const onCap = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
+    const rate = knife?.sand ? cfg.rate * (1 - (1 - cfg.dull) * knife.wear) : cfg.rate;
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
@@ -241,11 +244,12 @@ export function applyStroke(hoof, tool, x, y, dist) {
       if (pareTract(hoof, i, ev) || pareNecro(hoof, i, ev) || pareDouble(hoof, i, ev)) return;
       if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) return;
       // Flat-bottomed blade: an even strip across most of its width, feathered at the edges.
-      const d = cut(hoof, i, cfg.rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist, cfg.resist, cfg.wall);
+      const d = cut(hoof, i, rate * dist * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist, cfg.resist, cfg.wall);
       // A clean knife pass leaves a smooth surface.
       hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
     });
     for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, x, y, dist * Math.min(1, onCap[c] / 6), ev);
+    if (knife?.sand) knife.wear = Math.min(1, knife.wear + ev.removed * cfg.wearPer);
   } else if (tool === 'rasp') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       // The rasp has no edge to bite skin: it just rides over the cleft.

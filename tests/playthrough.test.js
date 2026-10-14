@@ -16,13 +16,15 @@ import { makePlayer } from './player.js';
 
 const DT = 1 / 60;
 
-function playthrough(cd, quiet = false) {
+// knife: the blade in hand on a sand farm (WP12.4), or null for a knife that stays sharp.
+function playthrough(cd, quiet = false, knife = null) {
   const hoof = new Hoof(cd);
   const side = hoof.side;
   const s = newSession();
   let bloodAt = null, coreCutAt = null;
   // Session bookkeeping, as main.js handle() does it.
   const p = makePlayer(hoof, {
+    knife,
     onEvent(ev, tool, x, y) {
       if (ev.claws.size && s.firstCutClaw == null && trimUnderway(s, cd)) s.firstCutClaw = [...ev.claws][0];
       if (ev.dirtyCut) s.dirtyCuts++;
@@ -330,5 +332,33 @@ test('the careful player pries an old block off first, then plays the foot as it
       const claw = plain.lesion ? soundClaw(plain) : seed === 1 ? CLAW.OUTER : CLAW.INNER;
       playthrough(makeCase(id, seed, { oldBlock: { claw, kind: id === 'toenecrosis' ? 'wood' : 'rubber' } }), true);
     }
+  }
+});
+
+
+// WP12.4: on the sand farm the knife wears as it pares. The bot swaps past 0.6 and still trims
+// every condition to Textbook; a knife that isn't on sand changes nothing.
+test('on sand the careful player swaps a worn knife and still reaches Textbook', () => {
+  let swaps = 0, cows = 0;
+  for (const id of Object.keys(CONDITIONS)) {
+    for (let seed = 1; seed <= 3; seed++) {
+      const knife = { sand: true, wear: 0 };
+      playthrough(makeCase(id, seed, dealMods(seed)), true, knife);
+      swaps += knife.swaps ?? 0;
+      if (knife.wear || knife.swaps) cows++;
+    }
+  }
+  assert.ok(swaps >= cows, `${swaps} swaps over ${cows} knifed cows: a sand cow should need about one`);
+});
+
+test('off sand the knife never wears, and the trim is identical to playing with no knife at all', () => {
+  for (const id of ['routine', 'ulcer', 'whiteline']) {
+    const a = new Hoof(makeCase(id, 2)), b = new Hoof(makeCase(id, 2));
+    const knife = { sand: false, wear: 0 };
+    makePlayer(a).brushAll().nip();
+    makePlayer(b, { knife }).brushAll().nip();
+    for (const [h, k] of [[a, null], [b, knife]]) for (let x = 120; x < 300; x += 6) makePlayer(h, { knife: k }).drag('knife', [[x, 260], [x, 560]], 120);
+    assert.equal(knife.wear, 0);
+    assert.deepEqual(b.thick, a.thick);
   }
 });

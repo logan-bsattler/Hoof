@@ -205,6 +205,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .tool kbd { position: absolute; top: 3px; right: 5px; font-size: 9px; color: var(--muted); font-family: inherit; }
 .tool.active { border-color: var(--brass); background: #4a3826; box-shadow: 0 0 0 1px var(--brass) inset; }
 .tool.active .name { color: var(--text); }
+/* WP12.4: the knife's edge on a sand farm. */
+.tool .wear { position: absolute; top: 5px; left: 5px; width: 7px; height: 7px; border-radius: 50%; background: #7bbf6a; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); }
+.tool .wear[data-edge='worn'] { background: #e0a83a; }
+.tool .wear[data-edge='dull'] { background: #ff6b5b; }
 /* Guided run: the next beat's tool pulses until it's picked. */
 .tutorial .tool.suggested:not(.active) { animation: nudge 1.1s ease-in-out infinite; }
 @keyframes nudge { 50% { border-color: var(--sound); box-shadow: 0 0 0 2px var(--sound) inset; } }
