@@ -179,7 +179,7 @@ export class Renderer {
         c.arc(L.x, L.y, ring, 0, Math.PI * 2);
         c.stroke();
         c.setLineDash([]);
-        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼', foreign: 'puncture ▼', toenecrosis: 'toe necrosis ▼', doublesole: 'false sole ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - ring - 6, '#ff6b5b', fs);
+        label(c, { dd: 'DD ▼', footrot: 'foot rot ▼', foreign: 'puncture ▼', dds: 'deep sepsis ▼', toenecrosis: 'toe necrosis ▼', doublesole: 'false sole ▼' }[L.type] ?? 'ulcer ▼', L.x, L.y - ring - 6, '#ff6b5b', fs);
       }
       c.restore();
     }

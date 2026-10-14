@@ -51,6 +51,11 @@ export const FINDING = {
     probeText: 'It sounds hollow under the testers, and she doesn’t mind. A layer of old sole has lifted off the one underneath.',
     diagnosedText: 'A double sole. Get the knife under the lifted edge and pare the false sole off.',
   },
+  dds: {
+    look: 'one claw swollen over an old weeping hole', feel: 'extremely sore on that claw',
+    probeText: 'She nearly comes out of the crush. That claw is hot and tight right up the bulb, and the old hole at the heel weeps grey pus.',
+    diagnosedText: 'It’s gone deep. Leave this claw for the vet: trim and block the sound one.',
+  },
   twoclaw: {
     look: 'sore spots on both claws', feel: 'sore on both claws',
     probeText: 'Sore on both claws.',
@@ -684,6 +689,10 @@ export const CONDITIONS = {
             id: 'whiteline', label: 'White-line abscess',
             feedback: 'An abscess swells one claw. This swelling runs across both, with the skin split between them: foot rot.',
           },
+          {
+            id: 'dds', label: 'Deep sepsis',
+            feedback: 'Deep sepsis swells one claw, over an old hole in its sole. Here both claws are up and the skin between them is split: foot rot.',
+          },
         ],
         howto: '<li><b>Not every foot gets trimmed.</b> Some go to the vet: <b>Vet / leave…</b> sits beside Release.</li>',
         misreadNote: 'Misread the foot. Swelling across both claws, split grey skin between them and the smell: that’s foot rot.',
@@ -795,6 +804,66 @@ export const CONDITIONS = {
         howto: '<li><b>Thin sole?</b> If it gives under the testers, nip the toes and leave the sole: there’s nothing spare to take.</li>',
         misreadNote: 'Misread the foot. A sole that gives under the testers and shows pink is thin: it needed the toes nipped, nothing more.',
         plan: 'Plan: nip both toes back to the line and flick off any loose heel horn. No grinder and no dish: the sole is already under 7 mm.',
+      };
+    },
+  },
+
+  // Case L "Gone Deep" (WP13.3): deep digital sepsis. An ulcer left too long, so the infection
+  // has gone into the joint of one claw. Only that claw swells, which is the tell against foot
+  // rot. Opening it further is the vet's work: the trimmer trims and blocks the sound claw and
+  // calls the vet. hoof.js marks the hole (Z.SEPSIS) and keeps every blade out of it.
+  dds: {
+    caseId: 'L',
+    title: 'Gone Deep',
+    noun: 'swollen claw',
+    weight: 0.08,
+    steps: ['clean', 'diagnose', 'trimSound', 'blockSound', 'refer'],
+    requires: { open: false, block: true, treat: false },
+    call: 'vet',
+    diagnosis: 'dds',
+
+    // The hole sits at the ulcer site, mostly on the big claw. No loose heel horn (r 0): the
+    // sound claw's trim is all the knife work she gets.
+    place(rand, side, v = {}) {
+      const at = (claw, axial) => GEOM.midX + clawSide(claw, side) * axial;
+      const big = v.big ?? CLAW.OUTER;
+      const sore = rand() < 0.8 ? big : otherClaw(big);
+      const { type: _t, ...lesion } = placeUlcer(rand, at, sore, v);
+      const sound = otherClaw(sore);
+      const looseHorn = { claw: sound, x: at(sound, 90), y: 228, r: 0 };
+      const decoys = placeDecoys(rand, at, side, [lesion], v);
+      return { lesion, looseHorn, decoys, swollen: [sore] };
+    },
+
+    copy({ cow, limb, lesion }) {
+      const sore = CLAW_NAME[lesion.claw], sound = CLAW_NAME[soundClaw({ lesion })];
+      return {
+        intro:
+          `#${cow} has been lame on the ${limb} for a fortnight, and now she’s off her feed. ` +
+          'The farmer thought it was foot rot. Lift the foot and look at both claws.',
+        diagnosisPrompt: 'She’s very lame and won’t eat. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'dds', label: 'Deep sepsis',
+            feedback: `Right. The ${sore} claw is swollen on its own over an old, weeping ulcer: the infection has gone deep, into the joint. That’s the vet’s.`,
+          },
+          {
+            id: 'footrot', label: 'Foot rot',
+            feedback: 'Foot rot swells both claws and splits the skin between them. Here one claw is up and the cleft is whole: it’s gone deep in that claw.',
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'There was an ulcer, but the swelling above it says it’s gone deep. That’s past opening: it’s the vet’s.',
+          },
+          {
+            id: 'whiteline', label: 'White-line abscess',
+            feedback: 'An abscess tracks in from the wall to a pocket of pus. This is an old hole at the heel with the whole claw swollen above it: it’s gone deep.',
+          },
+        ],
+        howto: '<li><b>One claw swollen?</b> If it’s gone deep, no blade on that claw. Trim and block the sound one, then call the vet.</li>',
+        misreadNote: 'Misread the foot. One claw swollen on its own over an old, weeping hole: the infection has gone deep.',
+        callNote: 'Deep sepsis needs the vet: the joint may have to come out. Released, she’ll only get worse.',
+        plan: `Plan: leave the ${sore} claw alone. Trim the sound ${sound} claw (nip the toe, grind it level), glue a rubber block on it, then send her to the hospital pen and call the vet.`,
       };
     },
   },

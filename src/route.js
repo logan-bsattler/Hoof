@@ -60,7 +60,7 @@ export const FARMS = [
   {
     id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', footbath: 'none', cows: 5, rep: 270,
     intro: 'The yard at Marsh End never dries out, and the slurry scraper broke in March. Expect muck, and what lives in it.',
-    mix: { dd: 0.4, footrot: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5, kicker: 0.33,
+    mix: { dd: 0.2, footrot: 0.2, dds: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5, kicker: 0.33,
   },
   {
     id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'sand', footbath: 'poor', cows: 5, rep: 380,
@@ -258,12 +258,14 @@ function backText(cd, b, was, last) {
   if (b.outcome === 'calved') return `Fresh now: she’s calved since visit ${b.visit}. Time for that trim.`;
   if (b.outcome === 'recheck') {
     if (b.was === 'thinsole') return `Back for a recheck. ${last}, and she went off sore: her soles were thin to start with. Still toes only, and leave the sole be.`;
+    if (b.was === 'dds') return `Back for a recheck. ${last}, and she went off with nobody calling the vet. That claw is worse: it still needs the vet, not the knife.`;
     if (b.was === 'nonfoot') return `Back for a recheck. ${last}, and she went off lame with nobody calling the vet. She’s no better, and it still isn’t in the foot.`;
     if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
     return was.diagnosis === 'sound'
       ? `Back for a recheck. ${last}, and she went off sore. Go gently this time and she earns her points.`
       : `Back for a recheck. ${last}, and she went off lame. The ${cd.noun} has got worse since: put it right and she earns her points this time.`;
   }
+  if (b.was === 'dds') return `The vet saw to that bad claw after visit ${b.visit}, and she’s sound on what she has. Just due her trim.`;
   if (b.was === 'thinsole') return `You nipped her toes on visit ${b.visit} (${b.grade}) and left her soles be. They’ve grown back: she’s due a proper trim.`;
   return was.diagnosis === 'sound'
     ? `You trimmed her on visit ${b.visit} (${b.grade}). She’s stayed sound: just due her trim.`

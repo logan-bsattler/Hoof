@@ -67,6 +67,8 @@ function newEvents() {
     cleftCut: false,
     // Thinnest living sole a tool cut into this stamp (mm): the cow's flinch reads it.
     minLive: Infinity,
+    // Deep sepsis (WP13.3): a blade in the old hole, and a cut aimed at the swollen claw.
+    holeCut: false, sepsisCut: false, sepsisTaken: 0,
   };
 }
 
@@ -74,6 +76,8 @@ function newEvents() {
 // `wall` scales the cut on living wall: the wall is harder horn than the sole.
 function cut(hoof, i, depth, ev, resist, resistThin = resist, wall = 1) {
   const z = hoof.zone[i];
+  // The deep sepsis hole takes no blade: opening it further is the vet's work.
+  if (z & Z.SEPSIS) { if (depth > 0.005) ev.holeCut = true; return 0; }
   const t = hoof.thick[i];
   if (t <= 0) return 0;
   if ((z & Z.WALL) && !(z & Z.DEAD)) depth *= wall;
@@ -85,6 +89,7 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist, wall = 1) {
   const d = Math.min(depth, t);
   hoof.thick[i] = t - d;
   ev.removed += d;
+  if (hoof.claw[i] === hoof.sepsisClaw) ev.sepsisTaken += d;
 
   if (z & Z.DEAD) {
     ev.dead += d;
@@ -138,6 +143,14 @@ function clearLoose(hoof, i, ev) {
   ev.loose[hoof.loose[i]]++;
   hoof.loose[i] = 0;
   return true;
+}
+
+// A cut aimed at the swollen claw (WP13.3): horn came off it, with the tool centred on it. A
+// disc working the sound claw's axial edge can graze it without counting.
+function aimedAtSepsis(hoof, x, y, ev) {
+  const i = hoof.cellAt(x, y);
+  if (ev.sepsisTaken > 0.01 && i >= 0 && hoof.claw[i] === hoof.sepsisClaw) ev.sepsisCut = true;
+  return ev;
 }
 
 // Where the knife cuts at full depth (stamp falloff f >= this): the flat of the blade.
@@ -261,7 +274,7 @@ export function applyStroke(hoof, tool, x, y, dist, knife = null) {
       cut(hoof, i, cfg.rate * dist * f, ev, 0.3);
     });
   }
-  return ev;
+  return aimedAtSepsis(hoof, x, y, ev);
 }
 
 // Grinder: continuous removal while held, scaled by time.
@@ -298,7 +311,7 @@ export function applyGrind(hoof, x, y, dt) {
     // The disc leaves swirl marks the rasp has to true up.
     hoof.rough[i] += (0.45 - hoof.rough[i]) * Math.min(1, d * 2);
   });
-  return ev;
+  return aimedAtSepsis(hoof, x, y, ev);
 }
 
 // Nippers: one bite, worked from the tip back toward the hoof. The jaws cut
@@ -330,7 +343,7 @@ export function applyBite(hoof, x, y) {
     bit = true;
     for (const i of chunk[c]) if (!blocked(hoof, i, ev)) cut(hoof, i, hoof.thick[i], ev, 1);
   }
-  if (ev.tooDeep && !bit) return ev;
+  if (ev.tooDeep && !bit) return aimedAtSepsis(hoof, x, y, ev);
   // Jaws centred on living horn: that's nipping the sole, not grazing the trim line from the toe.
   const at = hoof.cellAt(x, y);
   const onSole = at >= 0 && hoof.claw[at] && !(hoof.zone[at] & Z.DEAD);
@@ -349,7 +362,7 @@ export function applyBite(hoof, x, y) {
     cut(hoof, i, cfg.liveBite, ev, 1);
     hoof.rough[i] = 0.9;
   });
-  return ev;
+  return aimedAtSepsis(hoof, x, y, ev);
 }
 
 // Spray bottle: held like the grinder. Soaks antiseptic into opened tissue
@@ -376,6 +389,8 @@ export function applySpray(hoof, x, y, dt) {
 export function applyWrap(hoof, claw, m, ready) {
   const L = hoof.caseDef.lesion;
   if (!L) return { ok: false, reason: 'nothing' };
+  // Deep sepsis: the vet will want to see that claw as it is.
+  if (L.type === 'dds') return { ok: false, reason: 'vet' };
   if (hoof.caseDef.requires?.treat === false) return { ok: false, reason: 'untreated' };
   if (hoof.caseDef.requires?.wrap === false) return { ok: false, reason: 'nowrap' };
   if (!claw) return { ok: false, reason: 'miss' };

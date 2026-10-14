@@ -1,7 +1,7 @@
 // A DOM-free "careful hand": drives the real tools over a hoof the way a steady player would.
 // Used by the playthrough test (can the tools reach Textbook without blood?) and by the art lab.
 
-import { Z, LOOSE, clawBox } from '../src/hoof.js';
+import { Z, LOOSE, GEOM, clawBox, clawSide } from '../src/hoof.js';
 import { CFG } from '../src/config.js';
 import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
 
@@ -62,14 +62,16 @@ export function makePlayer(hoof, opts = {}) {
       return p;
     },
     // Nip each column from the tip back, stopping before the jaws' core would reach live horn.
-    nip() {
+    // With a claw given, only that claw's columns (deep sepsis: the sound claw only).
+    nip(claw = null) {
       const core = CFG.tools.nippers.radius * CFG.tools.nippers.liveCore;
       const touchesLive = (x, y) => {
         let live = false;
         hoof.stamp(x, y, core, (i) => { if (!(hoof.zone[i] & Z.DEAD)) live = true; });
         return live;
       };
-      for (const x of [158, 242, 128, 272, 100, 300, 190, 210, 80, 320, 70, 330, 112, 288, 143, 257, 174, 226]) {
+      const xs = [158, 242, 128, 272, 100, 300, 190, 210, 80, 320, 70, 330, 112, 288, 143, 257, 174, 226];
+      for (const x of claw ? xs.filter((x) => Math.sign(x - GEOM.midX) === clawSide(claw, hoof.side)) : xs) {
         for (let y = 640; y >= 520 && !touchesLive(x, y); y -= 6) {
           emit(applyBite(hoof, x, y), 'nippers', x, y);
           if (onStamp) onStamp('nippers', x, y, 0, 0);

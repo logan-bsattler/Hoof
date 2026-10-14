@@ -33,6 +33,7 @@ export const GUIDE_CONDITIONS = {
   twoclaw: { plain: 'Lesions on both claws', finding: 'twoclaw' },
   dd: { plain: 'Digital dermatitis', finding: 'dd' },
   footrot: { plain: 'Foot rot', finding: 'footrot' },
+  dds: { plain: 'Deep sepsis', finding: 'dds' },
   thinsole: { plain: 'Thin soles', look: 'long toes over a pink, thin sole', feel: 'the sole gives under the testers',
     todo: 'Nip the toes back and flick off loose heel horn. No grinder and no dish: she has no sole to spare.' },
   nonfoot: { plain: 'Lame higher up the leg', look: 'a clean foot, the toe worn square from dragging', feel: 'firm everywhere you test',

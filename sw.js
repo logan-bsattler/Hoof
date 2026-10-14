@@ -1,7 +1,7 @@
 // Service worker: precaches the app shell so TRUE HOOF installs and plays offline.
 // Network-first, so a reachable server always wins and dev edits show up on reload;
 // the cache is the fallback when offline or slow. Bump VERSION when the asset list changes.
-const VERSION = 'true-hoof-v46';
+const VERSION = 'true-hoof-v47';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
@@ -11,7 +11,7 @@ const ASSETS = [
   'src/scoring.js', 'src/steps.js', 'src/toolart.js', 'src/tools.js', 'src/tutorial.js',
   'src/ui.js', 'src/walkoff.js',
   'assets/guide/routine.png', 'assets/guide/ulcer.png', 'assets/guide/whiteline.png', 'assets/guide/puncture.png', 'assets/guide/toenecrosis.png',
-  'assets/guide/doublesole.png', 'assets/guide/twoclaw.png', 'assets/guide/dd.png', 'assets/guide/footrot.png', 'assets/guide/nonfoot.png', 'assets/guide/thinsole.png',
+  'assets/guide/doublesole.png', 'assets/guide/twoclaw.png', 'assets/guide/dd.png', 'assets/guide/footrot.png', 'assets/guide/nonfoot.png', 'assets/guide/thinsole.png', 'assets/guide/dds.png',
   'audio/brush.mp3', 'audio/clunk.mp3', 'audio/grinder.mp3', 'audio/knife1.mp3',
   'audio/knife2.mp3', 'audio/knife3.mp3', 'audio/moo-flinch.mp3', 'audio/moo.mp3',
   'audio/rasp.mp3', 'audio/sigh.mp3', 'audio/snip.mp3', 'audio/snort.mp3', 'audio/spray.mp3',

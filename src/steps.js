@@ -44,6 +44,17 @@ export const STEPS = [
     tip: 'Nip both overgrown toes back to the dashed line. Her sole is already under 7 mm: no grinder on it and no dish.',
     done: (m) => m.claws[CLAW.INNER].deadRemain < 0.12 && m.claws[CLAW.OUTER].deadRemain < 0.12,
   },
+  // Deep sepsis (WP13.3): the swollen claw is the vet's. Trim the sound one: toe off, sole level.
+  {
+    id: 'trimSound', label: (cd) => `Trim the sound (${CLAW_NAME[soundClaw(cd)]}) claw only`, tool: 'nippers',
+    tip: (cd) => `Leave the swollen ${CLAW_NAME[cd.lesion.claw]} claw alone. Nip the ${CLAW_NAME[soundClaw(cd)]} toe back to the dashed line, then grind its sole down until the gauge reads ~7 mm.`,
+    done: (m, s, hoof) => levelled(m.claws[soundClaw(hoof.caseDef)], hoof.caseDef),
+  },
+  {
+    id: 'blockSound', label: 'Rubber block on the sound claw', tool: 'block',
+    tip: 'Glue the rubber block on the SOUND claw, so the swollen one carries no weight on the way to the vet.',
+    done: (m, s, hoof) => hoof.block === soundClaw(hoof.caseDef) && hoof.blockKind === 'rubber',
+  },
   {
     id: 'step1', label: (cd) => `1 · Trim the first (${CLAW_NAME[firstClaw(cd)]}) claw`, tool: 'nippers',
     tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.`,
@@ -178,7 +189,7 @@ export function evaluateSteps(m, session, hoof, now) {
 export function suggestedTool(current, m, caseDef) {
   if (current < 0) return null;
   const s = stepsFor(caseDef)[current];
-  if (s.id !== 'step1' && s.id !== 'step2') return s.tool;
-  const k = m.claws[s.id === 'step1' ? firstClaw(caseDef) : secondClaw(caseDef)];
+  if (s.id !== 'step1' && s.id !== 'step2' && s.id !== 'trimSound') return s.tool;
+  const k = m.claws[s.id === 'trimSound' ? soundClaw(caseDef) : s.id === 'step1' ? firstClaw(caseDef) : secondClaw(caseDef)];
   return k.deadRemain >= 0.12 ? 'nippers' : 'grinder';
 }

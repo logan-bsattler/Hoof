@@ -71,7 +71,7 @@ const game = {
   result: null,
   lastWarn: {},
   tutorial: null,       // a Tutorial during the guided first run, else null
-  ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false, cut: false },
+  ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false, cut: false, holeCut: false, sepsisCut: false },
 };
 
 document.getElementById('routeReset').addEventListener('click', () => restartRound());
@@ -305,7 +305,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (game.state !== 'play' || game.ptr.down) return;
   canvas.setPointerCapture(e.pointerId);
   const p = toLogical(e);
-  Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId, cut: false });
+  Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId, cut: false, holeCut: false, sepsisCut: false });
   const mode = TOOLS[game.tool].mode;
   if (mode === 'bite') bite(p.x, p.y);
   if (mode === 'hold') {
@@ -426,6 +426,11 @@ function tap(x, y) {
       } else if (L.type === 'ulcer') {
         renderer.weep(L.x, L.y, 1);
         Sound.bubbles();
+      } else if (L.type === 'dds') {
+        // Gone deep: grey pus wells out of the old hole, and she nearly comes out of the crush.
+        renderer.weep(L.x, L.y, 1.5, 'pus');
+        jolt(5);
+        Sound.moo(true);
       } else if (L.type === 'dd' || L.type === 'footrot') {
         // Raw skin: a sharp flinch, the foot snatched against the strap.
         jolt(5);
@@ -458,6 +463,7 @@ const WRAP_MSG = {
     : caseDef.lesions ? 'Flush this claw’s opened lesion with the spray bottle before you cover it.' : 'Flush the opened ulcer with the spray bottle before you cover it.',
   nothing: 'She’s sound: nothing to pad or wrap.',
   nowrap: 'No wrap for foot rot. Spray it and let the vet see her.',
+  vet: 'No wrap on that claw: the vet will want to see it as it is. Block the sound claw and make the call.',
   early: 'Finish the trim first. The wrap goes on last, just before she’s released.',
   done: () => caseDef.call ? 'She’s wrapped. Make the call.' : 'She’s wrapped. Release her.',
   other: 'That claw’s wrapped. Now the other one.',
@@ -708,6 +714,14 @@ function handle(ev, x, y) {
     warnOnce('cleft', skin
       ? 'No blade in the cleft! That’s raw skin: spray it, don’t cut it.'
       : 'That’s the heel cleft: skin, not horn. Keep the blades out of it.');
+  }
+  // Deep sepsis (WP13.3): counted once per stroke, as the cuts are.
+  if (ev.holeCut) {
+    if (!game.ptr.holeCut) { game.ptr.holeCut = true; s.holeCuts++; jolt(5); Sound.moo(true); }
+    warnOnce('hole', 'That’s the vet’s job now: the infection’s deep in the joint.');
+  } else if (ev.sepsisCut) {
+    if (!game.ptr.sepsisCut) { game.ptr.sepsisCut = true; s.sepsisCuts++; jolt(4); }
+    warnOnce('sepsis', 'Leave the swollen claw: trim the sound one.');
   }
   if (ev.blockedSkip) warnOnce('blocked', game.hoof.oldBlock?.on ? 'Can’t trim under the old block. Tap it with the knife to pry it off.' : 'Can’t trim under the block.', 'info', 6);
 

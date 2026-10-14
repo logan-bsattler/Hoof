@@ -18,6 +18,7 @@ export const Z = {
   CLEFT: 256,  // skin of the heel cleft between the bulbs: no tool cuts here
   DD: 512,     // digital dermatitis: the raw lesion on the cleft skin
   ROT: 1024,   // foot rot: the split, infected skin along the whole cleft, both claws
+  SEPSIS: 2048, // deep sepsis: the old, open hole at the ulcer site. No blade goes in it
 };
 
 export const CLAW = { NONE: 0, OUTER: 1, INNER: 2 };
@@ -278,6 +279,8 @@ export class Hoof {
     // With a lesion on each claw (J3) each claw is padded and wrapped on its own: wrapAt holds
     // the stage per claw, and wrap/wrapClaw stay unused.
     this.wrapAt = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
+    // The claw a deep sepsis has gone into (WP13.3): no blade belongs on it.
+    this.sepsisClaw = CLAW.NONE;
     this.rand = mulberry32(seed);
     this.build();
     // No muck got under the old block: the sole it covers comes off clean.
@@ -420,6 +423,14 @@ export class Hoof {
     else if (L?.type === 'footrot') {
       for (let i = 0; i < this.n; i++) if (this.zone[i] & Z.CLEFT) this.zone[i] |= Z.ROT;
     }
+    // Deep sepsis: the hole is already open, so there's no cap and nothing loose. Its horn keeps
+    // its thickness (a Z.ULCER core would read as a bump in the relief, and invite the knife).
+    else if (L?.type === 'dds') {
+      this.sepsisClaw = L.claw;
+      this.stampExact(L.x, L.y, L.r, (i, d) => {
+        if ((this.zone[i] & Z.LIVE) && this.claw[i] === L.claw && d <= L.r) this.zone[i] |= Z.SEPSIS;
+      });
+    }
     // Toe necrosis: a patch of dead, black horn at the tip of the toe, down to the bone.
     else if (L?.type === 'toenecrosis') this.stampExact(L.x, L.y, L.r, (i) => {
       if ((this.zone[i] & Z.LIVE) && this.claw[i] === L.claw) this.loose[i] = this.looseInit[i] = LOOSE.NECRO;
@@ -538,6 +549,11 @@ export class Hoof {
       return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
     }
     if (z & Z.CLEFT) return { kind: 'cleft', text: 'Heel cleft: skin, not horn. Keep the blades out of it.' };
+    // Deep sepsis (WP13.3): the whole bulb and the sole round the old hole are exquisitely sore.
+    if (L?.type === 'dds' && this.claw[i] === L.claw && ((z & Z.HEEL) || Math.hypot(this.cellX(i) - L.x, this.cellY(i) - L.y) <= L.r * 1.75)) {
+      const finding = this.lesionFinding(L);
+      return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };
+    }
     // The lesion whose loose horn this is, on this cell's claw.
     const LL = this.lesions().find((l) => l.claw === this.claw[i] && LESION_LOOSE[l.type] === this.looseInit[i]);
     if (LL) {
@@ -581,7 +597,7 @@ export class Hoof {
   contactMap() {
     const n = this.thick.length;
     const out = new Float32Array(n);
-    const bears = (i) => (this.zone[i] & Z.LIVE) && !(this.zone[i] & (Z.DEAD | Z.DISH | Z.HEEL | Z.ULCER))
+    const bears = (i) => (this.zone[i] & Z.LIVE) && !(this.zone[i] & (Z.DEAD | Z.DISH | Z.HEEL | Z.ULCER | Z.SEPSIS))
       && this.looseInit[i] !== LOOSE.ULCER && this.looseInit[i] !== LOOSE.TRACT && this.looseInit[i] !== LOOSE.NECRO && !(this.looseInit[i] === LOOSE.DOUBLE && this.loose[i]) && this.thick[i] > 0.05;
     const top = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
     for (let i = 0; i < n; i++) if (bears(i)) top[this.claw[i]] = Math.max(top[this.claw[i]], this.thick[i]);
@@ -636,6 +652,8 @@ export class Hoof {
       if (z & (Z.DD | Z.ROT)) { m.ddN++; m.ddTint += this.tint[i]; }
       // The cleft is skin: it is neither trimmed nor graded as horn.
       if (z & Z.CLEFT) continue;
+      // Nor is the deep sepsis hole: it's left for the vet.
+      if (z & Z.SEPSIS) continue;
 
       // A false sole still on isn't graded as horn; pared off, the new sole under it is plain sole.
       if (lg === LOOSE.DOUBLE) {

@@ -30,6 +30,8 @@ function playthrough(cd, quiet = false, knife = null) {
       if (ev.dirtyCut) s.dirtyCuts++;
       if (ev.grinderLesion) s.grinderLesion = true;
       if (ev.cleftCut) s.cleftCuts++;
+      if (ev.holeCut) s.holeCuts++;
+      if (ev.sepsisCut) s.sepsisCuts++;
       if (ev.blood && !bloodAt) bloodAt = `${tool} at ${x.toFixed(0)},${y.toFixed(0)}`;
       // Any cut into the opened core is a moo and a slip in the game: the careful hand never does it.
       if (ev.lesionCut && !coreCutAt) coreCutAt = `${tool} at ${x.toFixed(0)},${y.toFixed(0)}`;
@@ -102,6 +104,22 @@ function playthrough(cd, quiet = false, knife = null) {
     s.probes.push('thinsole');
     until('toeOnly', () => p.nip(), 3);
     heelHorn();
+    return verdict();
+  }
+
+  // Deep sepsis (WP13.3): hands off the swollen claw. Nip and grind the sound one, rubber block
+  // on it, and the vet.
+  if (L?.type === 'dds') {
+    const ok = soundClaw(cd);
+    p.nip(ok);
+    until('trimSound', () => p.grind(ok, 270, 580, 1));
+    hoof.block = ok;
+    hoof.blockKind = 'rubber';
+    s.blockAttempts.push(ok);
+    assert.ok(done('blockSound'));
+    assert.equal(s.holeCuts + s.sepsisCuts, 0, 'no blade on the swollen claw');
+    s.call = cd.call;
+    until('refer', () => {});
     return verdict();
   }
 

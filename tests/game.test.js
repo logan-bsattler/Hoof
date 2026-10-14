@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, soundClaw, insideClaw } from '../src/hoof.js';
+import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, clawBox, soundClaw, insideClaw } from '../src/hoof.js';
 import { CASE_B, makeCase, dealCase, dealMods, temperament } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { stepsFor, stepLabel } from '../src/steps.js';
@@ -459,6 +459,7 @@ for (const id of Object.keys(CONDITIONS)) test(`${id}: 50 dealt cows all build, 
     for (const f of cd.findings) assert.ok(insideClaw(f.claw, f.x, f.y, cd.side, 4), `seed ${seed}: ${f.kind} outside its claw`);
     const { h, status, r, t } = await idealRun(cd);
     if (L?.type === 'dd' || L?.type === 'footrot') assert.ok(h.metrics().ddN >= 8, `seed ${seed}: DD cells ${h.metrics().ddN}`);
+    else if (L?.type === 'dds') assert.ok(h.zone.filter((z) => z & Z.SEPSIS).length > 10, `seed ${seed}: hole cells`);
     else if (L) assert.ok(h.metrics().looseN[LESION_LOOSE[L.type]] > 10, `seed ${seed}: lesion cells`);
     else assert.equal(h.metrics().looseN[LOOSE.ULCER] + h.metrics().looseN[LOOSE.TRACT], 0, `seed ${seed}: no lesion cells on a sound foot`);
     if (L?.path) {
@@ -501,7 +502,7 @@ test('routine: opening a decoy, a needless block or a misread all cost points', 
 
 test('dealCase deals both conditions, and the same seed deals the same cow', () => {
   const seen = new Set();
-  for (let seed = 1; seed <= 80; seed++) seen.add(dealCase(seed).condition);
+  for (let seed = 1; seed <= 200; seed++) seen.add(dealCase(seed).condition);
   assert.deepEqual([...seen].sort(), Object.keys(CONDITIONS).sort());
   assert.deepEqual(dealCase(99), dealCase(99));
 });
@@ -1073,4 +1074,57 @@ test('sand: the knife wears as it pares, a worn one cuts slower, and off sand it
   const worn = { sand: true, wear: 1 };
   assert.ok(pare(worn) < sharp * 0.7, 'a worn blade takes far less');
   assert.equal(worn.wear, 1, 'wear tops out at 1');
+});
+
+test('WP13.3: deep sepsis wants the sound claw trimmed and blocked, and every blade kept off the swollen one', () => {
+  const cd = makeCase('dds', 13);
+  assert.deepEqual(stepsFor(cd).map((s) => s.id), ['clean', 'diagnose', 'trimSound', 'blockSound', 'refer']);
+  assert.deepEqual(cd.swollen, [cd.lesion.claw], 'only the sore claw swells');
+  const ok = soundClaw(cd), L = cd.lesion;
+  // The job done: clean, the sound claw's toe off and its sole at target, a rubber block on it.
+  const good = () => {
+    const h = new Hoof(cd);
+    for (let i = 0; i < h.n; i++) {
+      if (!h.claw[i]) continue;
+      h.mud[i] = 0;
+      if (h.claw[i] !== ok) continue;
+      if (h.zone[i] & Z.DEAD) h.thick[i] = 0;
+      else if (!(h.zone[i] & (Z.HEEL | Z.CLEFT | Z.DISH | Z.TRI))) h.thick[i] = Math.min(h.thick[i], CFG.sole.target);
+    }
+    h.block = ok;
+    return h;
+  };
+  const sess = (o = {}) => ({ ...idealSession(cd), call: 'vet', ...o });
+  const h = good();
+  assert.equal(evaluateSteps(h.metrics(), sess(), h, 1).current, -1, 'every step done');
+  const g = scoreCase(h.metrics(), sess(), h, cd);
+  assert.equal(g.grade, 'Textbook', g.notes.join(' | '));
+  assert.equal(g.gait, CONDITIONS.dds.call === 'vet' ? 'to the vet' : g.gait);
+
+  // The hole takes no blade, and a cut centred on the swollen claw is flagged.
+  const t = new Hoof(cd), i = t.cellAt(L.x, L.y);
+  assert.ok(t.zone[i] & Z.SEPSIS);
+  const before = t.thick[i];
+  assert.ok(applyStroke(t, 'knife', L.x, L.y, 10).holeCut);
+  assert.equal(t.thick[i], before, 'the hole keeps its horn');
+  const b = clawBox(L.claw, cd.side);
+  assert.ok(applyGrind(t, b.cx, 420, 0.1).sepsisCut, 'grinding the swollen claw counts');
+  assert.ok(!applyGrind(t, clawBox(ok, cd.side).cx, 420, 0.1).sepsisCut, 'grinding the sound claw does not');
+  assert.equal(applyWrap(t, L.claw, t.metrics(), true).reason, 'vet');
+
+  // Costs: 15 a stroke at most 30; no block −15; a block on the swollen claw is lame; released −25.
+  const cut = scoreCase(h.metrics(), sess({ holeCuts: 1, sepsisCuts: 2 }), h, cd);
+  assert.equal(g.parts.restraint - cut.parts.restraint, 30);
+  assert.ok(cut.notes.some((n) => n.includes('vet’s job')));
+  const nb = good(); nb.block = CLAW.NONE;
+  const r1 = scoreCase(nb.metrics(), sess(), nb, cd);
+  assert.equal(g.parts.correctness - r1.parts.correctness, 15);
+  assert.ok(r1.notes.some((n) => n.includes('weight off that claw')));
+  const bs = good(); bs.block = L.claw;
+  const r2 = scoreCase(bs.metrics(), sess({ blockAttempts: [L.claw] }), bs, cd);
+  assert.equal(r2.gait, 'lame');
+  assert.equal(g.parts.correctness - r2.parts.correctness, 30);
+  const rel = scoreCase(h.metrics(), sess({ call: null }), h, cd);
+  assert.equal(g.parts.correctness - rel.parts.correctness, 25);
+  assert.equal(rel.gait, 'lame');
 });

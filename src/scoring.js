@@ -17,6 +17,8 @@ export function newSession() {
     dishBeforeLevel: false, stepDoneAt: {}, blood: false, nicks: 0, cleftCuts: 0,
     // How she left the crush: null (released) or a CALLS id. cuts: strokes that took horn off.
     call: null, cuts: 0,
+    // Deep sepsis (WP13.3): strokes into the old hole, and strokes on the swollen claw.
+    holeCuts: 0, sepsisCuts: 0,
   };
 }
 
@@ -73,7 +75,8 @@ export function lesionOpened(m, hoof) {
   if (hoof.lesions().length > 1) return hoof.lesions().every((L) => opened(m, hoof, L));
   const L = hoof.caseDef.lesion;
   // Digital dermatitis is skin: there is nothing to open.
-  if (!L || L.type === 'dd') return true;
+  // Nor is there for deep sepsis: what's open is the vet's.
+  if (!L || L.type === 'dd' || L.type === 'dds') return true;
   if (L.type === 'toenecrosis') return m.looseRemain[LOOSE.NECRO] <= 0.1;
   if (L.type === 'doublesole') return m.looseRemain[LOOSE.DOUBLE] <= 0.1;
   return L.type === 'whiteline' || L.type === 'foreign' ? hoof.drained : m.looseRemain[LOOSE.ULCER] <= 0.1;
@@ -127,19 +130,23 @@ export function scoreCase(m, session, hoof, caseDef) {
   const trim = caseDef.requires?.trim !== false;
   // Thin soles (WP13.1): the toes are trimmed, the sole is judged on what was taken from it.
   const thin = !!caseDef.thinSole;
+  // Deep sepsis (WP13.3): only the sound claw is trimmed, so only it is judged as a trim.
+  const dds = caseDef.lesion?.type === 'dds';
+  const soundK = dds ? m.claws[sound] : null;
 
   // Balance: level claws, right height, toe length, heel preserved.
   const level = ramp(Math.abs(m.levelDiff), 0.3, 3);
   // A wider band early on the route (WP7.6) widens the full-marks height by the same slack.
   const slack = Math.max(0, tolOf(caseDef) - CFG.sole.tolerance);
   const off = (k) => thin ? ramp(k.wbTakenMean, 0.3 + slack, 1.5 + slack) : ramp(Math.abs(k.wbMean - T), 0.4 + slack, 3 + slack);
-  const height = (off(inner) + off(outer)) / 2;
-  const toe = 100 * (1 - (inner.deadRemain + outer.deadRemain) / 2);
+  const height = dds ? off(soundK) : (off(inner) + off(outer)) / 2;
+  const toe = 100 * (1 - (dds ? soundK.deadRemain : (inner.deadRemain + outer.deadRemain) / 2));
   const heel = ramp(m.heelRemovedMean, 0.3, 2);
-  const balance = trim ? 0.4 * level + 0.3 * height + 0.2 * toe + 0.1 * heel : 100;
+  const balance = !trim ? 100 : dds ? 0.5 * height + 0.35 * toe + 0.15 * heel : 0.4 * level + 0.3 * height + 0.2 * toe + 0.1 * heel;
+  if (dds && height < 70) notes.push(`The sound ${CLAW_NAME[sound]} claw is off target at ${soundK.wbMean.toFixed(1)} mm; aim for ~${T}. It carries her now.`);
   if (trim) {
-  if (level < 70) notes.push(`Claws aren’t level: ${Math.abs(m.levelDiff).toFixed(1)} mm apart. She’ll rock on the taller one.`);
-  if (height < 70 && !thin) notes.push(`Sole height is off target (inner ${inner.wbMean.toFixed(1)} mm, outer ${outer.wbMean.toFixed(1)} mm; aim for ~${T}).`);
+  if (level < 70 && !dds) notes.push(`Claws aren’t level: ${Math.abs(m.levelDiff).toFixed(1)} mm apart. She’ll rock on the taller one.`);
+  if (height < 70 && !thin && !dds) notes.push(`Sole height is off target (inner ${inner.wbMean.toFixed(1)} mm, outer ${outer.wbMean.toFixed(1)} mm; aim for ~${T}).`);
   if (toe < 85) notes.push('Overgrown toe left on. Nip back to the dashed line.');
   if (heel < 80) notes.push('You took horn off the heel. Step 1 rule: don’t touch the heel.');
   }
@@ -169,7 +176,10 @@ export function scoreCase(m, session, hoof, caseDef) {
       : 'No block needed: the trouble is in the skin, not under a claw. It only tips her onto one claw.');
   }
   if (L && !pair && session.blockAttempts.includes(L.claw)) { correctness -= 30; notes.push('The block went on the sore claw at some point. It belongs on the sound claw.'); }
-  if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${caseDef.noun ?? 'ulcer'} is still carrying weight.`); }
+  // Deep sepsis: no block is its own fault; a block on the swollen claw was charged just above.
+  if (dds && need.block && hoof.block !== sound) {
+    if (!hoof.block) { correctness -= 15; notes.push('No block. She needed the weight off that claw on the way to the vet.'); }
+  } else if (need.block && hoof.block !== sound) { correctness -= 25; notes.push(`No block on the sound claw, so the ${caseDef.noun ?? 'ulcer'} is still carrying weight.`); }
   // Toe necrosis wants the taller wood block; everything else the rubber one.
   const kind = need.block === 'wood' ? 'wood' : 'rubber';
   if (need.block && hoof.block === sound && hoof.blockKind !== kind) {
@@ -185,8 +195,8 @@ export function scoreCase(m, session, hoof, caseDef) {
       L.type === 'foreign' ? 'The puncture was never pared down to the pus. It’s still under pressure.' :
       pair ? pairOpenNote(m, hoof) : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
-  if (trim && !thin && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
-  if (trim && !thin && session.firstCutClaw === secondClaw(caseDef)) {
+  if (trim && !thin && !dds && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
+  if (trim && !thin && !dds && session.firstCutClaw === secondClaw(caseDef)) {
     const [a, b] = [CLAW_NAME[firstClaw(caseDef)], CLAW_NAME[secondClaw(caseDef)]];
     correctness -= 10;
     notes.push(`Started on the ${b} claw. On a ${caseDef.foot ?? 'hind'} foot, trim the ${a} claw first and match the ${b} to it.`);
@@ -228,7 +238,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   const triFrac = m.triCut / Math.max(1, m.triN);
   // Whole-claw over-trimming: below the target band costs, below thin costs a lot.
   let clawOver = 0;
-  for (const [name, k] of [['Inner', inner], ['Outer', outer]]) {
+  for (const [name, k] of [['Inner', inner], ['Outer', outer]].filter(([, k]) => !dds || k === soundK)) {
     if (k.wbMean < CFG.sole.thin) {
       clawOver += 40;
       notes.push(`${name} claw ground to ${k.wbMean.toFixed(1)} mm: dangerously thin sole.`);
@@ -251,7 +261,12 @@ export function scoreCase(m, session, hoof, caseDef) {
   // Strokes on a foot that wasn't to be trimmed: 15 each, at most 30.
   const needless = trim ? 0 : Math.min(30, 15 * session.cuts);
   if (needless) notes.push(caseDef.trimNote ?? 'This foot wasn’t to be trimmed today.');
-  const restraint = clamp(100 - needless - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
+  // Deep sepsis: a blade in the old hole, or on the swollen claw at all: 15 a stroke, at most 30.
+  const holes = session.holeCuts ?? 0, swollenCuts = session.sepsisCuts ?? 0;
+  const deep = dds ? Math.min(30, 15 * (holes + swollenCuts)) : 0;
+  if (dds && holes) notes.push('That’s the vet’s job now: the infection’s deep in the joint. No blade in the hole.');
+  if (dds && swollenCuts) notes.push(`Leave the swollen ${CLAW_NAME[L.claw]} claw: trim the sound one. Every stroke on it hurt her.`);
+  const restraint = clamp(100 - needless - deep - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - (session.cleftCuts ? 20 : 0));
   if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
   if (hunted) notes.push(L.type === 'foreign' ? 'You opened a crater round the puncture. A narrow funnel straight down on the mark is all it needs.' : 'You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
@@ -260,8 +275,8 @@ export function scoreCase(m, session, hoof, caseDef) {
   // Finish: clean, smooth, no loose horn.
   const looseLeft = Math.min(1, (m.looseRemain[LOOSE.ULCER] + m.looseRemain[LOOSE.HEEL] + m.looseRemain[LOOSE.NECRO] + m.looseRemain[LOOSE.DOUBLE]) / 2);
   // A thin sole isn't ground, so there are no grinder marks to rasp out.
-  const finish = !trim ? ramp(m.mudMean, 0.02, 0.4) : thin ? 0.4 * ramp(m.mudMean, 0.02, 0.4) + 0.6 * 100 * (1 - looseLeft) : 0.3 * ramp(m.mudMean, 0.02, 0.4) + 0.4 * ramp(m.roughMean, 0.12, 0.6) + 0.3 * 100 * (1 - looseLeft);
-  if (trim && !thin && m.roughMean > 0.2) notes.push('Surface is rough. A few rasp passes trues it up.');
+  const finish = !trim || dds ? ramp(m.mudMean, 0.02, 0.4) : thin ? 0.4 * ramp(m.mudMean, 0.02, 0.4) + 0.6 * 100 * (1 - looseLeft) : 0.3 * ramp(m.mudMean, 0.02, 0.4) + 0.4 * ramp(m.roughMean, 0.12, 0.6) + 0.3 * 100 * (1 - looseLeft);
+  if (trim && !thin && !dds && m.roughMean > 0.2) notes.push('Surface is rough. A few rasp passes trues it up.');
   if (trim && m.looseRemain[LOOSE.HEEL] > 0.1) notes.push('Loose heel horn left on (step 5).');
 
   const parts = { balance, correctness, restraint, finish };
@@ -297,12 +312,15 @@ export function scoreCase(m, session, hoof, caseDef) {
     : gaitScore >= 75 ? 'sound' : gaitScore >= 50 ? 'tender' : 'lame';
   // A cow sent off the line doesn't walk off: no gait, no mobility score, and she isn't lame.
   // Blocked with both claws sore (J3), she goes to the pen lame all the same.
-  const gait = pair && hoof.block ? 'lame' : made ? CALLS[made].gait : walked;
+  // Blocked on the swollen claw (WP13.3), she goes to the vet lame.
+  const lameAnyway = pair ? !!hoof.block : dds && blockedSore;
+  const gait = lameAnyway ? 'lame' : made ? CALLS[made].gait : walked;
 
   // AHDB mobility score: a block on the sore claw is the worst case, severely impaired.
-  const mobility = made && !(pair && hoof.block) ? null : blockedSore ? CFG.mobility.blockedSore : CFG.mobility[gait];
+  const mobility = made && !lameAnyway ? null : blockedSore ? CFG.mobility.blockedSore : CFG.mobility[gait];
 
-  if (!notes.length) notes.push(made ? 'Textbook. The right call, and nothing done that she didn’t need.'
+  if (!notes.length) notes.push(dds && made ? 'Textbook. The swollen claw left for the vet, the sound one trimmed and blocked to carry her.'
+    : made ? 'Textbook. The right call, and nothing done that she didn’t need.'
     : L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
     : thin ? 'Textbook. Toes back to length, and the thin sole left alone.'
     : 'Textbook. Level, balanced, and nothing opened that didn’t need opening.');

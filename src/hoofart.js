@@ -273,6 +273,7 @@ export class HoofArt {
 
     this.hoof = hoof;
     this.swell = swellShapes(this.polys, hoof);
+    this.sepsis = sepsisShape(hoof);
     this.snap = {
       thick: Float32Array.from(hoof.thick), mud: Float32Array.from(hoof.mud),
       rough: Float32Array.from(hoof.rough), loose: Uint8Array.from(hoof.loose),
@@ -1280,6 +1281,7 @@ export class HoofArt {
     this.swellUnder(ctx);
     ctx.drawImage(this.canvas, this.X0, this.Y0, this.LW, this.LH);
     this.swellOver(ctx);
+    this.sepsisHole(ctx);
     ctx.drawImage(this.overlay, this.X0, this.Y0, this.LW, this.LH);
     // Bubbles: thin glossy films that swell and pop.
     for (const b of this.bubbles) {
@@ -1294,6 +1296,62 @@ export class HoofArt {
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.4, r * 0.22, 0, Math.PI * 2); ctx.fill();
     }
+    ctx.restore();
+  }
+
+  // The deep sepsis hole, over the horn. Muck over it hides it: it fades with the mean mud.
+  sepsisHole(ctx) {
+    const s = this.sepsis, hoof = this.hoof;
+    if (!s || !hoof) return;
+    let mud = 0;
+    for (const i of s.cells) mud += hoof.mud[i];
+    const a = 1 - smoothstep(0.25, 0.8, s.cells.length ? mud / s.cells.length : 0);
+    if (a <= 0.01) return;
+    const { L } = s;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // The dribble first, so the hole sits over its head.
+    tracePoly(ctx, s.drib, false);
+    for (const [w, al] of [[6, 0.12], [4, 0.2], [2.4, 0.3]]) {
+      ctx.strokeStyle = `rgba(150,136,84,${al})`;
+      ctx.lineWidth = w;
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(236,226,180,0.18)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    // A dark, inflamed margin, then the hole itself.
+    tracePoly(ctx, s.rim);
+    ctx.strokeStyle = 'rgba(96,34,30,0.75)';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+    const g = ctx.createRadialGradient(L.x, L.y, 1, L.x, L.y, L.r);
+    g.addColorStop(0, 'rgb(46,20,18)');
+    g.addColorStop(1, 'rgb(74,30,26)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    // Proud red granulation bulging up out of it, each blob lit from the upper left.
+    ctx.save();
+    tracePoly(ctx, s.rim);
+    ctx.clip();
+    for (const b of s.blobs) {
+      const bg = ctx.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.4, b.r * 0.1, b.x, b.y, b.r);
+      bg.addColorStop(0, 'rgb(232,108,100)');
+      bg.addColorStop(0.6, 'rgb(186,52,50)');
+      bg.addColorStop(1, 'rgb(110,26,28)');
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    }
+    // Grey pus pooled in the low side of the hole.
+    ctx.fillStyle = 'rgba(190,176,120,0.45)';
+    ctx.beginPath(); ctx.ellipse(L.x, L.y + L.r * 0.55, L.r * 0.55, L.r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // A wet sheen along the upper rim.
+    ctx.strokeStyle = 'rgba(255,240,230,0.5)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.arc(L.x, L.y, L.r * 0.7, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
     ctx.restore();
   }
 
@@ -1363,6 +1421,31 @@ export class HoofArt {
 }
 
 // ------------------------------------------------------------------ helpers
+
+// Deep sepsis (WP13.3): the old ulcer hole, already open. A ragged outline, proud red tissue
+// bulging in it, and a grey-yellow dribble toward the toe. All seeded from the case, so the
+// same cow draws the same hole. null on any other foot.
+function sepsisShape(hoof) {
+  const L = hoof.caseDef.lesion;
+  if (L?.type !== 'dds') return null;
+  const rand = mulberry32((hoof.caseDef.seed ?? 1) * 7919 + 13);
+  const rim = [];
+  for (let k = 0, n = 18; k < n; k++) {
+    const a = (k / n) * Math.PI * 2, r = L.r * (0.78 + rand() * 0.3);
+    rim.push([L.x + Math.cos(a) * r, L.y + Math.sin(a) * r * 0.85]);
+  }
+  const blobs = [];
+  for (let k = 0; k < 7; k++) {
+    const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * L.r * 0.5;
+    blobs.push({ x: L.x + Math.cos(a) * d, y: L.y + Math.sin(a) * d * 0.85, r: L.r * (0.16 + rand() * 0.16) });
+  }
+  // The dribble runs down the sole toward the toe, wandering a little.
+  const drib = [[L.x + (rand() - 0.5) * 4, L.y + L.r * 0.7]];
+  for (let k = 1; k <= 5; k++) drib.push([drib[k - 1][0] + (rand() - 0.5) * 5, drib[k - 1][1] + 7 + rand() * 4]);
+  const cells = [];
+  for (let i = 0; i < hoof.n; i++) if (hoof.zone[i] & Z.SEPSIS) cells.push(i);
+  return { L, rim: smoothPoly(rim, 2), blobs, drib, cells };
+}
 
 // Swollen bulbs puff out fully above SWELL_Y0 and blend back into the outline by SWELL_Y1.
 const SWELL_Y0 = 225, SWELL_Y1 = 295, SWELL_D = 5.5;
