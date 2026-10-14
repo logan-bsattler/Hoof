@@ -35,7 +35,7 @@ function traitsLine({ temper, mud, growth, foot, kicker }) {
 }
 
 // Everything a case needs, written out from where things are on the foot.
-function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker }) {
+function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker, swollen }) {
   const C = CONDITIONS[condition];
   const cow = 100 + (((seed - 100) % 900) + 900) % 900; // ear tag #100–#999; seed 214 is #214
   const leg = side === 'RH' ? 'right' : 'left';
@@ -62,6 +62,9 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     ...(C.toeDrag ? { toeDrag: true } : {}),
     // Trimmed too hard before (WP13.1): her soles start under target, so leave them be.
     ...(C.thinSole ? { thinSole: true } : {}),
+    // The claws whose heel bulbs are swollen (WP13.2): art only, drawn by hoofart.js. The
+    // condition names them, or its place() does when it depends on the dealt claw.
+    ...((swollen ?? C.swollen) ? { swollen: swollen ?? C.swollen } : {}),
 
     // Excess sole (mm above target) on each claw. Outer hind claws overgrow most.
     excess,

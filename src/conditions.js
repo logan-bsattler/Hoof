@@ -647,6 +647,8 @@ export const CONDITIONS = {
     requires: { open: false, block: false, treat: true, wrap: false, trim: false },
     call: 'vet',
     diagnosis: 'footrot',
+    // The whole foot is up: both heel bulbs swell (WP13.2).
+    swollen: [CLAW.OUTER, CLAW.INNER],
 
     // The split runs the whole cleft (hoof.js marks it on both claws); `lesion` is where the
     // testers' read card points, on one claw's side of it.

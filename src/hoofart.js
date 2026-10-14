@@ -89,6 +89,7 @@ export class HoofArt {
     this.octx = this.overlay.getContext('2d');
     this.octx.setTransform(S, 0, 0, S, -this.X0 * S, -this.Y0 * S);
     this.mask = null;
+    this.swell = [];
     this.built = false;
     this.hoof = null;
     this.drips = [];
@@ -271,6 +272,7 @@ export class HoofArt {
     yield 0.12;
 
     this.hoof = hoof;
+    this.swell = swellShapes(this.polys, hoof);
     this.snap = {
       thick: Float32Array.from(hoof.thick), mud: Float32Array.from(hoof.mud),
       rough: Float32Array.from(hoof.rough), loose: Uint8Array.from(hoof.loose),
@@ -1275,7 +1277,9 @@ export class HoofArt {
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
+    this.swellUnder(ctx);
     ctx.drawImage(this.canvas, this.X0, this.Y0, this.LW, this.LH);
+    this.swellOver(ctx);
     ctx.drawImage(this.overlay, this.X0, this.Y0, this.LW, this.LH);
     // Bubbles: thin glossy films that swell and pop.
     for (const b of this.bubbles) {
@@ -1292,9 +1296,113 @@ export class HoofArt {
     }
     ctx.restore();
   }
+
+  // Swollen heel bulbs (WP13.2), behind the horn: the bulb's outline puffs out past it as tight,
+  // red-pink skin, so only the rim that sticks out shows.
+  swellUnder(ctx) {
+    for (const s of this.swell) {
+      const g = ctx.createLinearGradient(0, SWELL_Y0 - 10, 0, SWELL_Y1);
+      g.addColorStop(0, 'rgb(204,104,96)');
+      g.addColorStop(0.6, 'rgb(178,84,78)');
+      g.addColorStop(1, 'rgb(140,70,62)');
+      ctx.fillStyle = g;
+      tracePoly(ctx, s.bulge);
+      ctx.fill();
+      // The skin rolls away from the lamp at its outer edge.
+      ctx.strokeStyle = 'rgba(92,36,32,0.7)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+  }
+
+  // Over the horn: the flush runs a few px in from the rim, a crease marks where skin meets
+  // horn, and the lamp (upper left) puts a hard shine along the stretched skin. Where both
+  // bulbs are up, they shoulder each other apart: the axial edges roll away into the cleft.
+  swellOver(ctx) {
+    if (!this.swell.length) return;
+    const fade = (a, b, rgb, a0) => {
+      const g = ctx.createLinearGradient(0, a, 0, b);
+      g.addColorStop(0, `rgba(${rgb},${a0})`);
+      g.addColorStop(1, `rgba(${rgb},0)`);
+      return g;
+    };
+    ctx.save();
+    ctx.lineJoin = 'round';
+    for (const s of this.swell) {
+      ctx.save();
+      tracePoly(ctx, s.poly);
+      ctx.clip();
+      // Layered strokes, widest first, so the flush fades inward instead of ending in a ring.
+      ctx.strokeStyle = fade(SWELL_Y0 + 20, SWELL_Y1, '196,92,86', 0.11);
+      for (let w = 24; w > 0; w -= 3) { ctx.lineWidth = w; ctx.stroke(); }
+      if (s.apart) {
+        tracePoly(ctx, s.axial, false);
+        const g = ctx.createLinearGradient(0, 190, 0, SWELL_Y1 - 10);
+        g.addColorStop(0, 'rgba(30,18,15,0)');
+        g.addColorStop(0.35, 'rgba(30,18,15,0.22)');
+        g.addColorStop(1, 'rgba(30,18,15,0)');
+        ctx.strokeStyle = g;
+        for (let w = 12; w > 0; w -= 2) { ctx.lineWidth = w; ctx.stroke(); }
+      }
+      ctx.restore();
+      tracePoly(ctx, s.poly);
+      ctx.strokeStyle = fade(SWELL_Y0 + 30, SWELL_Y1, '72,26,22', 0.6);
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      const lit = ctx.createLinearGradient(s.cx - 50, SWELL_Y0 - 10, s.cx + 30, SWELL_Y1 - 20);
+      lit.addColorStop(0, 'rgba(255,232,222,0.7)');
+      lit.addColorStop(0.45, 'rgba(255,226,214,0.25)');
+      lit.addColorStop(1, 'rgba(255,226,214,0)');
+      tracePoly(ctx, s.shine, false);
+      ctx.strokeStyle = lit;
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 // ------------------------------------------------------------------ helpers
+
+// Swollen bulbs puff out fully above SWELL_Y0 and blend back into the outline by SWELL_Y1.
+const SWELL_Y0 = 225, SWELL_Y1 = 295, SWELL_D = 5.5;
+
+// The shapes for each swollen claw (caseDef.swollen), from the smoothed outlines: the puffed
+// outline, a shine line just inside its crest, and the axial heel edge facing the cleft.
+function swellShapes(polys, hoof) {
+  const claws = hoof.caseDef.swollen ?? [];
+  return claws.map((claw) => {
+    const poly = polys[claw];
+    let area = 0, cx = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
+      area += ax * by - bx * ay;
+      cx += ax / poly.length;
+    }
+    const out = area > 0 ? 1 : -1;  // which side of each edge is outward
+    const offset = (d) => poly.map(([x, y], i) => {
+      const [px, py] = poly[(i + poly.length - 1) % poly.length], [nx, ny] = poly[(i + 1) % poly.length];
+      const tx = nx - px, ty = ny - py, l = Math.hypot(tx, ty) || 1;
+      const k = d * smoothstep(SWELL_Y1, SWELL_Y0, y);
+      return [x + (out * ty * k) / l, y - (out * tx * k) / l];
+    });
+    const toMid = Math.sign(GEOM.midX - cx);
+    const heel = (pts) => pts.filter(([, y]) => y < SWELL_Y1);
+    return {
+      claw, poly, cx,
+      bulge: offset(SWELL_D),
+      shine: heel(offset(SWELL_D * 0.55)).filter(([x]) => (x - cx) * toMid < 30),
+      axial: heel(poly).filter(([x, y]) => (x - cx) * toMid > 20 && y > 190),
+      apart: claws.length > 1,
+    };
+  });
+}
+
+function tracePoly(ctx, pts, close = true) {
+  ctx.beginPath();
+  pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  if (close) ctx.closePath();
+}
 
 function makeCanvas(w, h) {
   if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
