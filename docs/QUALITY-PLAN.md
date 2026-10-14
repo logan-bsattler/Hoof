@@ -600,6 +600,8 @@ The case start is already sliced behind the loading bar (24 ms a frame; noise fi
 - Low spots the grinder skips stay as dark, ragged, stained islands (ref 0:35, 1:25 left claw). They also tell the player where the sole is low.
 - `nIsle` already raises the stain depth; make the islands bigger and darker, with the crisp broken edge the stain already has.
 
+**10.3 status (2026-10-13): done, pending Ben's eye in play.** The old islands came from the static `nIsle` noise (the same spots on every cow) and soaked only ~1.5 mm deep, while one grinder pass takes off 2–4 mm, so none survived. Now `stainIslands()` places 2–4 lobed patches per claw, per cow (from the case seed), biased toward the axial half where the sole dishes, kept off the wall, dead toe and any lesion's horn. The stain there soaks 3.4–5.2 mm deep at the core, with `nIsle` breaking the edge up, so a level trim leaves a few dark, ragged islands and grinding on one clears it. Once horn round it is cut, an island darkens to packed wet manure (gated, so a brushed claw doesn't give the islands away). The small noise pockets stay at 0.6 mm. Visual only: the sim doesn't know the spots are low. No measurable cost on a stroke patch.
+
 ### 10.4 Dirty hoof: less even (agreed 2026-10-13)
 - Manure is uniformly pebbled. Add large-scale coverage variation: thick clumps toward the heel and the gap, thinner smears, and a few patches where tan horn shows through (ref 0:15).
 

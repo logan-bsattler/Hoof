@@ -298,6 +298,7 @@ export class HoofArt {
       this.cleftF[i] = hoof.zone[i] & Z.CLEFT ? 1 : 0;
       this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
     }
+    this.isleF = stainIslands(hoof);
     this.markT.fill(0);
     this.octx.save();
     this.octx.setTransform(1, 0, 0, 1, 0, 0);
@@ -496,7 +497,7 @@ export class HoofArt {
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell, gx0 = g.x0;
     const d = this.img.data;
     const { thick, init, mud, rough, tint } = hoof;
-    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF;
+    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF, isleF = this.isleF;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
     const rot = L?.type === 'footrot';
@@ -797,7 +798,11 @@ export class HoofArt {
 
           // 3. Stained outer horn: the first fraction of a mm, deeper in low spots.
           if (!isWall) {
-            const isle = 0.9 * smoothstep(0.66, 0.82, nIsle[p] / 255);
+            // Low spots keep their stain through a level pass: small pockets from the noise, and
+            // the cow's big islands, whose edge the noise breaks up.
+            const ni = nIsle[p] / 255;
+            const isl = isleF[i0] * w0 + isleF[i1] * w1 + isleF[i2] * w2 + isleF[i3] * w3;
+            const isle = 0.6 * smoothstep(0.66, 0.82, ni) + (isl > 0.01 ? Math.max(0, isl + (ni - 0.5) * 2.4 * Math.min(1, isl) + (ncv - 0.5) * 0.6) : 0);
             const sd = 0.2 + 0.4 * ns + isle;
             // Jitter the cut depth at pixel scale so the stain breaks off in a crisp, ragged edge.
             const rj = removed + (ngr - 0.5) * 0.14 + (ncv - 0.5) * 0.3;
@@ -810,7 +815,9 @@ export class HoofArt {
               // wet residue left packed into the low spots after brushing.
               const gk = 0.9 + 0.2 * ngr;
               let sr = (124 - 70 * ns) * gk, sg = (88 - 50 * ns) * gk, sb = (50 - 28 * ns) * gk;
-              const res = smoothstep(0.58, 0.8, nIsle[p] / 255 + (nLump[p] / 255 - 0.5) * 0.35);
+              // An island the grinder skimmed past is darker still: packed, wet manure in the hollow.
+              const res = Math.max(smoothstep(0.58, 0.8, ni + (nLump[p] / 255 - 0.5) * 0.35),
+                smoothstep(0.4, 1.4, isle - removed) * smoothstep(0.3, 1.4, removed) * (0.75 + 0.25 * (nLump[p] / 255)));
               sr += (40 - sr) * res * 0.8; sg += (29 - sg) * res * 0.8; sb += (17 - sb) * res * 0.8;
               crust = Math.max(crust, res * st * 0.8);
               // The dark, cracked patch that gives the ulcer away on a cleaned foot.
@@ -1317,6 +1324,49 @@ function smoothPoly(pts, rounds = 3) {
 // only pays for the pixels the last one didn't cover. Logical-space frequencies, so they
 // scale with S.
 let NOISE = null;
+// Low spots in the sole that a level grinder skims over: a few patches per claw, placed per cow,
+// where the manure stain soaked in deeper (mm). Biased toward the axial half, where the sole
+// dishes. Kept off the wall and off any lesion's own horn. Visual only: the thickness the game
+// scores doesn't know about them.
+function stainIslands(hoof) {
+  const n = hoof.n, out = new Float32Array(n);
+  const rand = mulberry32(((hoof.caseDef.seed ?? 214) * 7919 + 31) >>> 0);
+  for (const c of [CLAW.OUTER, CLAW.INNER]) {
+    let axMax = 0, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (hoof.claw[i] !== c || hoof.edge[i] < 10) continue;
+      axMax = Math.max(axMax, Math.abs(hoof.cellX(i) - GEOM.midX));
+      y0 = Math.min(y0, hoof.cellY(i)); y1 = Math.max(y1, hoof.cellY(i));
+    }
+    if (!axMax) continue;
+    const blobs = [];
+    for (let k = 2 + Math.floor(rand() * 3); k > 0; k--) {
+      const ax = 14 + (axMax - 14) * Math.pow(rand(), 1.6) * 0.75;
+      blobs.push({
+        ax, y: Math.max(GEOM.heelY + 6, y0 + 20) + (Math.min(y1 - 30, 520) - Math.max(GEOM.heelY + 6, y0 + 20)) * rand(),
+        rx: 6 + 9 * rand(), ry: 12 + 22 * rand(), depth: 3.4 + 1.8 * rand(), tilt: (rand() - 0.5) * 0.6,
+        ph: rand() * 6.28,
+      });
+    }
+    for (let i = 0; i < n; i++) {
+      if (hoof.claw[i] !== c || hoof.edge[i] < 9 || hoof.looseInit[i] || (hoof.zone[i] & Z.DEAD)) continue;
+      const ax = Math.abs(hoof.cellX(i) - GEOM.midX), y = hoof.cellY(i);
+      let v = 0;
+      for (const b of blobs) {
+        const dx = ax - b.ax - (y - b.y) * b.tilt, dy = y - b.y;
+        // A lobed outline, so no patch is a plain ellipse.
+        const a = Math.atan2(dy / b.ry, dx / b.rx);
+        const r2 = (dx * dx) / (b.rx * b.rx) + (dy * dy) / (b.ry * b.ry);
+        const lobe = 1 + 0.22 * Math.sin(3 * a + b.ph) + 0.12 * Math.sin(5 * a - b.ph);
+        const t = 1 - r2 / (lobe * lobe);
+        if (t > 0) v = Math.max(v, b.depth * Math.min(1, t * 1.6));
+      }
+      out[i] = v;
+    }
+  }
+  return out;
+}
+
 function noiseFields(S, w, h, X0, Y0, cls) {
   const n = w * h;
   if (!NOISE || NOISE.S !== S || NOISE.w !== w || NOISE.h !== h) {
