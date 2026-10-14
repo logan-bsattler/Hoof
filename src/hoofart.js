@@ -299,6 +299,9 @@ export class HoofArt {
       this.ddF[i] = hoof.zone[i] & Z.DD ? 1 : 0;
     }
     this.isleF = stainIslands(hoof);
+    this.mudK = mudBody(hoof);
+    // Its thin end per cell, so compose doesn't run the smoothstep per pixel.
+    this.mudThin = this.mudK.map((k) => 1 - smoothstep(0.15, 0.55, k));
     this.markT.fill(0);
     this.octx.save();
     this.octx.setTransform(1, 0, 0, 1, 0, 0);
@@ -497,7 +500,7 @@ export class HoofArt {
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell, gx0 = g.x0;
     const d = this.img.data;
     const { thick, init, mud, rough, tint } = hoof;
-    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF, isleF = this.isleF;
+    const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF, isleF = this.isleF, mudK = this.mudK, mudThin = this.mudThin;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
     const rot = L?.type === 'footrot';
@@ -1136,17 +1139,22 @@ export class HoofArt {
         }
 
         // 5. Manure and straw on top. A film lingers even after the clumps go.
-        const film = smoothstep(0.03, 0.5, m) * 0.4;
+        // How thick the cake is here: thin smears let the horn through, thick clumps stand proud.
+        const mk = m > 0 ? mudK[i0] * w0 + mudK[i1] * w1 + mudK[i2] * w2 + mudK[i3] * w3 : 0;
+        const film = smoothstep(0.03, 0.5, m) * (0.25 + 0.2 * mk);
         R += (104 - R) * film; G += (80 - G) * film; B += (48 - B) * film;
-        const thr = nMudThr[p] / 255;
-        const cov = smoothstep(thr - 0.05, thr + 0.05, m);
+        const thr = nMudThr[p] / 255 + 0.55 * Math.max(0, 0.32 - mk);
+        // A thin smear is translucent and broken: grit and fibre specks stay opaque and dark.
+        const thin = m > 0 ? mudThin[i0] * w0 + mudThin[i1] * w1 + mudThin[i2] * w2 + mudThin[i3] * w3 : 0;
+        const spk = thin > 0 ? smoothstep(0.5, 0.72, nLump[p] / 255 + (ngr - 0.5) * 0.35) * thin : 0;
+        const cov = smoothstep(thr - 0.05, thr + 0.05, m) * (1 - 0.45 * thin * (1 - spk));
         let mudSp = 0;
         if (cov > 0) {
-          const rel = cov * (0.35 + 0.65 * smoothstep(thr, thr + 0.3, m));
+          const rel = cov * (0.35 + 0.65 * smoothstep(thr, thr + 0.3, m)) * (0.35 + 0.95 * mk);
           gx += mudX[p] * rel; gy += mudY[p] * rel;
           // Thin smears are a translucent orange-brown; thick, wet clumps go near black.
           const lu = nLump[p] / 255;
-          const deep = smoothstep(thr - 0.05, thr + 0.25, m + (lu - 0.5) * 0.4);
+          const deep = smoothstep(thr - 0.05, thr + 0.25, m + (lu - 0.5) * 0.4 + (mk - 0.55) * 0.7) * (1 - spk) + spk * 0.85;
           const tk = 0.8 + 0.4 * lu;
           let mr = 92 * tk, mg = 62 * tk, mb = 32 * tk;
           mr += (28 + 30 * lu - mr) * deep; mg += (20 + 21 * lu - mg) * deep; mb += (12 + 11 * lu - mb) * deep;
@@ -1363,6 +1371,23 @@ function stainIslands(hoof) {
       }
       out[i] = v;
     }
+  }
+  return out;
+}
+
+// How thickly the manure is caked on, 0..1, at a large scale and per cow: thick clumps toward
+// the heel and the gap, thinner smears elsewhere, and a few spots where tan horn shows through.
+let MUD_N = null;
+function mudBody(hoof) {
+  MUD_N ??= valueNoise(mulberry32(5023));
+  const n = hoof.n, out = new Float32Array(n), seed = hoof.caseDef.seed ?? 214;
+  const ox = (seed * 37.1) % 211, oy = (seed * 19.7) % 197;
+  for (let i = 0; i < n; i++) {
+    if (!hoof.claw[i]) continue;
+    const x = hoof.cellX(i), y = hoof.cellY(i);
+    const heelness = smoothstep(330, 200, y), gapness = smoothstep(30, 6, Math.abs(x - GEOM.midX) - 7);
+    const v = fbm(MUD_N, x / 34 + ox, y / 46 + oy, 3);
+    out[i] = Math.max(0, Math.min(1, 0.5 + (v - 0.5) * 2.4 + 0.35 * Math.max(heelness, gapness) + 0.06));
   }
   return out;
 }

@@ -605,6 +605,8 @@ The case start is already sliced behind the loading bar (24 ms a frame; noise fi
 ### 10.4 Dirty hoof: less even (agreed 2026-10-13)
 - Manure is uniformly pebbled. Add large-scale coverage variation: thick clumps toward the heel and the gap, thinner smears, and a few patches where tan horn shows through (ref 0:15).
 
+**10.4 status (2026-10-13): done, pending Ben's eye in play.** `mudBody()` builds a per-cow, cell-level cake thickness (0..1) from a large-scale noise offset by the case seed, pushed up toward the heel and the interdigital gap. Thick areas get more relief and go nearer black; thin areas are a translucent smear with opaque grit specks, and the thinnest let the stained tan horn show through (they also brush clean a little sooner, since the coverage threshold rises there). Art only: the sim's `mud` and the brushing rules are unchanged.
+
 ### 10.5 Pocket size varies per cow (agreed 2026-10-13)
 - The opened ulcer is smaller than the reference. Rather than one bigger size, vary `lesion.r` per cow (for example 10–16) through the light variations (WP2.3 / 7.3), so some pockets are big jobs and some small.
 - Check the probe text, `lesionOpened`, the tint threshold and scoring still hold at both ends of the range; add the range to the variation sweep.
