@@ -76,7 +76,7 @@ export const FARMS = [
   {
     id: 'ridgeway', footbath: 'poor', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
     intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
-    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, whiteline: 0.15, twoclaw: 0.1, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5, kicker: 0.33,
+    mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, twoclaw: 0.1, thinsole: 0.15, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5, kicker: 0.33,
     decoys: [1, 3],
   },
 ];
@@ -257,12 +257,14 @@ export function backLine(cd) {
 function backText(cd, b, was, last) {
   if (b.outcome === 'calved') return `Fresh now: she’s calved since visit ${b.visit}. Time for that trim.`;
   if (b.outcome === 'recheck') {
+    if (b.was === 'thinsole') return `Back for a recheck. ${last}, and she went off sore: her soles were thin to start with. Still toes only, and leave the sole be.`;
     if (b.was === 'nonfoot') return `Back for a recheck. ${last}, and she went off lame with nobody calling the vet. She’s no better, and it still isn’t in the foot.`;
     if (was.recheck) return `Back for her recheck. ${last}. The ${cd.noun} never fully heals: pare back what’s black again, wood block, and the vet.`;
     return was.diagnosis === 'sound'
       ? `Back for a recheck. ${last}, and she went off sore. Go gently this time and she earns her points.`
       : `Back for a recheck. ${last}, and she went off lame. The ${cd.noun} has got worse since: put it right and she earns her points this time.`;
   }
+  if (b.was === 'thinsole') return `You nipped her toes on visit ${b.visit} (${b.grade}) and left her soles be. They’ve grown back: she’s due a proper trim.`;
   return was.diagnosis === 'sound'
     ? `You trimmed her on visit ${b.visit} (${b.grade}). She’s stayed sound: just due her trim.`
     : `${last} on the ${was.noun ?? 'lesion'}. It’s healed: she’s just due her trim.`;

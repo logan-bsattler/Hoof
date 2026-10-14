@@ -30,6 +30,8 @@ function idealTrim(hoof) {
     hoof.loose[i] = 0;
     if (z & Z.DEAD) { hoof.thick[i] = 0; continue; }
     if (z & (Z.HEEL | Z.ULCER)) { hoof.rough[i] = 0; continue; }
+    // Thin soles (WP13.1): the toes come off and the sole is left as she came in.
+    if (hoof.caseDef.thinSole) continue;
     hoof.thick[i] = z & Z.DISH ? D : T;
     hoof.rough[i] = 0;
   }
@@ -732,7 +734,7 @@ test('variations: decoy count and kinds, lesion size and position follow the mod
     for (const n of [0, 1, 3]) {
       const cd = makeCase(id, 4, { decoyCount: n, decoyKinds: ['bruise'] });
       const decoys = cd.findings.filter((f) => f.kind === 'bruise' || f.kind === 'stain');
-      assert.equal(decoys.length, (id === 'routine' || id === 'nonfoot') ? Math.max(1, n) : n, `${id} ${n} decoys`);
+      assert.equal(decoys.length, ['routine', 'nonfoot', 'thinsole'].includes(id) ? Math.max(1, n) : n, `${id} ${n} decoys`);
       assert.ok(decoys.every((f) => f.kind === 'bruise'));
     }
   }
@@ -990,6 +992,67 @@ test('D26: lame higher up the leg. A clean, firm foot, a scuffed toe, and the ve
   // Read as sound: a misread.
   const snd = read(); snd.diagnosis = 'sound'; snd.diagnosisCorrect = false; snd.call = 'vet';
   assert.ok(scoreCase(hoof.metrics(), snd, hoof, cd).parts.correctness <= 85);
+});
+
+// ------------------------------------------------------------------ WP13.1 thin soles
+test('WP13.1: a thin-soled cow starts under target and level, and her sole reads thin', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    for (const foot of ['hind', 'front']) {
+      const cd = makeCase('thinsole', seed, { foot, growth: 1.5 });
+      assert.ok(cd.thinSole && !cd.lesion && cd.call === null);
+      const h = new Hoof(cd);
+      const m = h.metrics();
+      for (const c of [CLAW.INNER, CLAW.OUTER]) {
+        const k = m.claws[c];
+        assert.ok(k.wbMean > 5 && k.wbMean < T - 0.3, `seed ${seed} ${foot}: wb ${k.wbMean.toFixed(2)} (growth doesn't thicken her)`);
+        assert.ok(k.deadN > 50, 'her toes are still long');
+      }
+      assert.ok(Math.abs(m.levelDiff) <= 0.5, `seed ${seed}: level ${m.levelDiff.toFixed(2)}`);
+    }
+  }
+  const cd = makeCase('thinsole', 7);
+  const h = new Hoof(cd);
+  for (let i = 0; i < h.n; i++) h.mud[i] = 0;
+  const [x, y] = findCell(h, (i) => !(h.zone[i] & (Z.DEAD | Z.HEEL | Z.CLEFT | Z.WALL)) && !h.findingAt(i));
+  const r = h.probe(h.cellAt(x, y), false);
+  assert.equal(r.kind, 'thinsole');
+  assert.match(r.text, /gives under the testers/);
+  assert.equal(r.finding, h.probe(h.cellAt(x, y), false).finding, 'one finding per claw');
+  // A routine cow's sole is still just firm.
+  const plain = new Hoof(makeCase('routine', 7));
+  for (let i = 0; i < plain.n; i++) plain.mud[i] = 0;
+  assert.equal(plain.probe(plain.cellAt(x, y), false).kind === 'thinsole', false);
+});
+
+test('WP13.1: toes only is Textbook; grinding her thin sole like any other costs Restraint', () => {
+  const cd = makeCase('thinsole', 3);
+  const steps = stepsFor(cd).map((s) => s.id);
+  assert.deepEqual(steps, ['clean', 'diagnose', 'toeOnly', 'step5']);
+  const ok = new Hoof(cd);
+  idealTrim(ok);
+  const s = { ...idealSession(cd), probes: ['thinsole'] };
+  assert.equal(evaluateSteps(ok.metrics(), s, ok, 1).current, -1, 'toes off and heel horn flicked: every step done');
+  const g = scoreCase(ok.metrics(), s, ok, cd);
+  assert.equal(g.grade, 'Textbook', g.notes.join(' | '));
+  assert.equal(g.gait, 'sound');
+
+  // The habit: grind both claws a millimetre and a half and dish them, as on any cow.
+  const ground = new Hoof(cd);
+  idealTrim(ground);
+  for (let i = 0; i < ground.n; i++) {
+    const z = ground.zone[i];
+    if (!ground.claw[i] || (z & (Z.DEAD | Z.HEEL | Z.CLEFT))) continue;
+    ground.thick[i] = Math.max(0.5, ground.thick[i] - (z & Z.DISH ? 2.5 : 1.5));
+  }
+  const bad = scoreCase(ground.metrics(), s, ground, cd);
+  assert.ok(bad.parts.restraint <= 70, `restraint ${bad.parts.restraint}`);
+  assert.ok(bad.notes.some((n) => /already thin/.test(n)), bad.notes.join(' | '));
+  assert.notEqual(bad.grade, 'Textbook');
+  // Not marked down for the sole she came in with: no "over-trimmed to N mm (target 7)" note.
+  assert.ok(!g.notes.some((n) => /over-trimmed|off target/.test(n)));
+  // A block on a thin-soled cow is needless.
+  ok.block = CLAW.OUTER;
+  assert.ok(scoreCase(ok.metrics(), s, ok, cd).notes.some((n) => /both soles are thin/.test(n)));
 });
 
 // ------------------------------------------------------------------ WP12.4 sand dulls the knife

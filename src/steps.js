@@ -38,6 +38,12 @@ export const STEPS = [
     tip: 'Get the knife under the lifted edge of the old sole and pare it away until it’s new sole all over. Not the grinder: it tears into the thin sole underneath.',
     done: (m) => m.looseRemain[LOOSE.DOUBLE] < 0.1,
   },
+  // Thin soles (WP13.1): the long toes come off and nothing else. No grinder, no dish.
+  {
+    id: 'toeOnly', label: 'Nip the toes back, leave the sole', tool: 'nippers',
+    tip: 'Nip both overgrown toes back to the dashed line. Her sole is already under 7 mm: no grinder on it and no dish.',
+    done: (m) => m.claws[CLAW.INNER].deadRemain < 0.12 && m.claws[CLAW.OUTER].deadRemain < 0.12,
+  },
   {
     id: 'step1', label: (cd) => `1 · Trim the first (${CLAW_NAME[firstClaw(cd)]}) claw`, tool: 'nippers',
     tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.`,

@@ -20,6 +20,7 @@ export const SHOTS = {
   dd: { seed: 9, box: lesionBox(100) },
   footrot: { seed: 10, box: (cd) => ({ x: 200, y: cd.lesion.y + 12, size: 120 }) },
   nonfoot: { seed: 11, box: () => ({ x: 200, y: 410, size: 440 }) },
+  thinsole: { seed: 12, box: () => ({ x: 200, y: 430, size: 420 }) },
 };
 
 const id = new URLSearchParams(location.search).get('cond');

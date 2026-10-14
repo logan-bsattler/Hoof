@@ -48,6 +48,18 @@ function scuffFinding(cd, claw) {
   return (by[claw] ??= { kind: 'scuff', claw, look: 'toe tip worn square and scuffed', feel: 'firm, not sore' });
 }
 
+// A thin-soled cow (WP13.1): one read-card finding per claw, as for the scuffed toe.
+const thins = new WeakMap();
+function thinFinding(cd, claw) {
+  if (!thins.has(cd)) thins.set(cd, {});
+  const by = thins.get(cd);
+  return (by[claw] ??= {
+    kind: 'thinsole', claw, look: 'sole pink and thin', feel: 'gives under the testers',
+    probeText: 'It gives under the testers: thin. Not much horn to take here.',
+    diagnosedText: 'Thin sole. Nip the toes back and leave the sole alone.',
+  });
+}
+
 // How deep (mm) a decoy mark goes into the horn before trimming takes it off.
 export const DECOY_DEPTH = { stain: 1, bruise: 2.5 }; // centre line between the claws
 
@@ -362,7 +374,9 @@ export class Hoof {
         else if (y >= GEOM.dishY0 && y <= GEOM.dishY1 && ax < GEOM.dishW && !(this.zone[i] & Z.WALL)) this.zone[i] |= Z.DISH;
         if (y > GEOM.triY && ax < GEOM.triW) this.zone[i] |= Z.TRI;
 
-        const sole = T + excess + 2.2 * smoothstep(GEOM.toeRamp[0], GEOM.toeRamp[1], y) + nz * 0.35;
+        // A thin sole (WP13.1) was ground flat last time: no extra horn toward the toe.
+        const toeUp = cd.thinSole ? 0 : 2.2;
+        const sole = T + excess + toeUp * smoothstep(GEOM.toeRamp[0], GEOM.toeRamp[1], y) + nz * 0.35;
         // A slow wobble so the feathered zone edges don't read as ruled lines.
         const jit = smoothNoise(x * 1.9 + 41, y * 1.9 - 23);
         if (this.zone[i] & Z.HEEL) {
@@ -551,6 +565,11 @@ export class Hoof {
     if (t < CFG.sole.thin) {
       return { kind: 'thin', text: `Flexes under pressure: only ${t.toFixed(1)} mm left. Stop cutting here.` };
     }
+    // Trimmed too hard before (WP13.1): live sole under target gives under the testers.
+    if (this.caseDef.thinSole && !(z & Z.HEEL) && t < CFG.sole.target - 0.3) {
+      const f = thinFinding(this.caseDef, this.claw[i]);
+      return { kind: 'thinsole', finding: f, text: `${diagnosed ? f.diagnosedText : f.probeText} ${t.toFixed(1)} mm.` };
+    }
     return { kind: 'firm', text: `Firm, healthy horn. ${t.toFixed(1)} mm of sole.` };
   }
 
@@ -580,7 +599,7 @@ export class Hoof {
 
   metrics() {
     const { target: T, dishTarget: D, thin } = CFG.sole;
-    const acc = () => ({ wbSum: 0, wbN: 0, dishSum: 0, dishN: 0, deadN: 0, deadLeft: 0 });
+    const acc = () => ({ wbSum: 0, wbN: 0, wbTaken: 0, dishSum: 0, dishN: 0, deadN: 0, deadLeft: 0 });
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
@@ -645,13 +664,17 @@ export class Hoof {
         if (t < D - 1.25) m.overDish++;
       } else if (!lg) {
         // The toe triangle is left alone, so it's judged on its own (triCut), not in the claw's depth.
+        // Over-trimming is judged from the target, or from where she started if that was lower
+        // (a thin sole, WP13.1). Every other cow starts above target, so this is the target.
+        const from = Math.min(T, this.init[i]);
         if (z & Z.TRI) {
           m.triN++;
-          if (t < T - 0.75) m.triCut++;
+          if (t < from - 0.75) m.triCut++;
         } else if (!this.keepOut[i]) {
           k.wbSum += t; k.wbN++;
+          k.wbTaken += Math.max(0, this.init[i] - t);
           m.wbN++;
-          if (t < T - 1.25) m.overWB++;
+          if (t < from - 1.25) m.overWB++;
         }
       }
     }
@@ -659,6 +682,8 @@ export class Hoof {
     for (const c of [CLAW.OUTER, CLAW.INNER]) {
       const k = claws[c];
       k.wbMean = k.wbN ? k.wbSum / k.wbN : 0;
+      // Mean horn (mm) taken off the weight-bearing sole since she came in.
+      k.wbTakenMean = k.wbN ? k.wbTaken / k.wbN : 0;
       k.dishMean = k.dishN ? k.dishSum / k.dishN : 0;
       k.deadRemain = k.deadN ? k.deadLeft / k.deadN : 0;
     }

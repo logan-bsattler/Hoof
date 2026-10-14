@@ -748,4 +748,52 @@ export const CONDITIONS = {
       };
     },
   },
+
+  // Case K "Thin Soles" (WP13.1): trimmed too hard before, so her soles are already under
+  // target while her toes are still long. The job is the toes only: nip them back and leave
+  // the sole alone. The trap is the habit of grinding every sole to the gauge. makeCase deals
+  // her excess under target on both claws, level with each other; the testers read the sole
+  // as giving (hoof.js), and the scorer counts horn taken from where she started.
+  thinsole: {
+    caseId: 'K',
+    title: 'Thin Soles',
+    noun: 'sole',
+    weight: 0.08,
+    steps: ['clean', 'diagnose', 'toeOnly', 'step5'],
+    requires: { open: false, block: false, treat: false },
+    diagnosis: 'thinsole',
+    thinSole: true,
+
+    place(rand, side, v = {}) { return CONDITIONS.routine.place(rand, side, v); },
+
+    copy({ cow, limb }) {
+      return {
+        intro:
+          `#${cow} is due on the ${limb}. She’s tender on the yard concrete and walks short, ` +
+          'and her toes look long. Test the sole before you take anything off it.',
+        diagnosisPrompt: 'She walks short on hard ground. What are you looking at?',
+        diagnosisOptions: [
+          {
+            id: 'thinsole', label: 'Thin soles: leave them',
+            feedback: 'Right. The sole gives under the testers and shows pink: somebody took too much last time. Nip the long toes back and leave the sole alone.',
+          },
+          {
+            id: 'sound', label: 'Nothing: she’s sound',
+            feedback: 'She’d be routine if there were horn to take. Under the testers it gives: it’s thin, so nip the toes and stop.',
+          },
+          {
+            id: 'bruise', label: 'Sole bruise',
+            feedback: 'A bruise is one firm, reddish patch. Here the whole sole gives under the testers: it’s thin all over.',
+          },
+          {
+            id: 'ulcer', label: 'Sole ulcer',
+            feedback: 'An ulcer springs in one spot. This sole gives everywhere you test: it’s just thin.',
+          },
+        ],
+        howto: '<li><b>Thin sole?</b> If it gives under the testers, nip the toes and leave the sole: there’s nothing spare to take.</li>',
+        misreadNote: 'Misread the foot. A sole that gives under the testers and shows pink is thin: it needed the toes nipped, nothing more.',
+        plan: 'Plan: nip both toes back to the line and flick off any loose heel horn. No grinder and no dish: the sole is already under 7 mm.',
+      };
+    },
+  },
 };

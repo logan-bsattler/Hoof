@@ -60,6 +60,8 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     call: C.call ?? null,
     // Lame higher up the leg (D26): she drags the toe, and its tip is worn square.
     ...(C.toeDrag ? { toeDrag: true } : {}),
+    // Trimmed too hard before (WP13.1): her soles start under target, so leave them be.
+    ...(C.thinSole ? { thinSole: true } : {}),
 
     // Excess sole (mm above target) on each claw. Outer hind claws overgrow most.
     excess,
@@ -115,7 +117,11 @@ export function makeCase(condition, seed, mods = {}) {
   });
   const growth = mods.growth ?? 1;
   const hi = between(3.5, 5.5), lo = between(1.8, 3.0);
-  const excess = { [big]: hi * growth, [small]: lo * growth };
+  // A thin-soled cow (WP13.1) is under target on both claws, the big claw up to 0.2 mm taller, whatever
+  // her growth: the last trimmer took sole, not toe. The same two draws place her.
+  const excess = C.thinSole
+    ? { [big]: -0.5 - (hi - 3.5) / 2 + (lo - 1.8) / 6, [small]: -0.5 - (hi - 3.5) / 2 }
+    : { [big]: hi * growth, [small]: lo * growth };
   const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, ...over } = mods;
   if (over.kicker) over.temper = Math.max(over.temper ?? 0.5, CFG.temper.kickFrom);
   const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });

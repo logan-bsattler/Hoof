@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const IDS = ['routine', 'ulcer', 'whiteline', 'puncture', 'toenecrosis', 'doublesole', 'twoclaw', 'dd', 'footrot', 'nonfoot'];
+const IDS = ['routine', 'ulcer', 'whiteline', 'puncture', 'toenecrosis', 'doublesole', 'twoclaw', 'dd', 'footrot', 'nonfoot', 'thinsole'];
 const OUT = fileURLToPath(new URL('../assets/guide/', import.meta.url));
 const BASE = process.env.BASE ?? 'http://localhost:5173';
 const browser = [

@@ -94,6 +94,17 @@ function playthrough(cd, quiet = false, knife = null) {
     return verdict();
   }
 
+  // Thin soles (WP13.1): test the sole itself, nip both toes back, and leave the sole alone.
+  if (cd.thinSole) {
+    let i = 0;
+    while (i < hoof.n && hoof.probe(i, false).kind !== 'thinsole') i++;
+    assert.ok(i < hoof.n, 'the sole reads thin under the testers');
+    s.probes.push('thinsole');
+    until('toeOnly', () => p.nip(), 3);
+    heelHorn();
+    return verdict();
+  }
+
   // A double sole: the false sole comes off with the knife before any trimming.
   if (L?.type === 'doublesole') until('pareSole', () => p.pareSole());
 
@@ -175,11 +186,7 @@ function playthrough(cd, quiet = false, knife = null) {
 
   }
 
-  // Step 5: flick the loose heel horn off.
-  const H = cd.looseHorn;
-  until('step5', () => {
-    for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
-  });
+  heelHorn();
 
   if (cd.call) { s.call = cd.call; until('refer', () => {}); }
 
@@ -216,6 +223,14 @@ function playthrough(cd, quiet = false, knife = null) {
   }
 
   return verdict();
+
+  // Step 5: flick the loose heel horn off.
+  function heelHorn() {
+    const H = cd.looseHorn;
+    until('step5', () => {
+      for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
+    });
+  }
 
   // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
   // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.
