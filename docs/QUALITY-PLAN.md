@@ -700,10 +700,64 @@ All four come from Nate's AMA (`docs/NOTES-NATE-AMA.md`, lines 28–37). None ch
 | D35 | Sand: make Greystone the sand farm, or add a new farm? | **Taken (2026-10-14):** Greystone (no new farm) |
 | D36 | Fresh knife: tap the knife button again, free and unlimited? | **Taken (2026-10-14):** Yes |
 
-## WP13: later conditions (outline only, not scoped)
-- **Deep digital sepsis** (call: vet). Swelling on **one** claw only, which plays off foot rot's swelling across both. It's a second vet case that can't be told apart without looking at the swelling. Cost: swelling is only in the copy today, not drawn, so it needs the first swelling art in hoofart.js, and foot rot should get the same art. Medium.
-- **Thin-soled cow** (call: null, restraint). Her sole is already near 7 mm (over-trimmed before, or worn on concrete). The right job is to nip the toe and level only what's above target: no grinder on the sole. It tests the "stop at 7 mm" skill without a lesion. Cost: a lower starting thickness and a thin-sole tell at the read (it flexes under thumb pressure). Small. A Ridgeway fit ("trimmed too hard before they came").
-- **Axial fissure:** still parked. It needs a wall view (see WP8).
+## WP13: later conditions (medium; scoped 2026-10-14)
+
+Two new conditions, each a restraint lesson the road doesn't teach yet. The thin-soled cow tests "stop at 7 mm" when she arrives already there. Deep digital sepsis is a second vet case, and swelling is the only way to tell it from foot rot. The axial fissure stays parked: it needs a wall view (see WP8).
+
+Both follow the 7.2 recipe: a `CONDITIONS` entry with `place`/`copy`, its `FINDING`, HoofArt, a bot path in `tests/player.js`, a `howto` hint, a 50-seed sweep, a playthrough on all four foot × claw layouts, a field-guide page with its crop (`dev/guide-crop.html`, `scripts/guide-crops.mjs`), and a farm slot. Neither changes the save format (`parseRound` checks `CONDITIONS`). **Build order (D37): 13.1 → 13.2 → 13.3**, shipping after each step.
+
+### Fact checks (done 2026-10-14, by reading the code)
+| Check | Finding | Consequence |
+|---|---|---|
+| Does the sole art already show a thin sole? | **Yes.** `SOLE_RAMP` in hoofart.js warms from ivory at 7 mm to pink by 3.5 mm. | The thin cow needs no new sole art: start her thin and the ramp draws it. |
+| Does the scorer punish a sole that *arrives* under target? | **Yes, wrongly.** Restraint docks a claw whose `wbMean` ends below the target band, whatever she came in with. | 13.1 must score against her starting thickness, not the fixed target. |
+| What does `levelled()` accept? | `deadRemain < 0.12` and `wbMean ≤ T + tol`. | A thin cow passes steps 1–2 once the dead toe is off, with no grinding. That's the lesson, for free. |
+| What does the probe say on a 5–6 mm sole? | "Firm, healthy horn. N mm." Only under `sole.thin` (3 mm) does it flex. | 13.1 adds the tell: a case flag makes the probe say the sole gives under the testers. |
+| Is foot rot's swelling drawn? | **Only as colour.** The bulbs flush red-pink beside the cleft. The outline doesn't change, and the plan's puffed coronet and wider claw gap were never done (8.2). | 13.2 is the first shape change in hoofart.js. |
+| Does any farm already set up a thin cow? | **Yes.** Ridgeway's intro: "Some were trimmed too hard before they came: look at the toes." | 13.1 goes to Ridgeway (D40). |
+
+### 13.1 Thin-soled cow (call: null; small)
+- **What it is:** she was over-trimmed before (or worn on concrete), so her sole is already **under** target: 5.5–6.5 mm across both claws (D38). Her toes are still long, because the last trimmer took sole, not toe. The trap is the habit: grind every sole to the gauge.
+- **Look:** soles warmer and pinker than usual (the existing ramp), long toes, decoys as usual. The read card says "she's tender on hard ground and walks short".
+- **Probe:** on live sole under target: "It gives under the testers: thin. N mm. Not much to take here." This is a case flag (`thinSole`), not a new `FINDING` mark, so the whole sole reads thin, not one spot.
+- **Job:** nip the dead toe back to the line, then leave the sole alone: no grinder on it, no dish (D39). Rasp only the nipped edge.
+- **Steps:** clean, diagnose, a new `toeOnly` step ("Nip the toes back, leave the sole", `deadRemain < 0.12` on both claws), then release. Dropping steps 2–3 is the lesson, as dropping the trim was for foot rot.
+- **Model:** `place` as routine. `makeCase` sets `excess` to −1.5 to −0.5 mm per claw (seeded), so the sole starts under T while the dead toe keeps its usual height above it (`T + excess + 2.5` puts it near the line, so the toe-length cue holds; check this in the art lab). `thinSole: true` on the case. Nothing else changes in the grid.
+- **Scoring:** for a `thinSole` case, Restraint is measured against the cell's **starting** thickness: horn taken from live sole costs (the over-trim note becomes "Her sole was already thin: every mm you took was one she needed"). The usual under-target note is skipped, since she arrived there. Balance is judged on level only, which she already is. Blood stays the usual fail, and comes sooner because there's less horn.
+- **Read card:** "Thin soles: leave them" (right), "Sound: routine trim" ("She'd be routine if there were horn to take. Under the testers it gives: it's thin, so nip the toes and stop"), "Sole bruise", "Sole ulcer".
+- **Farm:** Ridgeway, in place of one routine cow: {toenecrosis .2, ulcer .2, dd .15, whiteline .15, twoclaw .1, thinsole .1, routine .1}. Routine drops under 0.2 here, so **D40** asks whether that's fine (the thin cow is a routine foot in all but the trap).
+- **Cost:** small. No new art and no new grid zone. The only new rule is restraint measured from her starting thickness.
+
+### 13.2 Swelling art (shared; medium)
+- **Why first of the two vet pieces:** deep sepsis can only be told from foot rot by where the swelling sits, so the swelling has to be drawn before either reads right.
+- **Art, sole view only:** on a swollen claw, the heel bulb outline bulges outward 4–6 px and the coronet band shows as a tight, shiny, red-pink rim above the bulb. Foot rot swells both claws and pushes them apart 3–4 px at the cleft. The grid doesn't move: it's art only, drawn over the existing outline, as 8.2 planned. `caseDef.swollen: [claws]` drives it.
+- **Foot rot gets it too:** both claws swollen, and the existing cleft flush stays.
+- **Check:** at phone size (375 × 667), swelling on one claw must read as one-sided before the probe. This is the art check for WP13. If it doesn't read, the intro says which claw is "up" (D41).
+- **Cost:** medium. All hoofart.js, plus an artlab stage per condition. Foot rot's 50-seed sweep must stay byte-identical in its grid and scores, since only pixels change.
+
+### 13.3 Deep digital sepsis (call: vet; medium)
+- **What it is:** an ulcer or white-line abscess left too long, so the infection has gone deep into the joint or tendon sheath of one claw. It's beyond the trimmer: the vet resects the joint or takes the claw off. Nate refers anything needing surgery or antibiotics (1:26:12), and Shearer's note (8.2 above) is the tell: swelling confined to one claw points to the claw, not foot rot.
+- **Look:** one claw swollen (13.2) above an old, open ulcer at the usual site, with a dark, weeping hole and proud red tissue in it. The other claw is normal. The cleft skin is whole, which separates it from foot rot. She is very lame, and the read card says "she's been lame a fortnight and she's off her feed".
+- **Probe:** extremely sore on the swollen claw's bulb and coronet. The open hole weeps. The sound claw is firm.
+- **Job (D42):** trim the **sound** claw, block it (rubber), then *Call the vet*. No knife in the hole: opening it further is the vet's work. Wrap optional, not required.
+- **Steps:** clean, diagnose, a new `trimSound` step (the sound claw's dead toe off and level), `blockSound` (rubber block on the sound claw), `refer`.
+- **Model:** a `dds` lesion type on the ulcer site, built from `buildUlcer` with no cap (already open, `LOOSE` empty), so there is nothing for the knife to do there. Its `FINDING.dds` covers the bulb, coronet and hole of that claw (as `FOOTROT_HEEL` does for both). A blade in the hole costs Restraint −15 each (cap −30) with the note "That's the vet's job now: the infection's deep in the joint". Trimming the swollen claw is the same cost.
+- **Scoring:** released without the call is the 8.1 Correctness −25 ("This one needs the vet"). Pen in place of the vet is −15. A block on the swollen claw is Correctness −30 and lame, as in J3. No block at all is Correctness −15 ("she needed the weight off that claw on the way to the vet").
+- **Read card:** dds (right), footrot ("Foot rot swells both claws and splits the skin between them. Here one claw is up and the cleft is whole: it's gone deep in that claw"), ulcer ("There was an ulcer, but the swelling above it says it's gone deep. That's past opening: it's the vet's"), whiteline. Foot rot's card gains a dds option the other way.
+- **Return:** none. The vet has her, as with foot rot.
+- **Farm:** Marsh End, so the two vet cases sit side by side: {dd .2, footrot .2, dds .2, whiteline .2, routine .2}. Its footbath stays none, so DD still leans up (×1.5).
+- **Cost:** medium. Most of it is the step list, the scoring branch and the hole art. The swelling comes from 13.2.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D37 | Build order: thin sole, then swelling art, then deep sepsis? | Yes. Thin sole is small and needs no art, so it ships first |
+| D38 | Thin sole: under target (5.5–6.5 mm), or near target (~7 mm) as the outline said? | **Under target.** At 7 mm she's just a routine cow that's already done, which teaches nothing. Under target makes "leave the sole" the right call and needs the start-relative scoring |
+| D39 | Thin sole: no dish at all, or a light dish? | No dish. Dishing to 4.5 mm on a 5.5 mm sole is the over-trim the case is about |
+| D40 | Ridgeway takes the thin cow from its routine share, leaving routine at 0.1 | Yes. The thin cow is a routine foot apart from the trap, and the farm's intro already sets it up |
+| D41 | If one-claw swelling doesn't read at phone size, say which claw in the intro? | Yes, as a fallback only |
+| D42 | Deep sepsis: trim and block the sound claw and refer, or refer only (no trim, like foot rot)? | **Trim and block the sound claw, then refer.** It's what a trimmer can do for her before the vet comes, and it makes the two vet cases play differently. Refer-only would make them the same play with a different read |
 
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
