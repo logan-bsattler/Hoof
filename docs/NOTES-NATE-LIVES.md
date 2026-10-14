@@ -23,6 +23,84 @@ Reading status (2026-10-14):
 | Hoof GP Q&A lives: `RJqEruf7GlA` `Eq0QH_bXavI` `CqA6d74OAhk` `s1U8rJY06TM` `Wn4BcA5MeC0` `rQJznFgYbGA` `A4DJ4ycmKnk` `nrZwLZeXcQg` `2_NwAKOmKRo` `j-ckE4DKg2M` `t4BAzBv-CWk` | UK trimmer, 2.9M subs | not yet |
 | `reference/youtube/_interviews-talks/` | 16 podcasts/talks (Cramer, Burgi, Bovine Vet podcast, Dutch method, Hoard's on Nate, Hoof GP interviews) | not yet; order in the reading plan at the end |
 
+## Top ideas (2026-10-14, from all 11 lives)
+
+**The headline: Nate's biggest lesson is restraint around a lesion, and the game scores restraint
+on the sole but not round the lesion.** He calls leaving a ring of horn round an opened lesion his
+biggest change in 23 years, and says it twice. Scoring it is the best single idea here. Next come
+read-phase tests of "when to stop", then a season knob. The new conditions are worth having but
+cost the most.
+
+Tags: **[new]** not in the plan; **[extends X]** builds on built work; **[fix]** the game is wrong
+or unchecked. "×n" = how many lives say it. Ranked by how much it changes play.
+
+### Tier 1: sharpen the core skill (restraint and reading)
+1. **Score the horn left round a lesion. [new; extends restraint scoring, J2]** ×2. Free the
+   lesion (cut away the loose horn) but leave a ring of sound horn round it, and tidy up at the
+   recheck. Stripping the surround thin cost him "she can't walk" calls whenever a block came off.
+   Game: an over-thinned surround costs Restraint, and a returning cow whose surround was stripped
+   arrives worse. (April 1:38:28, March 37:39)
+2. **Decoys that teach when to stop. [extends decoys: `DECOY_KINDS` is stain/bruise]** ×3, one each:
+   - *Fades as you pare:* a dark mark by the wall that goes after a pass or two. (NYE 1:14:13)
+   - *Pigment:* black all the way through and never changes when pared. If the colour changes
+     as you pare it's separation; if it doesn't, it's pigment. (March 47:30)
+   - *Tempting bruise:* shaded like a track you should follow, but pink corium sits just under
+     it, so paring on bleeds. (Oct 1:00:30)
+   Also: an off-target dig leaves a pared hole that refills black, not just lost time (NYE 1:13:11).
+3. **Toe-out stance on the walk-in. [new; `walkoff.js` animates the exit only]** ×2. On a hind
+   foot with an outer-claw lesion she walks slightly duck-footed to unload it. That gives the
+   player a read before the testers. (NYE 1:38:35, autumn 22:11)
+
+### Tier 2: farm and route depth
+4. **A season knob. [new]** ×6, the most repeated idea. Summer (above ~65–68 °F) means cows stand
+   more, so more white line, abscesses and DD ("abscess season", July–Sept); winter is tame.
+   Freeze/thaw and mud bring foot rot. Wet summers give long toes. Summer runs ~10–15% problem
+   cows against 1–2% in winter. A per-visit modifier on `farmMix` would do it.
+5. **Pasture deals the wrong mix. [fix]** ×4. Hollins (pasture) deals routine/white line/ulcer.
+   Nate's pasture cows get rocks, punctures, sticks between the claws and foot rot, plus DD, but
+   *fewer* ulcers (except after a spring grass flush), and almost never toe necrosis. Swap Hollins's
+   ulcer share for puncture. (Pasture videos: 2nd Attempt 35:27, 1:19:38; Aug 31:25; Oct 5:01)
+6. **Ulcer cows come back; white-line cows don't. [extends 7.5 returning cows]** ×2. Ulcers
+   recur because the pedal bone grows spurs; white lines and abscesses are one-offs. Weight
+   `returningCows` toward old ulcer cows. (NYE 1:42:06, Nov 17:05)
+7. **Abscess stage: sealed or already burst. [new, art + copy]** ×2. Sealed: pus squirts when
+   opened and she walks out better at once. Burst: a dry track and little pus. (GdRK 1:11:20,
+   vJ2 49:18)
+8. **More uses for the 13.2 swelling. [extends 13.2/13.3]** ×4. A mid-sole puncture shows
+   swelling (yI8 3:55). Swelling climbing above the hoof means the vet now (Oct 1:07:51). A swollen
+   claw gets a double or thick block on the sound claw (Nov 5:27, Aug 27:32). Worth a line in
+   13.3's copy and a later variant.
+
+### Tier 3: new conditions (each roughly a 13.x-sized piece)
+9. **Sole fracture. [new]** ×2. An angled tear at the sole/heel-bulb seam, mostly on the *rear
+   medial* claw, caused by shear (a hard turn). It looks like an ulcer but sits too far back on
+   the wrong claw. A strong "where" test for the read. (GdRK 37:17, vJ2 57:12)
+10. **Pressure cow where a block *is* the call. [new]** ×2. A three-legged cow with no open
+   lesion, just redness through the claw: trim and block, and she walks out sound. The
+   counterweight to "red means leave it". (Oct 32:47, 2nd Attempt 1:21:49)
+11. **Corkscrew claw, as a chronic farm trait. [already a WP7 "later candidate"]** ×5. Rear
+   lateral, twisted, mostly beef and pasture; rebalance it, and it comes back.
+12. **The odd claw. [new]** ×1. Bigger from an old pedal-bone injury: trim it to its own shape,
+   because trimming it to match the other claw is the mistake. (Nov 50:10)
+13. **A bull. [new]** ×4. Thin soles from mounting, rubber blocks on both claws as an exception to
+   the no-block rule, and a chute-time limit (a thick neck held long can pinch the radial nerve).
+
+### Fact checks (done 2026-10-14, by reading the code)
+- **Pass:** ulcers, white lines and toe necrosis land on the big claw: outer on a hind foot, inner
+  on a front (`v.big`, `case.js:116`). That matches Nate's rear-lateral and front-medial rule.
+- **Pass:** step 3's copy doesn't claim the dish keeps muck out of the cleft (Nate doubts it).
+- **Note, no change:** the game's 7 mm target sits at Nate's ¼ in floor; he aims for ⅜ in
+  (~9.5 mm). 7 mm is the textbook figure, so keep it, but don't call it "plenty" in copy.
+- **Unchecked:** step 2 should never force a claw shorter than its own safe length to match
+  the other (Aug 45:12). A recheck shouldn't reward paring away healed black stain (March 58:34).
+
+### Copy lines worth taking (paraphrase, don't quote)
+Thin sole flexes like a magazine, a thick one is rigid like a hardback (Nov). Corium is soft like
+a marshmallow (Aug). Red at the surface is a month old (NYE). A trim costs about a penny a pound
+of her value (Aug). A treated cow gets a leg band and goes in the computer before her shot (GdRK).
+"Farmer math": told 10–15 cows, expect 25 (vJ2). Take your time, treat each cow as your own, stay
+calm (vJ2).
+
 ## New Years Eve Live, `sH2uF4yq-NQ` (Dec 31, 1:46)
 
 ### Checks against the game
@@ -445,8 +523,8 @@ His first live. Older numbers: $14 trim, $20 block, $5 wrap; ~30 farms, 40 to 1,
 Nate's 11 lives are done. More Nate would mostly repeat him, so the next reading goes after a
 **different view**, in this order:
 
-1. **Top ideas (above).** Turn these notes into ranked game changes first; reading more before
-   that just grows the pile.
+1. **Top ideas (above): done 2026-10-14.** Next: take the Tier 1 items into a WP in
+   `QUALITY-PLAN.md`.
 2. **Vet and lameness-science talks, chosen, not exhaustive.** These feed WP13.3 deep sepsis
    (a vet case) and the scoring of lesion work. In `reference/youtube/_interviews-talks/`:
    - `mTVn4SE-URI` Therapeutic Hoof Trimming, Dr. Gerard Cramer
