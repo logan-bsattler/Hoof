@@ -618,7 +618,7 @@ Dropped: the straight knife-dish shadows. They come from the art lab's ruler-str
 ## WP11: playtester feedback (2026-10-13)
 
 ### 11.1 Guided run: don't swap tools under the finger (done 2026-10-13)
-- A playtester: finishing a beat switched straight to the next tool, which started cutting in the wrong place at once. Now only the first beat hands over its tool; after that the next beat's tool button pulses (still on the green "suggested" dot, steady under reduced motion) and the player picks it. Not yet played in the browser.
+- A playtester: finishing a beat switched straight to the next tool, which started cutting in the wrong place at once. Now only the first beat hands over its tool; after that the next beat's tool button pulses (still on the green "suggested" dot, steady under reduced motion) and the player picks it. Checked in the preview 2026-10-14 through beats 1–3: the brush stays in hand after cleaning, the testers stay in hand after the read, and only the next beat's button runs the `nudge` pulse until it's picked. Not yet felt on a phone.
 
 ### 11.2 A guide book (to scope)
 - A playtester asked for a manual: what each tool does, and the conditions you'll meet. To decide: open from the title and from a button in play (pause); one page per tool (from `TOOLS` name/hint plus a drawn icon from toolart) and per condition (title, look and feel from `FINDING`, the right call, with art-lab style crops). Unlock conditions as they're met on the route, or show them all? Kept short, no spoilers on reads the player hasn't made?
