@@ -611,6 +611,8 @@ The case start is already sliced behind the loading bar (24 ms a frame; noise fi
 - The opened ulcer is smaller than the reference. Rather than one bigger size, vary `lesion.r` per cow (for example 10–16) through the light variations (WP2.3 / 7.3), so some pockets are big jobs and some small.
 - Check the probe text, `lesionOpened`, the tint threshold and scoring still hold at both ends of the range; add the range to the variation sweep.
 
+**10.5 status (2026-10-13): done, pending Ben's eye in play.** `lesion.r` already varied per cow (`band(rand, 10, 14, v.size)`), and the sweep already ran both ends. The ulcer band (single and the J3 pair) is now 10–16. `lesionOpened` and the tint check are fractions over the pocket's cells, so they scale; the playthrough at `lesionSize: 1` (r=16) still grades Textbook, spray included. At r=16 the opened pocket reaches the axial wall and is cut off square there; it reads acceptably, but watch it in play. A recheck can add 2 more (r=18).
+
 Dropped: the straight knife-dish shadows. They come from the art lab's ruler-straight scripted strokes, not from play.
 
 ## WP11: playtester feedback (2026-10-13)

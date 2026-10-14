@@ -738,7 +738,7 @@ test('variations: decoy count and kinds, lesion size and position follow the mod
   }
   const small = makeCase('ulcer', 4, { lesionSize: 0, lesionAt: 0 }).lesion;
   const big = makeCase('ulcer', 4, { lesionSize: 1, lesionAt: 1 }).lesion;
-  assert.equal(small.r, 10); assert.equal(big.r, 14);
+  assert.equal(small.r, 10); assert.equal(big.r, 16);
   assert.equal(small.y, 275); assert.equal(big.y, 305);
   const t0 = makeCase('whiteline', 4, { lesionSize: 0 }).lesion, t1 = makeCase('whiteline', 4, { lesionSize: 1 }).lesion;
   assert.ok(t1.len > t0.len && t1.pocket.r > t0.pocket.r, 'a bigger abscess has a longer track and pocket');

@@ -178,7 +178,7 @@ function placeCleft(rand, side, claw, v = {}) {
 // A sole ulcer on `claw` at the sole/heel junction, as the ulcer case places it.
 function placeUlcer(rand, at, claw, v = {}) {
   const between = (a, b) => a + rand() * (b - a);
-  return { type: 'ulcer', claw, x: at(claw, between(22, 36)), y: band(rand, 275, 305, v.at), r: band(rand, 10, 14, v.size) };
+  return { type: 'ulcer', claw, x: at(claw, between(22, 36)), y: band(rand, 275, 305, v.at), r: band(rand, 10, 16, v.size) };
 }
 
 export const CONDITIONS = {
@@ -259,7 +259,7 @@ export const CONDITIONS = {
       const big = v.big ?? CLAW.OUTER;
       const sore = rand() < 0.8 ? big : otherClaw(big); // the bigger, loaded claw ulcerates most
       const sound = otherClaw(sore);
-      const lesion = { claw: sore, x: at(sore, between(22, 36)), y: band(rand, 275, 305, v.at), r: band(rand, 10, 14, v.size) };
+      const lesion = { claw: sore, x: at(sore, between(22, 36)), y: band(rand, 275, 305, v.at), r: band(rand, 10, 16, v.size) };
       const looseHorn = placeHeelHorn(rand, at, sound);
       const decoys = placeDecoys(rand, at, side, [lesion, looseHorn], v);
       return { lesion, looseHorn, decoys };
