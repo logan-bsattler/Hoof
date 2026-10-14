@@ -521,6 +521,7 @@ Today a cow ends in exactly one way, the **Release** button (`requestRelease()` 
 
 ### Next batches (not scoped yet)
 - **Judgment cases:** scoped as WP9.
+- **Farm traits and later conditions:** scoped as WP12 and outlined as WP13 (2026-10-14).
 - **Farm traits:** footbath none/poor/good driving the DD share; a sand farm where the knife dulls; a known kicker on the visit card; cows remember (temperament shifts on return).
 - **Later conditions:** the axial fissure (needs a wall view); deep digital sepsis (a second vet case, with swelling on one claw only, which plays off foot rot's swelling on both); a thin-soled cow.
 
@@ -647,6 +648,52 @@ Dropped: the straight knife-dish shadows. They come from the art lab's ruler-str
 | D30 | Include "The trim" page (five steps)? | **Taken (2026-10-14):** Yes, short; it's what the guided run teaches, for players who skipped it |
 
 **11.2 status (2026-10-14): built, pending Ben's eye in play.** `src/guide.js` holds the pages (`guideBook()`, pure) and the panel (`Guide`). It opens from "Field guide" on the title card and the "Book" chip in the top bar (or B). Opened mid-cow, `game.state` goes to `'guide'` and the frame loop returns early, so no fidget, flinch, weep or clock; closing restores `'play'`. It won't open over a card or the walk-off. Conditions unlock from `route.history`; "Show all" appears on the Conditions tab once every farm has been visited. The 10 crops in `assets/guide/` are the brushed-clean foot at the read, drawn by `dev/guide-crop.html` and screenshotted by headless Edge (`npm start`, then `node scripts/guide-crops.mjs`). A node-only render missed the canvas overlay. They're precached (sw v40) and shipped in www/. Tests: `tests/guide.test.js`. Checked in the preview at desktop and 375×667: the panel scrolls inside itself, text is 11 px or larger, and the top bar fits after tightening the chips under 400 px. Some crops are subtle (the ulcer is just a dark spot, as it is at the read). Re-pick a seed in `dev/guide-crop.js` if one reads poorly.
+
+## WP12: farm traits (medium; scoped 2026-10-14 at `6f9985f`)
+
+The "next batches" left after WP8/WP9 come in two groups: farm traits and later conditions. **Recommendation: farm traits first.** The road has ten conditions already, but its eight farms differ only in their mix and their ranges. These four traits make a farm feel like a place, they reuse systems that exist (temperament, the visit card, the mix deck, `cut()`), and three of the four need no new art. The later conditions are outlined as WP13 below.
+
+All four come from Nate's AMA (`docs/NOTES-NATE-AMA.md`, lines 28–37). None changes the save format: each trait is either farm data or read from `route.history`. Build order: 12.1 → 12.2 → 12.3 → 12.4, shipping after each step with the bot sweep.
+
+### 12.1 Cows remember (small)
+- **Source:** Nate 1:26:54. Cows that have been through the crush before walk straight in, and a cow with a bad experience resists.
+- **Today:** `returnCase` keeps her temperament unchanged.
+- **Change:** her return temper shifts according to her last row. Lame or a blood fail: +0.15. Textbook or Clean and sound: −0.1. Anything else: unchanged. Clamp to 0–1, and apply the shift before the tier lean, as now. The intro adds a half-line when it moved ("She remembers last time: she won't walk in." / "She walks straight into the crush.").
+- **Tests:** route test that a lame row returns livelier and a Textbook row calmer. The bot sweep is unchanged (it plays fresh cows).
+
+### 12.2 A known kicker (small)
+- **Source:** Nate 1:21:18. Some cows are known for it.
+- **Change:** a `farm.kicker` chance (none at Willow Bank or Hollins; about 1 visit in 3 from Brackenford on, at most one cow a visit). That cow's temper is floored at `CFG.temper.kickFrom` (0.8), so she kicks, and the visit card names her ("Mind #233: she kicks."). Her intro repeats it. A returning kicker stays one (her seed decides).
+- **No new mechanic:** the warning is the feature. It tells the player to work in short strokes on that cow. A "go gently" mechanic is not planned (see D33).
+- **Tests:** deal (route), and the visit-card line.
+
+### 12.3 Footbath quality drives DD (small)
+- **Source:** Nate 1:33:41. No DD in 20 years on one farm, 30 of 50 cows on a farm with no footbath.
+- **Change:** `farm.footbath: 'none' | 'poor' | 'good'`, shown on the visit card and the road map. It scales the `dd` weight in the mix (none ×1.5, poor ×1, good ×0.25; the deck renormalises). Proposed: Marsh End none, Coldharbour none, Greystone poor, Ridgeway good; the others good. These farms' DD shares come out close to today's, so pacing barely moves. Check the herd decks in the route tests.
+- **Copy:** the farm intro or the visit card says it in Nate's terms ("the footbath's been dry since spring").
+
+### 12.4 Sand dulls the knife (medium)
+- **Source:** Nate 50:07, 51:00. He sharpens every day and carries 7 knives; sand and gravel dull them fast.
+- **Change:** a `farm.sand: true` farm (proposed: Greystone becomes sand-bedded freestalls, so no new farm is needed). On a sand farm the knife's cut rate falls with the area it has pared (`knifeWear` 0 → 1, the rate down to about 55%, and resistance up), and the knife's edge is drawn duller in the hand. **Fresh knife:** tap the knife button while the knife is in hand (or press 5 again). This swaps in a sharp one with a short sound and resets the wear. Swapping is free, so the skill is noticing.
+- **Not on other farms:** all wear stays at 0 there, so every other condition plays byte-identically (prove it with the sweep).
+- **Bot:** swaps whenever wear passes 0.6. Tests: wear rises and the swap resets it (game), and a sweep on the sand farm.
+- **Art:** a duller, scuffed blade in `toolart.js`, plus a small wear pip on the knife button.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D31 | Next batch: farm traits (WP12) before the later conditions (WP13)? | Yes, farm traits first |
+| D32 | Cows remember: lame or blood +0.15 temper, Textbook or Clean −0.1? | Yes, with a half-line in her intro |
+| D33 | Known kicker: a warning only, or also a "go gently" mechanic (short strokes calm her)? | Warning only |
+| D34 | Footbath: which farms get none/poor/good? | Marsh End and Coldharbour none, Greystone poor, the rest good |
+| D35 | Sand: make Greystone the sand farm, or add a new farm? | Greystone (no new farm) |
+| D36 | Fresh knife: tap the knife button again, free and unlimited? | Yes |
+
+## WP13: later conditions (outline only, not scoped)
+- **Deep digital sepsis** (call: vet). Swelling on **one** claw only, which plays off foot rot's swelling across both. It's a second vet case that can't be told apart without looking at the swelling. Cost: swelling is only in the copy today, not drawn, so it needs the first swelling art in hoofart.js, and foot rot should get the same art. Medium.
+- **Thin-soled cow** (call: null, restraint). Her sole is already near 7 mm (over-trimmed before, or worn on concrete). The right job is to nip the toe and level only what's above target: no grinder on the sole. It tests the "stop at 7 mm" skill without a lesion. Cost: a lower starting thickness and a thin-sole tell at the read (it flexes under thumb pressure). Small. A Ridgeway fit ("trimmed too hard before they came").
+- **Axial fissure:** still parked. It needs a wall view (see WP8).
 
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
