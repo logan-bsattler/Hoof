@@ -623,7 +623,7 @@ Dropped: the straight knife-dish shadows. They come from the art lab's ruler-str
 ### 11.2 A guide book (to scope)
 - A playtester asked for a manual: what each tool does, and the conditions you'll meet. To decide: open from the title and from a button in play (pause); one page per tool (from `TOOLS` name/hint plus a drawn icon from toolart) and per condition (title, look and feel from `FINDING`, the right call, with art-lab style crops). Unlock conditions as they're met on the route, or show them all? Kept short, no spoilers on reads the player hasn't made?
 
-**11.2 scope (2026-10-14), proposed; decisions D27–D30 below.**
+**11.2 scope (2026-10-14), agreed: Ben took the defaults for D27–D30. Ready to build.**
 
 *What it is:* a "Field guide" overlay, a DOM panel over the canvas (like the visit card), not a new canvas scene. Two tabs: **Tools** and **Conditions**, plus a short **The trim** page (the five steps in plain words). One page per entry, with prev/next and a list. It closes back to exactly where the player was.
 
@@ -641,10 +641,10 @@ Dropped: the straight knife-dish shadows. They come from the art lab's ruler-str
 
 | # | Decision | Default |
 |---|---|---|
-| D27 | Conditions unlock as met, or all open? | Unlock as met (tools always open); an "all" toggle after the route's first full round |
-| D28 | Art per condition: pre-rendered PNG crops, or a live mini hoof? | PNG crops (no build cost, no hitch in play) |
-| D29 | Open it mid-cow? | Yes, and it pauses her; but not during the walk-off or score card |
-| D30 | Include "The trim" page (five steps)? | Yes, short; it's what the guided run teaches, for players who skipped it |
+| D27 | Conditions unlock as met, or all open? | **Taken (2026-10-14):** Unlock as met (tools always open); an "all" toggle after the route's first full round |
+| D28 | Art per condition: pre-rendered PNG crops, or a live mini hoof? | **Taken (2026-10-14):** PNG crops (no build cost, no hitch in play) |
+| D29 | Open it mid-cow? | **Taken (2026-10-14):** Yes, and it pauses her; but not during the walk-off or score card |
+| D30 | Include "The trim" page (five steps)? | **Taken (2026-10-14):** Yes, short; it's what the guided run teaches, for players who skipped it |
 
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
