@@ -130,7 +130,9 @@ function playthrough(cd, quiet = false, knife = null) {
   // outer on a front) and match the other to it.
   p.nip();
   until('step1', () => p.grind(firstClaw(cd), 270, 580, 1));
-  assert.equal(s.firstCutClaw, firstClaw(cd), 'trimmed the right claw first');
+  // A heifer's first claw can be level once its toe is nipped (WP17.2), and the apprentice's
+  // cows come in trimmed (WP17.1): nothing to grind.
+  if (!((cd.partial || cd.apprentice) && s.firstCutClaw == null)) assert.equal(s.firstCutClaw, firstClaw(cd), 'trimmed the right claw first');
   until('step2', () => p.grind(secondClaw(cd), 270, 580, 1));
 
   // Step 3: knife the dish channel along each axial wall, around the ulcer's ringed cap, as the
@@ -370,6 +372,17 @@ test('dealt cows, with all their variations at once, play to Textbook across a s
 });
 
 // J3 pairs are the tightest layout: two ulcers can face each other across the cleft (seeds 12, 16).
+test('short routine cows, heifers and cows trimmed lately, play to Textbook (WP17.2)', () => {
+  for (const partial of ['heifer', 'lately']) for (let seed = 1; seed <= 8; seed++) playthrough(makeCase('routine', seed, { ...dealMods(seed), partial }), true);
+});
+
+test('the apprentice’s cows, every fault and none, on routine, ulcer and white-line feet, play to Textbook (WP17.1)', () => {
+  const sets = [[], ['unlevel'], ['nodish'], ['longtoe'], ['rough'], ['heel'], ['unlevel', 'heel'], ['nodish', 'longtoe']];
+  for (const id of ['routine', 'ulcer', 'whiteline']) {
+    for (let seed = 1; seed <= 4; seed++) for (const set of sets) playthrough(makeCase(id, seed, { ...dealMods(seed), apprentice: set }), true);
+  }
+});
+
 test('both-claws cows play to Textbook over a wider seed sweep (WP15.4)', () => {
   for (let seed = 1; seed <= 20; seed++) playthrough(makeCase('twoclaw', seed, dealMods(seed)), true);
 });

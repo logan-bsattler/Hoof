@@ -6,7 +6,7 @@
 // grow sole ulcers and white-line disease; wet slurry breeds digital dermatitis; grazing cows
 // wear their feet down and come in cleaner, with the odd stone bruise or white-line track.
 
-import { CASE_B, CASE_B_MODS, makeCase } from './case.js';
+import { CASE_A, CASE_A_MODS, CASE_B, CASE_B_MODS, makeCase, APPRENTICE_OK, APPRENTICE_FAULTS } from './case.js';
 import { CONDITIONS, DECOY_KINDS_ALL } from './conditions.js';
 import { mulberry32 } from './noise.js';
 import { CFG } from './config.js';
@@ -35,55 +35,75 @@ export const HERD_BONUS = 5;
 // cows (WP12.2). `footbath` none|poor|good scales the DD share (FOOTBATH, WP12.3). Housing
 // 'sand' wears the knife (onSand, WP12.4). `decoyKinds` widens the decoy pool from Top Lane on
 // (WP14.2, D47): the first three farms teach plain "firm means leave it" first.
+// `partial` is the chance a routine cow is a short one, a heifer or trimmed lately (WP17.2).
+// `apprentice`: from the Journeyman tier on, one cow a visit was trimmed by the farm's apprentice (WP17.1).
 export const FARMS = [
   {
     id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0, seasons: false,
     intro: 'Ruth keeps a dozen old Holsteins on deep straw. She’ll show you round: a quiet herd to learn on.',
     mix: { routine: 0.67, ulcer: 0.33 }, growth: [0.85, 1.1], mud: [0.7, 1.0], temper: [0.1, 0.35], front: 0,
-    // The first cow is the hand-built sole ulcer, with the guided trim on offer.
-    first: CASE_B, firstMods: CASE_B_MODS,
+    // The first visit opens on the hand-built cows, each with the guided trim on offer: a
+    // routine trim, then the sole ulcer (#2). `firstMods` are their hand placings, in order.
+    first: [CASE_A, CASE_B], firstMods: [CASE_A_MODS, CASE_B_MODS],
   },
   {
-    id: 'hollins', footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30, seasons: false,
+    id: 'hollins', partial: 0.25, footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 25, seasons: false,
     intro: 'Dev grazes his herd out until the frosts. Their feet wear well on grass, but the lane to the parlour is all stones, and the odd nail in the gateway.',
     mix: { routine: 0.5, whiteline: 0.3, puncture: 0.2 }, growth: [0.75, 1.0], mud: [0.8, 1.15], temper: [0.2, 0.5], front: 0,
   },
   {
-    id: 'brackenford', burst: 1 / 3, footbath: 'good', name: 'Brackenford', farmer: 'the Pryce brothers', housing: 'freestall', cows: 4, rep: 100,
+    id: 'brackenford', partial: 0.25, apprentice: true, burst: 1 / 3, footbath: 'good', name: 'Brackenford', farmer: 'the Pryce brothers', housing: 'freestall', cows: 4, rep: 75,
     intro: 'Eighty cows housed all year on concrete. The Pryces want the lame ones sorted before the vet comes Friday.',
     mix: { ulcer: 0.35, whiteline: 0.25, doublesole: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.85, 1.2], temper: [0.25, 0.6], front: 0, calving: 0.5, kicker: 0.33,
   },
   {
-    id: 'toplane', burst: 1 / 3, footbath: 'good', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 180,
+    id: 'toplane', partial: 0.25, apprentice: true, burst: 1 / 3, footbath: 'good', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 135,
     intro: 'Mary wants her old girls done front and back. Front feet grow the other way round: mind which claw goes first.',
     mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5, calving: 0.5, kicker: 0.33,
     decoyKinds: DECOY_KINDS_ALL,
   },
   {
-    id: 'marshend', burst: 1 / 3, name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', footbath: 'none', cows: 5, rep: 270,
+    id: 'marshend', partial: 0.25, apprentice: true, burst: 1 / 3, name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', footbath: 'none', cows: 5, rep: 200,
     intro: 'The yard at Marsh End never dries out, and the slurry scraper broke in March. Expect muck, and what lives in it.',
     mix: { dd: 0.2, footrot: 0.2, dds: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5, kicker: 0.33,
     decoyKinds: DECOY_KINDS_ALL,
   },
   {
-    id: 'greystone', burst: 1 / 3, name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'sand', footbath: 'poor', cows: 5, rep: 380,
+    id: 'greystone', partial: 0.25, apprentice: true, burst: 1 / 3, name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'sand', footbath: 'poor', cows: 5, rep: 285,
     intro: 'A big, busy unit on sand-bedded stalls. Priya’s heifers have never been in a crush before, and they let you know it.',
     mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5, kicker: 0.33,
     decoyKinds: DECOY_KINDS_ALL,
   },
   {
-    id: 'coldharbour', burst: 1 / 3, name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', footbath: 'none', cows: 6, rep: 500,
+    id: 'coldharbour', partial: 0.25, apprentice: true, burst: 1 / 3, name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', footbath: 'none', cows: 6, rep: 375,
     intro: 'Nobody’s trimmed at Coldharbour for two years. Long feet, a wet yard and cows that don’t want handling.',
     mix: { ulcer: 0.2, dd: 0.15, whiteline: 0.15, footrot: 0.15, doublesole: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25, calving: 0.5, kicker: 0.33,
     decoys: [1, 3], decoyKinds: DECOY_KINDS_ALL,
   },
   {
-    id: 'ridgeway', burst: 1 / 3, footbath: 'poor', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
+    id: 'ridgeway', partial: 0.25, apprentice: true, burst: 1 / 3, footbath: 'poor', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 480,
     intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
     mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, twoclaw: 0.1, thinsole: 0.15, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5, kicker: 0.33,
     decoys: [1, 3], decoyKinds: DECOY_KINDS_ALL,
   },
 ];
+
+// ------------------------------------------------------------------ kit (WP17.3)
+// What reputation opens besides farms: milestones, never spent (D65), placed between farms so
+// there's always something near to work toward. `tool` is the tool page the guide notes it on.
+export const KIT = [
+  { id: 'hose', name: 'Hose helper', rep: 50, tool: 'brush',
+    text: 'The farm hoses each foot before she comes in: half the muck is gone before you start.' },
+  { id: 'disc', name: 'Finer grinder disc', rep: 165, tool: 'grinder',
+    text: 'A finer grit: it cuts cleaner and slows near the trim line, so it’s easier to stop on target.' },
+  { id: 'knife', name: 'Better knife', rep: 330, tool: 'knife',
+    text: 'A keener hook: a closed cap gives in two flicks instead of three.' },
+  { id: 'wood', name: 'Wood block', rep: 480, tool: 'block',
+    text: 'Taller than rubber, for a claw that has to stay right off the floor. Tap the block tool again to swap.' },
+];
+// Which kit this reputation has opened, by id.
+export const kitFor = (rep) => Object.fromEntries(KIT.map((k) => [k.id, rep >= k.rep]));
+export const nextKit = (rep) => KIT.find((k) => rep < k.rep) ?? null;
 
 // ------------------------------------------------------------------ difficulty tiers (WP7.6)
 // The help turns down with reputation, never with a menu. Each tier opens with a farm, so the
@@ -92,8 +112,8 @@ export const FARMS = [
 // at the top). New cows lean calmer, with an extra decoy to read, early on; livelier later.
 export const TIERS = [
   { id: 'apprentice', name: 'Apprentice', rep: 0, guides: 'on', tolerance: 1.0, temper: -0.1, decoys: 1 },
-  { id: 'journeyman', name: 'Journeyman', rep: 100, guides: 'mistake', tolerance: 0.85, temper: 0, decoys: 0 },
-  { id: 'master', name: 'Master trimmer', rep: 270, guides: 'off', tolerance: 0.75, temper: 0.1, decoys: 0 },
+  { id: 'journeyman', name: 'Journeyman', rep: 75, guides: 'mistake', tolerance: 0.85, temper: 0, decoys: 0 },
+  { id: 'master', name: 'Master trimmer', rep: 200, guides: 'off', tolerance: 0.75, temper: 0.1, decoys: 0 },
 ];
 export const GUIDES_TEXT = { on: 'Guides on', mistake: 'Guides only after a slip', off: 'Guides off' };
 
@@ -174,6 +194,9 @@ export function farmMods(farm, seed, season = null) {
   if (farm.calving && rand() < farm.calving) mods.calving = true;
   // A white line that has burst on its own (WP15.3, D56), from Brackenford on. Drawn last again.
   if (farm.burst && rand() < farm.burst) mods.stage = 'burst';
+  // A short routine cow (WP17.2): a heifer, or one trimmed lately. Drawn last again; makeCase
+  // uses it on routine feet only, and never on a cow close to calving.
+  if (farm.partial && !mods.calving && rand() < farm.partial) mods.partial = rand() < 0.5 ? 'heifer' : 'lately';
   return { condition, mods };
 }
 
@@ -191,13 +214,15 @@ export function herdDeck(farm, season = null) {
   return ids.flatMap((id, i) => Array(n[i]).fill(id));
 }
 
-// The deck for one visit, shuffled from the visit's own seed. On a first visit with a hand-built
-// cow, she takes her own condition's card.
+// The deck for one visit, shuffled from the visit's own seed. On a first visit with hand-built
+// cows, each takes her own condition's card.
 function visitDeck(farm, visit, season) {
   const deck = herdDeck(farm, season);
   if (visit === 1 && farm.first) {
-    const i = deck.indexOf(farm.first.condition);
-    if (i >= 0) deck.splice(i, 1);
+    for (const cd of farm.first) {
+      const i = deck.indexOf(cd.condition);
+      if (i >= 0) deck.splice(i, 1);
+    }
   }
   const rand = mulberry32(cowSeed(farm, visit, 777));
   for (let i = deck.length - 1; i > 0; i--) {
@@ -250,7 +275,8 @@ const threwBlock = (h) => !!(h.stripped && h.blocked);
 // how last time went: cows remember the crush, WP12.1); the horn and muck are this visit's.
 export function returnCase(farm, h, visit, k, season = null) {
   const now = farmMods(farm, cowSeed(farm, visit, 100 + k), season).mods;
-  const { excess: _e, calving: _c, oldBlock: _o, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
+  const hand = h.visit === 1 ? (farm.first ?? []).findIndex((cd) => cd.seed === h.seed) : -1;
+  const { excess: _e, calving: _c, oldBlock: _o, ...base } = hand >= 0 ? farm.firstMods[hand] : farmMods(farm, h.seed).mods;
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
   const mood = remembers(h);
   if (base.temper !== undefined) cow.temper = Math.min(1, Math.max(0, base.temper + (CFG.temper.remember[mood] ?? 0)));
@@ -337,22 +363,41 @@ export function visitCases(farm, visit = 1, history = [], tier = null, season = 
   // At most one known kicker a visit (WP12.2): a new cow, and none if one is already coming back.
   const kr = mulberry32(cowSeed(farm, visit, 888));
   const kickAt = farm.kicker && kr() < farm.kicker && !cases.some((cd) => cd.kicker) ? cases.length + Math.floor(kr() * (farm.cows - cases.length)) : -1;
+  // The apprentice's cow (WP17.1): one of the fresh cows whose card an apprentice can trim,
+  // picked from the visit's seed, with the faults drawn for her.
+  const ar = mulberry32(cowSeed(farm, visit, 333));
+  const fresh = deck.slice(0, farm.cows - cases.length).map((id, k) => (APPRENTICE_OK.includes(id) ? k : -1)).filter((k) => k >= 0);
+  const appD = farm.apprentice && tier && tier.id !== 'apprentice' && fresh.length ? fresh[Math.floor(ar() * fresh.length)] : -1;
   let d = 0;
   for (let k = 0; cases.length < farm.cows; k++) {
     let cd;
-    if (k === 0 && visit === 1 && farm.first) cd = farm.first;
+    if (visit === 1 && k < (farm.first?.length ?? 0)) cd = farm.first[k];
     else {
       const seed = cowSeed(farm, visit, k);
       const { condition, mods } = farmMods(farm, seed, season);
-      cd = makeCase(deck[d] ?? condition, seed, { ...tierMods(tier, mods), ...(cases.length === kickAt ? { kicker: true } : {}) });
+      const cond = deck[d] ?? condition;
+      const app = d === appD && !(mods.calving && cond === 'routine') ? apprenticeFaults(ar, cond) : null;
+      cd = makeCase(cond, seed, { ...tierMods(tier, mods), ...(cases.length === kickAt ? { kicker: true } : {}),
+        ...(app ? { apprentice: app, partial: undefined } : {}) });
     }
     if (tags.has(cd.subtitle.split(' · ')[0])) continue;
     tags.add(cd.subtitle.split(' · ')[0]);
-    if (cd !== farm.first) d++;
+    if (!farm.first?.includes(cd)) d++;
     cases.push(cd);
   }
-  // The tier's band rides on each cow (a copy, so Case B itself is never changed).
+  // The tier's band rides on each cow (a copy, so the hand-built cows themselves are never changed).
   return tier ? cases.map((cd) => ({ ...cd, tolerance: tier.tolerance })) : cases;
+}
+
+// What the apprentice left on one cow (WP17.1): on a routine cow nothing a fifth of the time,
+// else one or two faults; on a lesion cow the lesion (always) and a trim fault half the time.
+function apprenticeFaults(rand, condition) {
+  const r = rand();
+  const n = condition === 'routine' ? (r < 0.2 ? 0 : r < 0.7 ? 1 : 2) : r < 0.5 ? 0 : 1;
+  const pool = [...APPRENTICE_FAULTS];
+  const out = [];
+  for (let k = 0; k < n; k++) out.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+  return out;
 }
 
 // What one cow earns. Lame (or blood) earns nothing and flags her for the return visit.
@@ -439,7 +484,8 @@ export function endVisit(route) {
   route.best[v.farm] = Math.max(route.best[v.farm] ?? 0, earned);
   route.visit = null;
   const opened = FARMS.filter((f) => f.rep > before && f.rep <= route.rep);
+  const kit = KIT.filter((k) => k.rep > before && k.rep <= route.rep);
   // Rechecks that walked off sound this time.
   const mended = v.rows.filter((r) => r.back === 'recheck' && !r.lame).map((r) => r.tag);
-  return { farm, rows: v.rows, herdSound, mended, bonus: herdSound ? HERD_BONUS : 0, earned, before, rep: route.rep, opened, season, turned: season !== was ? season : null };
+  return { farm, rows: v.rows, herdSound, mended, bonus: herdSound ? HERD_BONUS : 0, earned, before, rep: route.rep, opened, kit, season, turned: season !== was ? season : null };
 }

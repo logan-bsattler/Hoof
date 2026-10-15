@@ -137,17 +137,31 @@ export class Renderer {
   }
 
   // Created on first use: the first resize can fire before layout gives the canvas a size.
-  material() {
+  // Asked for a foot the next material was made ready for, that one takes over.
+  material(hoof = null) {
+    if (hoof && this.next?.jobHoof === hoof) { this.art = this.next; this.next = null; }
     if (!this.art) this.art = new HoofArt(this.k >= 2.2 ? 3 : 2);
     return this.art;
   }
 
   // Up to `ms` of the work of getting a new foot ready to draw. Returns progress 0..1.
-  prepare(hoof, ms) { return this.material().prepareFor(hoof, ms); }
+  prepare(hoof, ms) { return this.material(hoof).prepareFor(hoof, ms); }
+
+  // Up to `ms` of getting the NEXT foot ready (#4), in a second material, while the current one
+  // is still on screen (walk-off, ticket, visit card). Same side of foot: it shares the side build
+  // and only its own foot is composed; otherwise it builds its own. Returns progress 0..1.
+  prebuild(hoof, ms) {
+    if (this.art?.hoof === hoof && !this.art.job) return 1;
+    if (this.next?.jobHoof !== hoof) {
+      this.next = new HoofArt(this.art?.S ?? (this.k >= 2.2 ? 3 : 2));
+      if (this.art?.built && this.art.builtSide === hoof.side && this.art.S === this.next.S) this.next.shareFrom(this.art);
+    }
+    return this.next.prepareFor(hoof, ms);
+  }
 
   hoof(hoof, diagnosed, m) {
     const c = this.ctx;
-    this.material().sync(hoof);
+    this.material(hoof).sync(hoof);
     // Contact shadows give each claw weight against the chute.
     const shadows = this.shadows && this.shadowsFor(hoof.side);
     for (const claw of CLAWS) {

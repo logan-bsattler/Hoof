@@ -310,7 +310,7 @@ export function applyFlick(hoof, path, knife = null) {
     hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
   }
   const end = path[path.length - 1];
-  for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, end.x, end.y, cfg.capFlick, ev);
+  for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, end.x, end.y, hoof.kit?.knife ? cfg.capFlickKeen : cfg.capFlick, ev);
   if (knife?.sand) knife.wear = Math.min(1, knife.wear + ev.removed * cfg.wearPer);
   return aimedAtSepsis(hoof, end.x, end.y, ev);
 }
@@ -345,9 +345,12 @@ export function applyGrind(hoof, x, y, dt) {
       hoof.rough[i] = 0.8;
       return;
     }
-    const d = cut(hoof, i, cfg.rate * dt * f, ev, cfg.resist, cfg.resistThin, cfg.wall);
+    // The finer disc (WP17.3, hoof.kit) slows near the line and leaves finer swirls.
+    const fine = hoof.kit?.disc ? cfg.fine : null;
+    const slow = fine && hoof.thick[i] - hoof.zoneTarget(i) < fine.near ? fine.rate : 1;
+    const d = cut(hoof, i, cfg.rate * dt * f * slow, ev, cfg.resist, cfg.resistThin, cfg.wall);
     // The disc leaves swirl marks the rasp has to true up.
-    hoof.rough[i] += (0.45 - hoof.rough[i]) * Math.min(1, d * 2);
+    hoof.rough[i] += ((fine ? fine.rough : 0.45) - hoof.rough[i]) * Math.min(1, d * 2);
   });
   return aimedAtSepsis(hoof, x, y, ev);
 }

@@ -1,5 +1,6 @@
 // Cases. makeCase(conditionId, seed, mods) deals a cow with a condition from conditions.js.
-// CASE_B "Pressure Point" is the hand-placed original sole ulcer.
+// CASE_B "Pressure Point" is the hand-placed original sole ulcer; CASE_A the hand-placed
+// routine trim that opens the road before it.
 
 import { CFG } from './config.js';
 import { CLAW } from './hoof.js';
@@ -92,6 +93,21 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
   };
 }
 
+// The read card's choices in this cow's own order: a seeded shuffle, so the right answer isn't
+// always the top button, and a reload shows her the same way.
+export function readOptions(cd) {
+  const rand = mulberry32((cd.seed ?? 0) ^ 0x3ead);
+  const opts = [...cd.diagnosisOptions];
+  for (let i = opts.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+  }
+  return opts;
+}
+
+// What the card and top bar call her before the read: her tag and foot, not the condition.
+export const cowName = (cd) => cd.subtitle.split(' · ')[0];
+
 // Last visit's dug decoys, back as old black pits (WP14.2, D48). A pit takes the place of any
 // decoy dealt on the same spot, and is dropped if it would land on the heel horn or a lesion.
 function withPits({ decoys, lesion, lesions, looseHorn }, pits) {
@@ -114,6 +130,8 @@ function withPits({ decoys, lesion, lesions, looseHorn }, pits) {
 //   kicker     true: a known kicker; her temper is floored where kicks start (WP12.2)
 //   pits       [{ claw, x, y }]: decoys dug out last visit, back as old black pits (WP14.2)
 //   stage      'burst': a white-line abscess that has broken out on its own (WP15.3)
+//   partial    'heifer' | 'lately': a routine cow with less to do (WP17.2, see partialWork)
+//   apprentice [fault ids]: trimmed already by the farm's apprentice, with these faults (WP17.1)
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).
 // With no mods she comes out exactly as before the variations existed.
 export function makeCase(condition, seed, mods = {}) {
@@ -137,14 +155,80 @@ export function makeCase(condition, seed, mods = {}) {
   const excess = C.thinSole
     ? { [big]: -0.5 - (hi - 3.5) / 2 + (lo - 1.8) / 6, [small]: -0.5 - (hi - 3.5) / 2 }
     : { [big]: hi * growth, [small]: lo * growth };
-  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, stage, ...over } = mods;
+  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, stage, partial, apprentice, ...over } = mods;
+  // Less to do (WP17.2): a heifer's young feet carry little horn, and a cow trimmed lately has
+  // one claw still right from last time. She's livelier too, if a heifer: it's her first crush.
+  const short = !calving && condition === 'routine' && PARTIAL[partial] ? partial : null;
+  if (short === 'heifer') {
+    excess[big] = 0.8 + (hi - 3.5) * 0.25;
+    excess[small] = 0.35 + (lo - 1.8) * 0.2;
+    over.temper = Math.min(1, (over.temper ?? 0.5) + 0.2);
+  } else if (short === 'lately') excess[big] = 0.15;
+  // The apprentice's cow (WP17.1): both claws trimmed this morning, each fault on a claw drawn
+  // from her seed. A claw left high stands a mm and more above the line.
+  const work = !short && !(calving && condition === 'routine') && APPRENTICE_OK.includes(condition) && Array.isArray(apprentice) ? apprenticeWork(seed, apprentice) : null;
+  if (work) {
+    excess[big] = excess[small] = 0.15;
+    if (work.unlevel) excess[work.unlevel] = 1.2;
+  }
   // A white-line abscess that has burst on its own (WP15.3); every other condition ignores it.
   if (stage === 'burst' && condition === 'whiteline') placed.lesion = { ...placed.lesion, stage };
   if (pits?.length) placed.decoys = withPits(placed, pits);
   if (over.kicker) over.temper = Math.max(over.temper ?? 0.5, CFG.temper.kickFrom);
   const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });
   if (oldBlock) return { ...cd, oldBlock, steps: ['unblock', ...cd.steps] };
+  if (short) return partialWork(cd, short, big);
+  if (work) {
+    const [tag] = cd.subtitle.replace('Holstein ', '').split(' · ');
+    return { ...cd, apprentice: work, trimmed: [CLAW.OUTER, CLAW.INNER],
+      intro: `The farm’s apprentice trimmed ${tag} this morning and wants you to look her over. Check the work: put right what isn’t, and leave what is.` };
+  }
   return calving && condition === 'routine' ? closeToCalving(cd) : cd;
+}
+
+// WP17.2: the short routine cows, dealt now and then from Hollins on (farm.partial). The steps
+// are the usual ones; they read done where the foot is already right, so there's less to do,
+// and taking more off a claw that's already right is over-trimming it.
+export const PARTIAL = {
+  heifer: { line: (tag, limb) => `A first-calf heifer, ${tag}, in for her first trim on the ${limb}. Young feet, not much horn: check her over and tidy what needs it. She’s never been in a crush before.` },
+  lately: { line: (tag, limb, claw) => `${tag} had her ${limb} trimmed a few weeks back, but only the ${claw} claw: the farmer ran out of time. Finish the job, and leave what’s already right.` },
+};
+function partialWork(cd, kind, big) {
+  const [tag, limb] = cd.subtitle.replace('Holstein ', '').split(' · ');
+  return {
+    ...cd, partial: kind, ...(kind === 'lately' ? { trimmed: [big] } : {}),
+    intro: PARTIAL[kind].line(tag, limb, big === CLAW.OUTER ? 'outer' : 'inner'),
+  };
+}
+
+// WP17.1: the conditions an apprentice can have trimmed (anything else wants a call or no trim),
+// and the faults they leave. Each claw fault names the claw; on a lesion cow the lesion itself is
+// always missed: the trim done, nothing opened.
+export const APPRENTICE_OK = ['routine', 'ulcer', 'whiteline'];
+export const APPRENTICE_FAULTS = ['unlevel', 'nodish', 'longtoe', 'rough', 'heel'];
+function apprenticeWork(seed, faults) {
+  const rand = mulberry32(seed ^ 0xa99e);
+  const work = {};
+  for (const f of faults) {
+    if (!APPRENTICE_FAULTS.includes(f)) continue;
+    work[f] = f === 'rough' || f === 'heel' ? true : rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
+  }
+  return work;
+}
+// What the apprentice left, for her ticket. `noun` is the lesion's name on a lesion cow.
+export function apprenticeLeft(cd) {
+  const w = cd.apprentice;
+  if (!w) return null;
+  const claw = (c) => (c === CLAW.OUTER ? 'outer' : 'inner');
+  const left = [
+    cd.lesion ? `the ${cd.noun} under a tidy trim` : null,
+    w.unlevel ? `the ${claw(w.unlevel)} claw left high` : null,
+    w.nodish ? `no dish on the ${claw(w.nodish)} claw` : null,
+    w.longtoe ? `the ${claw(w.longtoe)} toe left long` : null,
+    w.rough ? 'grinder swirls not rasped out' : null,
+    w.heel ? 'the loose heel horn' : null,
+  ].filter(Boolean);
+  return left.length ? left : null;
 }
 
 // WP9 J1: a routine foot on a cow due to calve within days. The foot is ordinary and so is her
@@ -198,3 +282,20 @@ export const CASE_B_MODS = {
   ],
 };
 export const CASE_B = makeCase('ulcer', 214, CASE_B_MODS);
+
+// Case A, the first cow on the road (#2): a hand-placed routine trim on the same left hind foot,
+// calm and fairly clean, so the guided run teaches the five steps and a read that comes back
+// "firm, leave it" before the first ulcer (Case B, cow 2). Two plain marks, the bruise being
+// the one the guided run has her test.
+export const CASE_A_MODS = {
+  side: 'LH',
+  excess: { [CLAW.OUTER]: 4.2, [CLAW.INNER]: 2.2 },
+  looseHorn: { claw: CLAW.OUTER, x: 108, y: 228, r: 11 },
+  decoys: [
+    { kind: 'bruise', claw: CLAW.INNER, x: 262, y: 330, r: 12 },
+    { kind: 'stain', claw: CLAW.OUTER, x: 140, y: 405, r: 11 },
+  ],
+  temper: 0.2,
+  mud: 0.85,
+};
+export const CASE_A = makeCase('routine', 132, CASE_A_MODS);

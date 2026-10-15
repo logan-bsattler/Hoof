@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
 import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, clawBox, soundClaw, insideClaw } from '../src/hoof.js';
-import { CASE_B, makeCase, dealCase, dealMods, temperament } from '../src/case.js';
+import { CASE_A, CASE_B, makeCase, dealCase, dealMods, temperament } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { stepsFor, stepLabel } from '../src/steps.js';
 import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, applyPry, BURST_POCKET, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
@@ -307,6 +307,74 @@ test('guided run starts at cleaning, tracks progress, and finishes on an ideal t
   idealTrim(h);
   t.update(h.metrics(), idealSession(), h);
   assert.equal(t.finished, true);
+});
+
+test('guided run on the routine first cow (#2): tests a mark, no lesion beats, finishes on an ideal trim', async () => {
+  const { Tutorial } = await import('../src/tutorial.js');
+  const h = new Hoof(CASE_A);
+  const t = new Tutorial(CASE_A);
+  assert.deepEqual(t.beats.map((b) => b.id), ['clean', 'probe', 'nipInner', 'grindInner', 'nipOuter', 'grindOuter', 'dish', 'rasp', 'heelHorn']);
+  const probe = t.beats.find((b) => b.id === 'probe');
+  assert.deepEqual([probe.target.x, probe.target.y], [CASE_A.findings[0].x, CASE_A.findings[0].y], 'the circled mark is her first decoy');
+  assert.ok(t.beats.every((b) => !b.target.avoid), 'no red ring to keep off');
+  t.update(h.metrics(), newSession(), h);
+  assert.equal(t.beat.id, 'clean');
+  idealTrim(h);
+  t.update(h.metrics(), idealSession(CASE_A), h);
+  assert.equal(t.finished, true);
+  // She's an easy, sound, left hind foot with two plain marks.
+  assert.equal(CASE_A.lesion, null);
+  assert.equal(CASE_A.side, 'LH');
+  assert.deepEqual(CASE_A.findings.map((f) => f.kind), ['bruise', 'stain']);
+  for (const f of CASE_A.findings) assert.ok(insideClaw(f.claw, f.x, f.y, 'LH', f.r), `${f.kind} sits on its claw`);
+  assert.ok(CASE_A.temper <= 0.3);
+});
+
+test('a cow trimmed lately starts with one claw done; a heifer has little horn (WP17.2)', () => {
+  const late = makeCase('routine', 9, { partial: 'lately' });
+  assert.equal(late.partial, 'lately');
+  const big = late.trimmed[0];
+  const h = new Hoof(late);
+  const m = h.metrics();
+  assert.equal(m.claws[big].deadRemain, 0, 'the toe is off');
+  assert.ok(m.claws[big].wbMean <= T + 0.5, `the sole is near the line: ${m.claws[big].wbMean}`);
+  assert.ok(m.claws[big].dishMean <= D + 0.5, 'and dished');
+  const other = big === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER;
+  assert.ok(m.claws[other].deadRemain > 0.5, 'the other claw is as she came in');
+  const heifer = makeCase('routine', 9, { partial: 'heifer' }), plain = makeCase('routine', 9);
+  assert.ok(heifer.excess[CLAW.OUTER] < plain.excess[CLAW.OUTER] / 2);
+  assert.ok(heifer.temper > plain.temper);
+  // Only routine cows are ever short, and a cow to be left stays one.
+  assert.equal(makeCase('ulcer', 9, { partial: 'heifer' }).partial, undefined);
+  assert.equal(makeCase('routine', 9, { partial: 'lately', calving: true }).partial, undefined);
+});
+
+test('the apprentice’s cow (WP17.1): a good one signed off untouched is Textbook; a fault left is not', async () => {
+  const { apprenticeLeft } = await import('../src/case.js');
+  const read = (cd) => ({ ...newSession(), diagnosis: cd.diagnosis, diagnosisCorrect: true, probes: cd.findings.map((f) => f.kind) });
+  const clean = (h) => { for (let i = 0; i < h.n; i++) h.mud[i] = 0; return h; };
+  const good = makeCase('routine', 21, { apprentice: [] });
+  const hg = clean(new Hoof(good));
+  assert.equal(evaluateSteps(hg.metrics(), read(good), hg, 1).current, -1, 'nothing left to do');
+  assert.equal(scoreCase(hg.metrics(), read(good), hg, good).grade, 'Textbook');
+  assert.equal(apprenticeLeft(good), null);
+  const STEP = { unlevel: ['step1', 'step2'], nodish: ['step3'], longtoe: ['step1', 'step2', 'finish'], rough: ['finish'], heel: ['step5'] };
+  for (const f of Object.keys(STEP)) {
+    const cd = makeCase('routine', 21, { apprentice: [f] });
+    const h = clean(new Hoof(cd));
+    const open = evaluateSteps(h.metrics(), read(cd), h, 1).status.filter((x) => !x.done).map((x) => x.id);
+    assert.ok(open.some((id) => STEP[f].includes(id)), `${f} leaves ${open}`);
+    const r = scoreCase(h.metrics(), read(cd), h, cd);
+    assert.notEqual(r.grade, 'Textbook', f);
+    assert.match(r.notes[0], /apprentice/);
+    assert.equal(apprenticeLeft(cd).length, 1);
+  }
+  // On an ulcer cow the ulcer is always missed: the trim done, nothing opened.
+  const ulcer = makeCase('ulcer', 21, { apprentice: [] });
+  assert.ok(apprenticeLeft(ulcer)[0].includes('ulcer'));
+  assert.equal(new Hoof(ulcer).metrics().looseRemain[LOOSE.ULCER], 1);
+  // Nothing an apprentice can't have trimmed.
+  assert.equal(makeCase('dd', 21, { apprentice: [] }).apprentice, undefined);
 });
 
 test('the block does not lock out the loose heel horn or the rasp step', () => {

@@ -74,6 +74,10 @@ for (let a = 0; a < ANG_N; a++) {
 // Foot rot's heel flush: how near the cleft a pixel is, from a smooth spread of side samples.
 const NEAR_TAPS = [4, 8, 12, 16, 20, 24, 28].map((dx) => [dx, 0.5 * Math.exp(-dx / 12)]);
 
+// What buildSteps makes for one side of foot, shared between materials (shareFrom).
+const STATIC_KEYS = ['polys', 'cls', 'edge', 'sx0', 'sy0', 'mudX', 'mudY', 'nMudThr', 'nStain', 'nIsle', 'nCav', 'nGrain',
+  'nStreak', 'nLump', 'nTone', 'nFleck', 'mudSpec', 'wetSpec', 'growth', 'straw', 'hash', 'mask', 'built', 'builtSide'];
+
 export class HoofArt {
   constructor(S = 2) {
     const g = CFG.grid;
@@ -231,6 +235,18 @@ export class HoofArt {
     this.built = true;
     this.builtSide = hoof.side;
     yield 1;
+  }
+
+  // A second material for the next foot (#4) borrows this one's side build: it depends only on
+  // which way round the foot is and is never written after it's built. Only the per-foot buffers
+  // are its own, so the next cow can be made ready behind the current one without touching it.
+  shareFrom(art) {
+    for (const k of STATIC_KEYS) this[k] = art[k];
+    const n = this.w * this.h;
+    this.markT = new Uint8Array(n);
+    this.markA = new Uint8Array(n);
+    this.arcX = new Int16Array(n);
+    this.arcY = new Int16Array(n);
   }
 
   // Take on a new foot: its cell classes (overgrowth varies cow to cow), fresh state and a

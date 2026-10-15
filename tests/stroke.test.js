@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { CFG } from '../src/config.js';
 import { Hoof, Z, LOOSE } from '../src/hoof.js';
 import { CASE_B } from '../src/case.js';
-import { applyFlick, applyStroke } from '../src/tools.js';
+import { applyFlick, applyStroke, applyGrind } from '../src/tools.js';
 import { startStroke, strokeMove, strokeTick, strokeEnd } from '../src/stroke.js';
 
 const K = CFG.tools.knife;
@@ -150,4 +150,31 @@ test('carving works the cap at half speed: 90 px of sawing holds, 180 px gives',
   assert.equal(saw(K.capGive), false);
   assert.equal(h.capOpen, false);
   assert.equal(saw(K.capGive), true);
+});
+
+// WP17.3: kit that reputation opens.
+test('the better knife opens a cap in two flicks', () => {
+  const h = new Hoof(CASE_B);
+  h.kit = { knife: true };
+  const L = CASE_B.lesion;
+  const flickAt = (dir) => applyFlick(h, [0, 1, 2, 3, 4].map((k) => ({ x: L.x - dir * (8 - k * 3), y: L.y })));
+  assert.equal(flickAt(1).capPop, false);
+  assert.equal(flickAt(-1).capPop, true);
+});
+
+test('the finer disc cuts slower near the line and leaves finer swirls', () => {
+  const run = (kit) => {
+    const h = new Hoof(CASE_B);
+    h.kit = kit;
+    const p = soundSole(h);
+    const i = h.cellAt(p.x, p.y);
+    // Bring the spot to just above the line, then grind it for a moment.
+    h.stamp(p.x, p.y, 40, (j) => { if (h.zone[j] & Z.LIVE) h.thick[j] = h.zoneTarget(j) + 1; });
+    const before = h.thick[i];
+    for (let k = 0; k < 4; k++) applyGrind(h, p.x, p.y, 0.02);
+    return { took: before - h.thick[i], rough: h.rough[i] };
+  };
+  const plain = run(undefined), fine = run({ disc: true });
+  assert.ok(fine.took > 0 && fine.took < plain.took * 0.8, `fine ${fine.took} vs plain ${plain.took}`);
+  assert.ok(fine.rough < plain.rough, `swirls ${fine.rough} vs ${plain.rough}`);
 });

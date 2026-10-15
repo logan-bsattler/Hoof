@@ -426,6 +426,7 @@ body.tutorial #stepTip { display: none; }
 .route-inner { position: relative; z-index: 2; max-width: 440px; margin: 0 auto; padding-top: clamp(24px, 9vh, 90px); }
 .route h1, .route .eyebrow, .route-rep, .route .fine { text-shadow: 0 1px 3px rgba(0,0,0,0.85), 0 0 12px rgba(0,0,0,0.6); }
 .route .link-btn { color: var(--text); text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+#routeLog { margin-top: 0; }
 .season-line { color: var(--brass); font-style: italic; }
 .route h1 { margin: 4px 0 2px; font-family: Georgia, serif; font-size: 30px; }
 .route-rep { color: var(--muted); font-size: 14px; margin: 4px 0 18px; }
@@ -467,6 +468,7 @@ body.tutorial #stepTip { display: none; }
 .stop-meta { font-size: 12px; color: var(--muted); }
 .stop-tier { grid-column: 2; font-size: 11px; color: var(--brass); letter-spacing: 0.04em; }
 #routeRep .tier { font-size: 12px; color: var(--brass); }
+#routeRep .kit { font-size: 12px; opacity: 0.85; }
 .stop.visited .pin { background: var(--sound); border-color: var(--sound); }
 .stop.suggest button { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass) inset; }
 .stop.suggest .pin { border-color: var(--brass); }

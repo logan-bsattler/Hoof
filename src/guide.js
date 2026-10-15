@@ -5,7 +5,7 @@
 
 import { TOOLS, TOOL_ORDER } from './tools.js';
 import { CONDITIONS, CALLS, FINDING } from './conditions.js';
-import { FARMS } from './route.js';
+import { FARMS, KIT } from './route.js';
 
 // When to reach for each tool, and what goes wrong with it.
 const TOOL_NOTES = {
@@ -15,7 +15,7 @@ const TOOL_NOTES = {
   grinder: ['Levelling each claw’s sole to about 7 mm, in smooth passes.', 'Not near a lesion or on a false sole: it tears. Linger in one spot and she bleeds.'],
   knife: ['Pull for the dish along the inner edge. Flick (a short, quick stroke) to open a cap and lift loose horn.', 'Flick the rim of an opened lesion, never the raw middle: a long carve there strips the ring she stands on. A tap prises off an old block.'],
   rasp: ['After the grinder, to true the sole before a block covers it.', 'Smoothing only: it won’t take a claw down.'],
-  block: ['On the sound claw, so the sore one is off the floor.', 'Never on the sore claw, nor when both claws are sore. Tap the tool again for the taller wood block.'],
+  block: ['On the sound claw, so the sore one is off the floor.', 'Never on the sore claw, nor when both claws are sore.'],
   spray: ['Flushing an opened lesion, or soaking sore skin in the cleft.', 'Flush again after each round of paring: fresh cuts need it too.'],
   wrap: ['The very last thing, on a treated claw: pad first, then the wrap.', 'Not every lesion gets one: some heal best open to the air.'],
 };
@@ -62,9 +62,11 @@ export const metConditions = (history) => new Set(history.map((h) => h.condition
 export const roundDone = (route) => FARMS.every((f) => route.visits[f.id]);
 
 // Every page of the guide. Locked condition pages carry no text from the game.
-export function guideBook({ history = [], all = false } = {}) {
+export function guideBook({ history = [], all = false, rep = 0 } = {}) {
   const met = metConditions(history);
-  const tools = TOOL_ORDER.map((id) => ({ id, name: TOOLS[id].name, key: TOOLS[id].key, hint: TOOLS[id].hint, notes: TOOL_NOTES[id] }));
+  // Kit that reputation opens for a tool (WP17.3): what it does, and when, or that you have it.
+  const kitNote = (id) => KIT.filter((k) => k.tool === id).map((k) => `${k.name}${rep >= k.rep ? '' : ` (from reputation ${k.rep})`}: ${k.text}`);
+  const tools = TOOL_ORDER.map((id) => ({ id, name: TOOLS[id].name, key: TOOLS[id].key, hint: TOOLS[id].hint, notes: TOOL_NOTES[id], kit: kitNote(id) }));
   const conditions = Object.entries(GUIDE_CONDITIONS).map(([id, g]) => {
     if (!all && !met.has(id)) return { id, locked: true };
     const C = CONDITIONS[id], F = FINDING[g.finding] ?? {};
@@ -159,7 +161,7 @@ export class Guide {
   get isOpen() { return !this.el.hidden; }
 
   entries() {
-    const book = guideBook({ history: this.route.history, all: this.all });
+    const book = guideBook({ history: this.route.history, all: this.all, rep: this.route.rep });
     return this.tab === 'tools' ? book.tools : this.tab === 'conditions' ? book.conditions : null;
   }
 
@@ -201,7 +203,7 @@ export class Guide {
         <h2>${esc(e.name)} <kbd>${esc(e.key)}</kbd></h2>
         <p class="sub">${esc(e.hint)}</p>
         <p><b>Reach for it:</b> ${esc(e.notes[0])}</p>
-        <p><b>Watch for:</b> ${esc(e.notes[1])}</p>`;
+        <p><b>Watch for:</b> ${esc(e.notes[1])}</p>${e.kit.map((k) => `<p><b>Kit:</b> ${esc(k)}</p>`).join('')}`;
       const cv = page.querySelector('canvas');
       const px = Math.round(96 * (devicePixelRatio || 1));
       cv.width = cv.height = px;

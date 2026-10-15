@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CASE_B, makeCase } from '../src/case.js';
+import { CASE_A, CASE_B, makeCase } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { CFG } from '../src/config.js';
 import {
@@ -11,7 +11,7 @@ import {
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
   farmCows, healedBack, backLine, TIERS, tierFor, tierMods, farmById,
   SEASONS, SEASON_DAYS, daysDone, seasonFor, seasonById, farmMix, visitHerd,
-  returningCows,
+  returningCows, KIT, kitFor, nextKit,
 } from '../src/route.js';
 import { Hoof, CLAW } from '../src/hoof.js';
 
@@ -36,13 +36,20 @@ test('farms: one road, opening in order from reputation 0, each a valid profile'
   assert.ok(FARMS[0].temper[1] <= 0.4 && FARMS[0].front === 0, 'the first farm is calm, hind feet only');
 });
 
-test('farm 1 is the tutorial: its first visit opens on Case B, with the guided trim', () => {
+test('farm 1 is the tutorial: its first visit opens on a routine trim (Case A), then Case B, then a dealt cow (#2)', () => {
   const herd = visitCases(FARMS[0], 1);
-  assert.equal(herd[0], CASE_B);
-  assert.equal(herd[0].condition, 'ulcer');
-  assert.equal(herd[0].foot, 'hind');
+  assert.equal(herd[0], CASE_A);
+  assert.equal(herd[0].condition, 'routine');
+  assert.equal(herd[0].lesion, null);
+  assert.ok(!herd[0].call && !herd[0].calving, 'nothing to leave: a plain trim');
+  assert.equal(herd[1], CASE_B);
+  assert.equal(herd[1].condition, 'ulcer');
+  for (const cd of herd.slice(0, 2)) assert.equal(cd.foot, 'hind');
+  // The deck still deals 1 ulcer and 2 routine: the hand-built two take their cards.
+  assert.deepEqual(herd.map((cd) => cd.condition), ['routine', 'ulcer', 'routine']);
+  assert.ok(herd[2] !== CASE_A && herd[2] !== CASE_B);
   // Later visits deal fresh cows.
-  assert.notEqual(visitCases(FARMS[0], 2)[0], CASE_B);
+  assert.ok(!visitCases(FARMS[0], 2).some((cd) => cd === CASE_A || cd === CASE_B));
 });
 
 test('a visit deals the farm’s fixed number of cows, the same herd every time, with unique tags', () => {
@@ -223,7 +230,7 @@ test('a return visit deals the lame cows back as rechecks, a few healed ones, th
 
 test('Case B comes back as Case B: the hand-placed ulcer, a little bigger, or healed', () => {
   const lame = newRoute();
-  playDay(lame, FARMS[0].id, [0]);
+  playDay(lame, FARMS[0].id, [1]);
   const [re] = startVisit(lame, FARMS[0].id);
   assert.equal(tag(re), tag(CASE_B));
   assert.equal(re.back.outcome, 'recheck');
@@ -286,6 +293,67 @@ test('return cows build on every farm, visit after visit, whatever went lame', (
 
 // ------------------------------------------------------------------ WP7.6 difficulty ramp
 
+test('short routine cows (WP17.2): heifers and cows trimmed lately, from Hollins on, never close to calving', () => {
+  const seen = { heifer: 0, lately: 0 };
+  let routine = 0;
+  for (const farm of FARMS) {
+    for (let visit = 1; visit <= 40; visit++) {
+      for (const cd of visitCases(farm, visit)) {
+        if (cd.condition !== 'routine' || cd.back) continue;
+        if (farm.id === 'willowbank') { assert.equal(cd.partial, undefined, 'none at Willow Bank'); continue; }
+        routine++;
+        if (!cd.partial) continue;
+        seen[cd.partial]++;
+        assert.ok(!cd.calving, 'never one to leave');
+        assert.ok(cd.intro.length > 40);
+      }
+    }
+  }
+  const share = (seen.heifer + seen.lately) / routine;
+  assert.ok(share > 0.15 && share < 0.35, `about a quarter of routine cows: ${share.toFixed(2)}`);
+  assert.ok(seen.heifer > 0 && seen.lately > 0);
+});
+
+test('the apprentice’s cow (WP17.1): one a visit from the Journeyman tier on, past Hollins, a fresh cow', () => {
+  let visits = 0, withOne = 0;
+  for (const farm of FARMS) {
+    for (const tier of TIERS) {
+      for (let visit = 1; visit <= 20; visit++) {
+        const herd = visitCases(farm, visit, [], tier);
+        const app = herd.filter((cd) => cd.apprentice);
+        assert.ok(app.length <= 1, 'at most one a visit');
+        if (!farm.apprentice || tier.id === 'apprentice') { assert.equal(app.length, 0, `${farm.name} ${tier.name}`); continue; }
+        visits++;
+        if (!app.length) continue;
+        withOne++;
+        const [cd] = app;
+        assert.ok(['routine', 'ulcer', 'whiteline'].includes(cd.condition));
+        assert.ok(!cd.back && !cd.calving && !cd.partial);
+        assert.deepEqual(cd.trimmed, [1, 2]);
+        assert.match(cd.intro, /apprentice/);
+      }
+    }
+  }
+  assert.ok(withOne / visits > 0.8, `most visits have one: ${withOne}/${visits}`);
+  assert.ok(!FARMS[0].apprentice && !FARMS[1].apprentice, 'never at Willow Bank or Hollins');
+});
+
+test('kit (WP17.3): milestones between farms, never spent, reported the day they open', () => {
+  assert.deepEqual(KIT.map((k) => k.id), ['hose', 'disc', 'knife', 'wood']);
+  for (let k = 1; k < KIT.length; k++) assert.ok(KIT[k].rep > KIT[k - 1].rep);
+  assert.equal(KIT.find((k) => k.id === 'wood').rep, farmById('ridgeway').rep, 'the wood block comes with Ridgeway');
+  assert.deepEqual(kitFor(0), { hose: false, disc: false, knife: false, wood: false });
+  assert.deepEqual(kitFor(200), { hose: true, disc: true, knife: false, wood: false });
+  assert.equal(nextKit(0).id, 'hose');
+  assert.equal(nextKit(10000), null);
+  const route = newRoute();
+  route.rep = 40;
+  const herd = startVisit(route, FARMS[0].id);
+  for (const cd of herd) recordCow(route, cd, result('Textbook'));
+  const d = endVisit(route);
+  assert.deepEqual(d.kit.map((k) => k.id), ['hose']);
+});
+
 test('tiers: the help turns down with reputation, each step opening with a farm, ending at today’s band', () => {
   assert.equal(TIERS[0].rep, 0);
   assert.deepEqual(TIERS.map((t) => t.guides), ['on', 'mistake', 'off']);
@@ -318,7 +386,9 @@ test('a visit deals its cows with the tier’s band; Case B itself is never chan
   const route = newRoute();
   const herd = startVisit(route, FARMS[0].id);
   assert.ok(herd.every((cd) => cd.tolerance === TIERS[0].tolerance));
-  assert.equal(tag(herd[0]), tag(CASE_B));
+  assert.equal(tag(herd[0]), tag(CASE_A));
+  assert.equal(tag(herd[1]), tag(CASE_B));
+  assert.equal(CASE_A.tolerance, undefined);
   assert.equal(CASE_B.tolerance, undefined);
   route.visit = null;
   route.rep = 300;

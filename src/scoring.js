@@ -111,6 +111,19 @@ export const blockOn = (hoof) => (hoof.block ? { claw: hoof.block, kind: hoof.bl
 // Flushed, padded and wrapped (sprayed only, where the condition wants no wrap: foot rot).
 const treated = (m, hoof) => (hoof.caseDef.requires?.wrap === false || hoof.wrapped) && m.lesionTint >= CFG.treat.tintMin;
 
+// Which of the apprentice's faults (WP17.1) are still in the foot, in words; the same tests the
+// steps use to call that work done.
+function apprenticeLeftIn(m, caseDef) {
+  const w = caseDef.apprentice, tol = tolOf(caseDef);
+  const out = [];
+  if (w.unlevel && (m.claws[w.unlevel].wbMean > CFG.sole.target + tol || Math.abs(m.levelDiff) > 0.6)) out.push(`the ${CLAW_NAME[w.unlevel]} claw high`);
+  if (w.nodish && m.claws[w.nodish].dishMean > CFG.sole.dishTarget + tol) out.push(`no dish on the ${CLAW_NAME[w.nodish]} claw`);
+  if (w.longtoe && m.claws[w.longtoe].deadRemain >= 0.12) out.push(`the ${CLAW_NAME[w.longtoe]} toe long`);
+  if (w.rough && m.roughMean >= 0.15) out.push('the swirl marks');
+  if (w.heel && m.looseRemain[LOOSE.HEEL] >= 0.1) out.push('the loose heel horn');
+  return out;
+}
+
 export function scoreCase(m, session, hoof, caseDef) {
   const T = CFG.sole.target, D = CFG.sole.dishTarget;
   const inner = m.claws[CLAW.INNER], outer = m.claws[CLAW.OUTER];
@@ -207,7 +220,8 @@ export function scoreCase(m, session, hoof, caseDef) {
       pair ? pairOpenNote(m, hoof) : 'Loose horn left over the ulcer: it needs opening up to heal.');
   }
   if (trim && !thin && !dds && (inner.dishMean > D + 1.5 || outer.dishMean > D + 1.5)) { correctness -= 10; notes.push('Dish not modelled on both claws.'); }
-  if (trim && !thin && !dds && session.firstCutClaw === secondClaw(caseDef)) {
+  // Claw order only counts on a foot nobody has started (WP17.1/17.2: a claw trimmed already).
+  if (trim && !thin && !dds && !caseDef.trimmed && session.firstCutClaw === secondClaw(caseDef)) {
     const [a, b] = [CLAW_NAME[firstClaw(caseDef)], CLAW_NAME[secondClaw(caseDef)]];
     correctness -= 10;
     notes.push(`Started on the ${b} claw. On a ${caseDef.foot ?? 'hind'} foot, trim the ${a} claw first and match the ${b} to it.`);
@@ -229,7 +243,7 @@ export function scoreCase(m, session, hoof, caseDef) {
       : 'Grinder over the lesion. Use the knife near the ulcer.');
   }
   if (session.dirtyCuts > 0) { correctness -= 10; notes.push('You cut into a dirty foot. Clean first, then cut.'); }
-  if (session.dishBeforeLevel) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }
+  if (session.dishBeforeLevel && !caseDef.trimmed) { correctness -= 5; notes.push('Dished before levelling. Functional steps go 1 → 2 → 3.'); }
   // The call (WP8.1): a cow that needs the pen or the vet and is released, or sent the wrong way.
   const want = caseDef.call ?? null, made = session.call ?? null;
   const referral = (c) => c === 'pen' || c === 'vet';
@@ -308,6 +322,13 @@ export function scoreCase(m, session, hoof, caseDef) {
   // due to be left (close to calving) who was trimmed or sent to the pen instead.
   const needsWork = CFG.grades.find((gr) => gr.name === 'Needs work');
   const capped = (note) => { total = Math.min(total, CFG.grades[CFG.grades.indexOf(needsWork) - 1].min - 1); notes.unshift(note); };
+  // The apprentice's cow (WP17.1): signing off a fault left in the foot is no Textbook job.
+  const left = caseDef.apprentice ? apprenticeLeftIn(m, caseDef) : [];
+  if (left.length) {
+    const textbook = CFG.grades.find((gr) => gr.name === 'Textbook');
+    total = Math.min(total, textbook.min - 1);
+    notes.unshift(`Signed off the apprentice’s work with ${left.join(' and ')} still to put right.`);
+  }
   if (!want && made) capped(`She didn’t need ${CALLS[made].noun}. ${caseDef.plan}`);
   else if (want === 'leave' && made !== 'leave') capped(caseDef.leaveNote ?? 'She was due any day: she’d have waited for dry-off.');
   const g = CFG.grades.find((gr) => total >= gr.min);

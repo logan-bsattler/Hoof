@@ -88,7 +88,8 @@ updates arrive whenever the server is reachable). If you add a file under `src/`
 
 One hoof case: a Holstein's hind foot with a hidden sole ulcer. The foot is shown the
 way a trimmer sees it in the chute: sole facing you, heel bulbs at the top, toes pointing down.
-The first cow is the hand-built #214 (left hind, ulcer on the outer claw). **Trim another** deals a
+The road opens at Willow Bank on two hand-built cows: #132, a routine trim with two harmless marks
+(Case A), then #214 (Case B, left hind, ulcer on the outer claw). In free play **Trim another** deals a
 fresh cow: left or right hind (a right hind shows its outer claw on your right), different overgrowth,
 ulcer size and position, sometimes on the inner claw, plus one or two harmless marks (a stain, a
 bruise) that look like trouble. Your best grade on the case is remembered on the device.
@@ -108,9 +109,32 @@ picks the visit up at the next cow; the road map has a "Start the round over" li
 `?farm=<id>` starts a visit at that farm, `?rep=n` sets the reputation, and `?cond=<id>&seed=n`
 is free play on one condition off the route.
 
-New players should pick **Guided first trim** on the opening card. It coaches the same case in
-13 small beats: each one picks the tool, outlines where to work, gives one instruction and shows
-a progress bar. **Lift the foot** plays it unguided.
+The long road varies its cows and gives reputation a second use (WP17). From Hollins on, about a
+quarter of routine cows are short ones: a **heifer** (young feet, little horn) or a cow **trimmed
+lately** (one claw already right). From Brackenford on, one cow a visit comes in already trimmed by
+the farm's **apprentice**, with one or two faults left (claws not level, no dish, a long toe, a
+rough sole, heel horn) or none: find them and fix them, or sign a good job off untouched.
+Reputation milestones open **kit**, never spent: a hose helper at 50 (the foot comes in half
+clean), a finer grinder disc at 165, a better knife at 330 (a cap gives in two flicks) and the wood
+block at 480. The road map shows what you have and what's next. Dev params:
+`?cond=routine&partial=heifer|lately` and `?cond=routine&apprentice=unlevel,heel` (or
+`&apprentice=` for a clean job).
+
+**Playtest log.** Each cow finished writes one entry on the device (`truehoof.playlog.v1`, the
+latest 400 cows, at most about 250k characters): farm, cow, tier, condition, guided or not, load
+time, time per step, each tool's uses and seconds, probes, the read, nicks and the grade. The road
+map's **Export playtest log** link downloads it as JSON (or copies it where a download can't run),
+for a beta tester to send.
+
+New players should pick **Guided first trim** on the opening card. On the routine first cow it
+coaches the trim in 9 small beats (testing a mark that stays firm instead of an ulcer); on the
+first ulcer cow in 13, adding the opening, block, flush and wrap. Each beat picks the tool,
+outlines where to work, gives one instruction and shows a progress bar. **Lift the foot** plays
+it unguided. On the road each guided run is offered until you've done one cow of its kind.
+
+The next cow's foot textures are built ahead, a slice a frame, behind the walk-off, the ticket or
+the visit card (and behind the title when a day is resumed), so the intro card is live at once. A
+foot on the same side shares the side's build; the spare material is dropped once she's in the crush.
 
 | Step | What you do | Tool |
 |---|---|---|
@@ -171,6 +195,8 @@ src/view.js              camera: full scene on desktop, zoomed onto the hoof on 
 src/hoofart.js           layered hoof material: horn, stain, manure + straw, tool marks, blood
 src/toolart.js           drawn tool sprites
 src/particles.js         shavings, mud, dust, flakes, release puff, blood
+src/playlog.js           playtest log: one entry per cow, capped storage, export
+src/route.js             the round: farms, visits, reputation, tiers, kit, seasons
 src/audio.js             WebAudio SFX: CC0 recordings + procedural layers/fallbacks, haptics
 audio/                   short CC0 MP3s (sources and licenses in audio/CREDITS.md)
 src/walkoff.js           the walk-off reward scene

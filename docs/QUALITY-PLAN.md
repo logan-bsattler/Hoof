@@ -983,6 +983,58 @@ No condition is added and no score changes, so the 7.2 recipe doesn't apply and 
 | D61 | Carving can still open a cap, at half speed? | Yes. Flicks are the way in, but nobody gets stuck. "Only a flick opens it" is stricter and more deliberate, but a player who never finds the flick can't finish an ulcer |
 | D62 | A flick takes at most 0.25 mm of live sole? | Yes. Enough to feel, too little to bleed unless the sole is already at the line |
 
+## WP17: the long road feels the same (medium; scoped 2026-10-15)
+
+From the 2026-10-15 review (#3). **Recommendation: break up the run of identical full trims with short cows that test judgement, and give reputation a second use besides opening farms.** Today every cow is the same five-step trim, and opening the whole road takes 59 cows at Textbook, 82 at Clean and 129 at Sound (13, 18 and 28 days; `tests/route.test.js` pacing). Reputation buys farms and nothing else, so the middle of the road (Brackenford to Greystone) is many near-identical cows with nothing new to aim for.
+
+### Fact checks (done 2026-10-15, by reading the code)
+
+| Question | Answer | So |
+|---|---|---|
+| Can a cow start part-trimmed? | Yes in principle: `makeCase` takes `excess` per claw outright (Case A and B use it), and `Hoof` builds thickness from it. A thin-soled cow (WP13.1) already starts below target. | A pre-trimmed cow is an `excess` near 0 on both claws plus a deliberate fault. No new simulation. |
+| Do the steps cope with work already done? | `evaluateSteps` checks state, not history: a claw already at target reads done. `steps` per case can be any list. | A partial-work cow gets a short step list and finishes as soon as the foot is right. |
+| Is there a "check and sign off" ending? | Release or the call (WP8.1). Releasing a sound foot untouched already scores. | No new ending; scoring reads the foot as it leaves. |
+| Can rep gate tools? | Yes: `woodOK()` in `main.js` gates the wood block on Ridgeway's rep. | Unlocks are more of the same gate, shown on the road map. |
+| Does rep ever go down? | No (WP7.4). | Unlocks are milestones, never a shop: nothing is spent. |
+
+### 17.1 The apprentice's cows (medium)
+- **Change:** from Journeyman (rep 100), one cow a visit comes in already trimmed by the farm's apprentice. The ticket on the intro says so. Each has one or two faults drawn from: claws not level, dish missed on one claw, toe left long, a thin spot near the line, a decoy dug out, or a lesion missed under a clean trim. The player reads the foot (gauge, beam, testers), fixes what's wrong, and releases. A good one needs nothing: releasing it untouched is right.
+- **Effects:** a 1–2 minute cow that teaches judging a finished foot, and restraint when nothing needs doing.
+- **Check:** route tests (one a visit from Journeyman, never at Willow Bank or Hollins); game tests (each fault reads undone on the right step; an untouched good one scores Textbook); the bot fixes each fault.
+- **Built 2026-10-15.** `case.js`: `APPRENTICE_OK` (routine, ulcer, white line) and `APPRENTICE_FAULTS` (`unlevel`, `nodish`, `longtoe`, `rough`, `heel`); `makeCase(..., { apprentice: [...] })` builds the trimmed foot with those faults left in, and `apprenticeLeft(cd)` names them on the ticket. A lesion cow keeps her lesion under the clean trim. `route.js`: farms from Brackenford on carry `apprentice: true`; `visitCases` picks one fresh cow a visit (stream 333) once past the Apprentice tier, a routine cow clean a fifth of the time, else one or two faults (a lesion cow: the lesion, plus a fault half the time). Dev: `?cond=routine&apprentice=unlevel,heel`, or `&apprentice=` for a good job. Tests: route (one a visit, from Journeyman, never Willow Bank or Hollins), game (an untouched good one is Textbook, a fault left is not), playthrough (every fault and none, routine, ulcer and white line, to Textbook).
+
+### 17.2 Partial-work cows (small)
+- **Change:** two short kinds, dealt now and then from Hollins on. A **heifer**: a small foot, little growth, mostly a check and a tidy. **Trimmed lately**: one claw done last time, so only the other claw, the heel horn and the read. Both use the normal steps, which read done where the foot is already right.
+- **Effects:** variety in length without new mechanics.
+- **Check:** route tests (share per farm); the bot sweep on both.
+- **Built 2026-10-15.** `farmMods` draws `partial` ('heifer' or 'lately', even odds) on a quarter of routine cows from Hollins on, never close to calving. A heifer: little horn on both claws and livelier (her first crush). Trimmed lately: the big claw at 0.15 mm excess and `trimmed: [claw]`. Own intro lines; neither gets a guided run or an apprentice. Dev: `?cond=routine&partial=heifer` or `&partial=lately`. Tests: route (share and never-calving), game (start state), playthrough (both to Textbook).
+
+### 17.3 Reputation unlocks (small)
+- **Change:** rep milestones (never spent) open kit, shown on the road map under the next farm: a finer grinder disc (a cleaner, slower cut near the line), a better knife (a stronger flick, so a cap opens in two), a helper with a hose (the foot comes in half clean). The wood block moves onto the same list.
+- **Effects:** rep is worth having between farms. The kit makes later cows a little quicker, not easier to bleed.
+- **Check:** tests per unlock; the guide names each.
+- **Built 2026-10-15.** `route.js` `KIT`, `kitFor(rep)`, `nextKit(rep)`: hose helper 50 (the foot comes in at `CFG.hose` of its muck), finer grinder disc 165 (`cfg.fine`: slower near the line, finer swirls), better knife 330 (a cap gives in two flicks), wood block 480 (was gated on Ridgeway's rep). Each rides on the hoof as `hoof.kit`. The road map shows a kit line (what you have, the next piece and its rep); the day summary names kit opened that day (`endVisit` reports `kit`); the guide notes each on its tool page. Tests: route (milestones between farms, reported on the day), stroke (knife two flicks, disc slower and finer).
+
+### 17.4 Shorter road (tiny)
+- **Change:** cut farm thresholds by about a quarter, or raise Textbook to 12 points, so a Clean player opens Ridgeway in about 60 cows, not 82.
+- **Effects:** fewer cows overall; the bot pacing test's bounds move.
+- **Built 2026-10-15.** Farm thresholds cut by a quarter: Hollins 25, Brackenford 75, Top Lane 135, Marsh End 200, Greystone 285, Coldharbour 375, Ridgeway 480; the Journeyman and Master tiers move with their farms (75, 200). The bot pacing test now opens the whole road in 10 days at Textbook and 21 at Sound (was 13 and 28). sw bumped with the review fixes and the playtest log to v58.
+
+### Not taken
+- **Skipping steps by menu** (auto-trim the sound claw). It removes the game rather than varying it.
+- **Spending reputation.** Rep only goes up (WP7.4); a shop would make a bad day cost kit.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D63 | Which of 17.1–17.4 to build? | 17.1 + 17.3 (the judging cows and a reason to earn rep) |
+| D64 | Apprentice cows from which tier? | Journeyman (Brackenford, rep 100) |
+| D65 | Unlocks as milestones, never spent? | Yes |
+| D66 | Which unlocks? | Finer disc, better knife, hose helper; wood block joins the list |
+
+**Ben's answers (2026-10-15):** D63 all four, 17.1–17.4. D64 Journeyman. D65 milestones (the default stood). D66 all four unlocks. **Build order (D67):** 17.4 → 17.3 → 17.2 → 17.1: the numbers first, so the unlock milestones and the new cows are placed on the final road.
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.

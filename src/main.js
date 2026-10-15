@@ -3,7 +3,7 @@
 
 import { CFG, touchAngle, tolOf } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
-import { CASE_B, dealCase, makeCase, temperament } from './case.js';
+import { CASE_A, apprenticeLeft, dealCase, makeCase, temperament, readOptions, cowName } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyFlick, applyGrind, applyBite, applySpray, applyWrap, applyPry } from './tools.js';
 import { startStroke, strokeMove, strokeTick, strokeEnd } from './stroke.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
@@ -21,24 +21,30 @@ import { Guide } from './guide.js';
 import { drawToolIcon } from './toolart.js';
 import { stance, drawStance, TOE_OUT_LINE } from './stance.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
-import { FARMS, FOOTBATH, HOUSING, onSand, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor, SEASON_DAYS, daysDone, seasonFor, seasonById } from './route.js';
+import { FARMS, FOOTBATH, HOUSING, onSand, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor, KIT, kitFor, nextKit, SEASON_DAYS, daysDone, seasonFor, seasonById } from './route.js';
 import { paintLandscape } from './seasonart.js';
+import { logEntry, appendLog, exportLog } from './playlog.js';
 
-// The round starts at the first farm on the road, whose first cow is the hand-built Case B.
+// The round starts at the first farm on the road, whose first cows are the hand-built Case A
+// (a routine trim) and Case B (a sole ulcer), each with the guided trim on offer.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
 // deals fresh cows), varied by any of &foot=front &growth= &mud= &temper= &decoys= &size= &at=
-// (see makeCase's mods). ?farm=<id> starts a visit there; ?rep=n starts with that reputation.
+// &partial= &apprentice= (see makeCase's mods). ?farm=<id> starts a visit there; ?rep=n starts
+// with that reputation.
 const devCase = new URLSearchParams(location.search);
 function devMods() {
   const num = (k) => (devCase.has(k) ? +devCase.get(k) : undefined);
   const mods = {
     foot: devCase.get('foot') ?? undefined, growth: num('growth'), mud: num('mud'), temper: num('temper'),
     decoyCount: num('decoys'), lesionSize: num('size'), lesionAt: num('at'),
+    // WP17: &partial=heifer|lately, &apprentice=unlevel,heel (or &apprentice= for a good job).
+    partial: devCase.get('partial') ?? undefined,
+    apprentice: devCase.has('apprentice') ? devCase.get('apprentice').split(',').filter(Boolean) : undefined,
   };
   return Object.fromEntries(Object.entries(mods).filter(([, v]) => v !== undefined));
 }
 const freePlay = devCase.has('cond');
-let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_B;
+let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_A;
 // The trimmer's round (route.js), saved on this device after each cow (save.js).
 const route = loadRound();
 // Free play never touches the round: a saved day in progress waits for the next normal launch.
@@ -78,6 +84,12 @@ const game = {
   result: null,
   lastWarn: {},
   tutorial: null,       // a Tutorial during the guided first run, else null
+  next: null,           // the cow coming next and her foot, built ahead (#4)
+  dealt: null,          // free play: the case "Trim another" deals
+  use: {},              // the playtest log: this cow's tools, { id: { n: uses, s: seconds held } }
+  guided: false,        // the playtest log: she was the guided run
+  liftedAt: 0,          // the playtest log: game.time when her foot was lifted
+  loadT0: 0, loadMs: null, // the playtest log: from lifting her foot to the foot being ready
   ptr: { x: 0, y: 0, down: false, over: false, downX: 0, downY: 0, moved: 0, biteAccum: 0, id: null, touch: false, cut: false, holeCut: false, sepsisCut: false },
 };
 
@@ -157,9 +169,36 @@ function saveBest(r) {
 
 // ---------------------------------------------------------------- lifecycle
 
+// The cow coming next, once it's known (#4): her foot is built ahead, a slice a frame, behind
+// the walk-off, the ticket or the visit card, so the intro card's buttons are live at once.
+function expect(cd) {
+  game.next = cd ? { cd, hoof: makeHoof(cd) } : null;
+}
+
+// The kit reputation has opened (WP17.3). Free play has it all but the hose: its feet come as dealt.
+const kitNow = () => (freePlay ? { ...kitFor(Infinity), hose: false } : kitFor(route.rep));
+
+// A cow's foot as she comes into the crush: hosed half clean once the farm does that for you.
+function makeHoof(cd) {
+  const hoof = new Hoof(cd);
+  hoof.kit = kitNow();
+  if (hoof.kit.hose) for (let i = 0; i < hoof.n; i++) hoof.mud[i] *= CFG.hose;
+  return hoof;
+}
+// Who follows the cow in the crush now: the next in the herd, or in free play a fresh deal
+// (kept, so "Trim another" deals that one) or, after a failed cow, the same one again.
+function expectAfter({ failed = false } = {}) {
+  if (route.visit) expect(herd[route.visit.k + 1] ?? null);
+  else expect(failed ? caseDef : (game.dealt = dealCase((Math.random() * 1e9) >>> 0)));
+}
+
 function newCase() {
-  game.hoof = new Hoof(caseDef);
+  game.hoof = game.next?.cd === caseDef ? game.next.hoof : makeHoof(caseDef);
+  game.next = null;
   game.preparing = true;
+  game.loadT0 = performance.now();
+  game.loadMs = null;
+  game.use = {};
   game.session = newSession();
   game.metrics = game.hoof.metrics();
   game.steps = evaluateSteps(game.metrics, game.session, game.hoof, 0);
@@ -191,10 +230,7 @@ function newCase() {
   particles.list = [];
   showSteps();
   ui.setReadable(false);
-  const v = route.visit;
-  document.getElementById('caseTitle').textContent = v
-    ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length} · ${caseDef.title} · ${caseDef.subtitle}`
-    : `Case ${caseDef.id} · ${caseDef.title} · ${caseDef.subtitle}`;
+  showCaseTitle();
   selectTool('brush');
   document.body.classList.remove('steps-open');
 }
@@ -206,9 +242,9 @@ async function showIntro() {
   const v = route.visit;
   const walkIn = stance(caseDef);
   const shown = ui.modal(
-    `<div class="eyebrow">${v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}${caseDef.back?.outcome === 'recheck' ? ' · Recheck' : ''}` : `Case ${caseDef.id} · Trimmer tier`}</div>
-     <h1>${caseDef.title}</h1>
-     <p class="sub">${caseDef.subtitle}</p>
+    `<div class="eyebrow">${v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}${caseDef.back?.outcome === 'recheck' ? ' · Recheck' : ''}` : 'Free play'}</div>
+     <h1>${cowName(caseDef)}</h1>
+     <p class="sub">${caseDef.subtitle.split(' · ')[1]}</p>
      ${caseDef.back ? `<p class="back ${caseDef.back.outcome}">${backLine(caseDef)}</p>` : ''}
      <p>${caseDef.intro}</p>
      ${walkIn ? '<figure class="stance"><canvas width="160" height="120" aria-label="Her hind legs from behind as she walked in"></canvas><figcaption>Walking in, from behind</figcaption></figure>' : ''}
@@ -218,14 +254,10 @@ async function showIntro() {
        <li><b>Clean</b> to reveal what’s hiding under the muck.</li>
        <li><b>Read</b> it with the hoof testers before you commit.</li>
        <li><b>Trim</b> the five steps in order: balance beats speed.</li>
-       ${caseDef.howto ?? ''}
-       ${caseDef.requires?.wrap === false ? '<li><b>Treat</b> what needs it before she goes.</li>' : caseDef.requires?.treat ? '<li><b>Treat</b> it: flush, pad and wrap before she goes.</li>' : '<li><b>Leave</b> what’s firm alone: not every mark is trouble.</li>'}
+       <li><b>Treat</b> what needs it, and leave what’s firm alone: not every mark is trouble.</li>
        <li><b>Never draw blood.</b> Pink means thin. Ease off.</li>
      </ul>`,
-    // The guided run teaches the hind foot (inner claw first).
-    // On the road, only until you've done an ulcer once.
-    caseDef.condition === 'ulcer' && caseDef.foot !== 'front' &&
-      !(v && route.history.some((h) => h.condition === 'ulcer'))
+    guidedOffer(caseDef, v)
       ? [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }]
       : [{ id: 'start', label: 'Lift the foot', primary: true }],
   );
@@ -235,9 +267,19 @@ async function showIntro() {
   Sound.setEnabled(game.sound);
   game.state = 'play';
   game.tutorial = mode === 'guided' ? new Tutorial(caseDef) : null;
+  game.guided = !!game.tutorial;
+  game.liftedAt = game.time;
   document.body.classList.toggle('tutorial', !!game.tutorial);
   if (game.tutorial) updateCoach();
   else { ui.setCoach(null); ui.toast(stepTip(stepsFor(caseDef)[0], caseDef), 'info', 4500); }
+}
+
+// The guided run teaches the hind foot (inner claw first), on a plain routine trim and on a
+// sole ulcer (#2). On the road, each only until you've done one of that kind; never on a cow
+// that has to be left, a recheck in last visit's block, or a returning cow.
+function guidedOffer(cd, v) {
+  if (!['routine', 'ulcer'].includes(cd.condition) || cd.foot === 'front' || cd.call || cd.oldBlock || cd.back || cd.trimmed || cd.partial) return false;
+  return !(v && route.history.some((h) => h.condition === cd.condition));
 }
 
 // Guided run: move to the next beat when the current one is done.
@@ -263,8 +305,8 @@ function stopHoldSounds() {
   Sound.spray(false);
 }
 
-// The wood block comes with the farm that brings toe necrosis (or free play).
-const woodOK = () => freePlay || route.rep >= farmById('ridgeway').rep;
+// The wood block is kit (WP17.3), opened with the farm that brings toe necrosis (or free play).
+const woodOK = () => kitNow().wood;
 
 // The player picking a tool. Picking the block again swaps rubber for wood (WP8.4) and back.
 function pickTool(id) {
@@ -319,6 +361,7 @@ canvas.addEventListener('pointerdown', (e) => {
   Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId, cut: false, holeCut: false, sepsisCut: false,
     cssX: e.clientX, cssY: e.clientY, stroke: game.tool === 'knife' ? startStroke(p.x, p.y) : null });
   const mode = TOOLS[game.tool].mode;
+  (game.use[game.tool] ??= { n: 0, s: 0 }).n++;
   if (mode === 'bite') bite(p.x, p.y);
   if (mode === 'hold') {
     game.holdLast = { x: p.x, y: p.y };
@@ -498,6 +541,8 @@ function tap(x, y) {
       Sound.tock();
       buzz(5);
       ui.toast(r.text, r.kind === 'thin' ? 'warn' : 'info');
+      // A routine cow's guided run (#2) commits the read once her circled mark is tested.
+      if (game.tutorial && !caseDef.lesion && r.finding && !game.session.diagnosis) setTimeout(() => { if (game.state === 'play' && !game.session.diagnosis) diagnose(); }, 900);
     }
   } else if (game.tool === 'block') {
     if (i < 0) { ui.toast('Tap a claw to glue the block onto it.'); return; }
@@ -551,14 +596,18 @@ async function diagnose() {
      <h2>What the testers found</h2>
      <ul class="found">${found.join('') || '<li>Nothing tested yet.</li>'}</ul>
      <p>${caseDef.diagnosisPrompt}</p>`,
-    caseDef.diagnosisOptions.map((o) => ({ id: o.id, label: o.label })),
+    readOptions(caseDef).map((o) => ({ id: o.id, label: o.label })),
   );
   const opt = caseDef.diagnosisOptions.find((o) => o.id === pick);
   game.session.diagnosis = pick;
   game.session.diagnosisCorrect = pick === caseDef.diagnosis;
+  showCaseTitle();
+  // The condition's working tip comes after the read, not on the intro card: before it, it
+  // would name what's wrong.
   await ui.modal(
-    `<div class="eyebrow">${game.session.diagnosisCorrect ? 'Good read' : 'Not quite'}</div>
-     <p>${opt.feedback}</p>${game.session.diagnosisCorrect || game.tutorial ? `<p class="plan">${caseDef.plan}</p>` : ''}`,
+    `<div class="eyebrow">${game.session.diagnosisCorrect ? 'Good read' : 'Not quite'} · ${caseDef.title}</div>
+     <p>${opt.feedback}</p>${game.session.diagnosisCorrect || game.tutorial ? `<p class="plan">${caseDef.plan}</p>` : ''}
+     ${caseDef.howto ? `<ul class="howto">${caseDef.howto}</ul>` : ''}`,
     [{ id: 'ok', label: 'Get to work', primary: true }],
   );
   if (game.session.diagnosisCorrect) Sound.step();
@@ -806,6 +855,7 @@ function fail(x, y) {
   game.shake = 10;
   game.ptr.down = false;
   stopHoldSounds();
+  expectAfter({ failed: true });
   Sound.moo(true);
   buzz([60, 40, 120]);
   particles.spawn('blood', x, y, '#c0101c', 10);
@@ -826,6 +876,7 @@ async function requestRelease() {
   }
   game.metrics = game.hoof.metrics();
   game.result = scoreCase(game.metrics, game.session, game.hoof, caseDef);
+  expectAfter();
   const hoof = game.hoof;
   // The weight test shows the trimmed foot as it stands, without guides or HUD.
   const drawFoot = () => {
@@ -855,6 +906,7 @@ async function requestCall() {
   game.session.call = r;
   game.metrics = game.hoof.metrics();
   game.result = scoreCase(game.metrics, game.session, game.hoof, caseDef);
+  expectAfter();
   game.walkoff = null;
   Sound.step();
   showResults();
@@ -869,29 +921,33 @@ async function showResults() {
       const v = Math.round(r.parts[key]);
       return `<div class="bar"><span>${label} <em>${w}%</em></span><div class="track"><div style="width:${v}%"></div></div><b>${v}</b></div>`;
     }).join('');
+  logCow(r);
   const earned = route.visit ? recordCow(route, caseDef, r) : null;
   if (earned) saveRound(route);
   await ui.modal(
-    `<div class="eyebrow">Trimmer’s ticket · ${route.visit ? farmById(route.visit.farm).name : `Case ${caseDef.id}`}</div>
+    `<div class="eyebrow">Trimmer’s ticket · ${route.visit ? farmById(route.visit.farm).name : "Free play"} · ${caseDef.title}</div>
      <h1 class="grade ${r.medal}">${r.grade}</h1>
      <p class="sub">Score ${r.total} / 100 · ${r.call ? `<b>${CALLS[r.call].ticket}</b>` : `walked off <b>${r.gait}</b>`}${newBest ? ' · <b>New best</b>' : ''}</p>
      ${earned ? repLine(earned) : ''}
      ${bars}
      ${stance(caseDef) === 'out' ? `<p class="sub">${TOE_OUT_LINE}</p>` : ''}
+     ${caseDef.apprentice ? `<p class="sub">What the apprentice left: ${apprenticeLeft(caseDef)?.join('; ') ?? 'nothing, a clean job'}.</p>` : ''}
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,
     [{ id: 'again', label: earned ? nextLabel(earned) : 'Trim another', primary: true }],
   );
   if (earned) { nextCow(earned); return; }
-  caseDef = dealCase((Math.random() * 1e9) >>> 0);
+  caseDef = game.dealt ?? dealCase((Math.random() * 1e9) >>> 0);
+  game.dealt = null;
   showIntro();
 }
 
 async function showFail() {
   game.state = 'results';
+  logCow({ failed: true, grade: 'Failed', total: 0, gait: 'lame' });
   const earned = route.visit ? recordCow(route, caseDef, { failed: true, grade: 'Failed', gait: 'lame', block: blockOn(game.hoof) }) : null;
   if (earned) saveRound(route);
   await ui.modal(
-    `<div class="eyebrow">Case failed</div>
+    `<div class="eyebrow">Case failed · ${caseDef.title}</div>
      <h1 class="grade fail">Drew blood</h1>
      <p>You cut into the corium. She flinched, and the foot will be sore for weeks.</p>
      ${earned ? repLine(earned) : ''}
@@ -901,6 +957,37 @@ async function showFail() {
   if (earned) { nextCow(earned); return; }
   showIntro();
 }
+
+// The playtest log (review 2026-10-15): one entry per cow, at her ticket or the fail card.
+// Logged before recordCow moves the visit on, so cow and tier are hers.
+function logCow(result) {
+  const v = route.visit;
+  appendLog(logEntry(caseDef, result, game.session, {
+    farm: v ? farmById(v.farm).name : null, visit: v ? v.n : null, k: v ? v.k : null,
+    tier: v ? tierFor(route.rep).name : null, guided: game.guided, time: game.time, start: game.liftedAt, use: game.use, loadMs: game.loadMs,
+  }));
+}
+
+// Export the log for a tester to send: a JSON download, or the clipboard where that fails.
+// The Android app's WebView drops blob downloads without an error, so there it copies.
+async function exportPlaylog() {
+  const json = exportLog(localStorage, { agent: navigator.userAgent, screen: `${screen.width}x${screen.height}`, rep: route.rep });
+  const name = `true-hoof-playlog-${new Date().toISOString().slice(0, 10)}.json`;
+  try {
+    if (window.Capacitor?.isNativePlatform?.()) throw new Error('no downloads in the app');
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    ui.toast('Playtest log saved', 'info', 2500);
+  } catch {
+    try { await navigator.clipboard.writeText(json); ui.toast('Playtest log copied', 'info', 2500); }
+    catch { ui.toast('Couldn’t export the log on this device', 'warn', 3000); }
+  }
+}
+document.getElementById('routeLog').addEventListener('click', exportPlaylog);
 
 // ---------------------------------------------------------------- the round
 
@@ -928,7 +1015,8 @@ async function showDay() {
       <td>${r.tag.replace('Holstein ', '')}${r.back ? ` <span class="again" title="${r.back === 'recheck' ? 'Recheck' : 'Seen before'}">↺</span>` : ''}</td><td>${r.title}</td><td>${r.grade}</td>
       <td>${r.gait}</td><td class="pts">${r.lame ? '—' : `+${r.points}`}</td></tr>`).join('');
   const flagged = d.rows.filter((r) => r.lame).length;
-  const opened = d.opened.map((f) => `<p class="rep-line">New on the road: <b>${f.name}</b> (${HOUSING[f.housing].toLowerCase()})</p>`).join('');
+  const opened = d.opened.map((f) => `<p class="rep-line">New on the road: <b>${f.name}</b> (${HOUSING[f.housing].toLowerCase()})</p>`).join('') +
+    d.kit.map((k) => `<p class="rep-line">New kit: <b>${k.name}</b>. ${k.text}</p>`).join('');
   const next = nextLocked(route);
   await ui.modal(
     `<div class="eyebrow">End of the day · ${d.farm.name}</div>
@@ -959,6 +1047,8 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const due = herdNow.filter((cd) => cd.calving);
   // A known kicker (WP12.2): the farmer warns you.
   const kicker = herdNow.find((cd) => cd.kicker);
+  // Her first cow's foot is built while the card is read.
+  expect(herdNow[0]);
   const tags = (list) => list.map((cd) => `<b>${cd.subtitle.split(' · ')[0].replace('Holstein ', '')}</b>`).join(', ');
   const rechecks = back.filter((cd) => cd.back.outcome === 'recheck');
   // A black toe is due back whatever happened (WP8.4); the rest came back lame.
@@ -986,8 +1076,10 @@ async function showVisit(farm, { fromMap = true } = {}) {
       ? [{ id: 'go', label: 'Start the day', primary: true }, { id: 'back', label: 'Back to the road' }]
       : [{ id: 'go', label: 'Start the day', primary: true }],
   );
-  if (pick !== 'go') { showRoute(); return; }
+  if (pick !== 'go') { expect(null); showRoute(); return; }
   herd = startVisit(route, farm.id);
+  // The same cow dealt again: keep the one whose foot is already built.
+  if (game.next && JSON.stringify(game.next.cd) === JSON.stringify(herd[0])) herd[0] = game.next.cd;
   game.knife.wear = 0; // sharpened every morning
   saveRound(route);
   caseDef = herd[0];
@@ -1009,7 +1101,8 @@ function showRoute() {
   document.getElementById('routeSeason').textContent = `${season.name} · day ${(daysDone(route) % SEASON_DAYS) + 1} of ${SEASON_DAYS}`;
   document.getElementById('routeRep').innerHTML = `Reputation <b>${route.rep}</b>` +
     (next ? ` · ${next.name} opens at ${next.rep}` : ' · every farm on the road is open') +
-    `<br><span class="tier">${tier.name} · ${GUIDES_TEXT[tier.guides].toLowerCase()} · ±${tier.tolerance.toFixed(2)} mm band</span>`;
+    `<br><span class="tier">${tier.name} · ${GUIDES_TEXT[tier.guides].toLowerCase()} · ±${tier.tolerance.toFixed(2)} mm band</span>` +
+    kitLine();
   const list = document.getElementById('routeStops');
   list.replaceChildren(...FARMS.map((f) => {
     const li = document.createElement('li');
@@ -1039,6 +1132,14 @@ function showRoute() {
   list.querySelector('.suggest button')?.focus({ preventScroll: true });
 }
 
+// The kit on the road map (WP17.3): what you have, and the next piece and its milestone.
+function kitLine() {
+  const have = KIT.filter((k) => route.rep >= k.rep).map((k) => k.name);
+  const next = nextKit(route.rep);
+  if (!have.length && !next) return '';
+  return `<br><span class="kit">Kit: ${have.length ? have.join(', ') : 'the basics'}${next ? ` · ${next.name} at ${next.rep}` : ''}</span>`;
+}
+
 // The countryside behind the road map, in the season's colours (WP15.1).
 function paintRouteSky() {
   const el = document.getElementById('route');
@@ -1057,7 +1158,7 @@ window.addEventListener('resize', () => { if (!document.getElementById('route').
 function begin() {
   if (freePlay) { showIntro(); return; }
   // A reload mid-visit picks the day up at the next cow, or its summary if every cow is done.
-  if (route.visit) { herd = visitHerd(route); nextCow({ last: route.visit.k >= herd.length }); return; }
+  if (route.visit) { if (!herd.length) herd = visitHerd(route); nextCow({ last: route.visit.k >= herd.length }); return; }
   const dev = farmById(devCase.get('farm'));
   if (dev && isOpen(dev, route.rep)) { showVisit(dev, { fromMap: false }); return; }
   // With a saved round, the road map; the first time out, straight to the first farm.
@@ -1097,6 +1198,15 @@ function resize() {
     renderer.resize(fitCamera(wrap.clientWidth, wrap.clientHeight, viewMode()), Math.min(2.5, window.devicePixelRatio || 1));
   });
 }
+// The top bar names her by tag and foot; the condition's name only once the read is committed,
+// so the bar never answers the read for you.
+function showCaseTitle() {
+  const v = route.visit;
+  const where = v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}` : 'Free play';
+  const what = game.session?.diagnosis ? ` · ${caseDef.title}` : '';
+  document.getElementById('caseTitle').textContent = `${where}${what} · ${caseDef.subtitle}`;
+}
+
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(document.getElementById('canvasWrap'));
 
@@ -1110,6 +1220,9 @@ function frame(now) {
   game.shake = Math.max(0, game.shake - dt * 25);
   // No case is dealt until the title card is tapped, and the road map covers the canvas between visits.
   // The first visit card also comes up before any cow is in the crush.
+  // The next cow's foot (#4), built while nothing is being cut: lightly under the walk-off's
+  // animation, harder behind a card.
+  if (game.next && !game.preparing && game.state !== 'play') renderer.prebuild(game.next.hoof, game.state === 'walkoff' ? 6 : 16);
   if (game.state === 'title' || game.state === 'route' || !game.session) { requestAnimationFrame(frame); return; }
   // A new foot's textures take seconds on a phone: build them a slice a frame behind the case
   // card's loading bar, so the card is up at once and the game never locks.
@@ -1118,10 +1231,12 @@ function frame(now) {
     ui.setLoading(p);
     if (p < 1) { requestAnimationFrame(frame); return; }
     game.preparing = false;
+    game.loadMs = performance.now() - game.loadT0;
   }
 
   if (game.state === 'play') {
     const ptr = game.ptr;
+    if (ptr.down && game.use[game.tool]) game.use[game.tool].s += dt;
     fidget(dt);
     renderer.fx.grindOn = ptr.down && game.tool === 'grinder';
     // A knife stroke held past the flick time is a carve, even with the finger still (WP16).
@@ -1278,6 +1393,10 @@ function showTitle() {
 
 // Dev aid: ?debug exposes the game state and renderer (its .cam maps logical ↔ screen) in the console.
 if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { hoofGame: game, hoofRenderer: renderer, hoofRoute: route, hoofRound: { showRoute, showDay, recordCow: (r) => recordCow(route, caseDef, r), nextCow } });
+
+// A day left off mid-visit, or a free-play case: that cow's foot is built behind the title card.
+if (freePlay) expect(caseDef);
+else if (route.visit) { herd = visitHerd(route); expect(herd[route.visit.k] ?? null); }
 
 resize();
 showTitle().then(begin);

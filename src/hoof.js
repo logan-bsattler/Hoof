@@ -366,10 +366,14 @@ export class Hoof {
       const span = clawSpan(c, y, this.side);
       const fromAxial = span ? (clawSide(c, this.side) > 0 ? x - span[0] : span[1] - x) : Infinity;
       const excess = cd.excess[c];
+      // A claw trimmed lately (WP17.2) or by the apprentice (WP17.1): its toe is off and its
+      // sole and dish are near the line, but for the apprentice's faults.
+      const done = !!cd.trimmed?.includes(c);
+      const fault = cd.apprentice ?? {};
       this.mud[i] = Math.min(1, 0.78 + 0.22 * nz + this.rand() * 0.12) * this.mudCover;
 
       if (this.zone[i] & Z.DEAD) {
-        this.thick[i] = T + excess + 2.5 + nz * 0.5;
+        this.thick[i] = done && fault.longtoe !== c ? 0 : T + excess + 2.5 + nz * 0.5;
         this.rough[i] = 0.8;
       } else {
         const ax = axialDist(x);
@@ -382,7 +386,7 @@ export class Hoof {
         if (y > GEOM.triY && ax < GEOM.triW) this.zone[i] |= Z.TRI;
 
         // A thin sole (WP13.1) was ground flat last time: no extra horn toward the toe.
-        const toeUp = cd.thinSole ? 0 : 2.2;
+        const toeUp = cd.thinSole || done ? 0 : 2.2;
         const sole = T + excess + toeUp * smoothstep(GEOM.toeRamp[0], GEOM.toeRamp[1], y) + nz * 0.35;
         // A slow wobble so the feathered zone edges don't read as ruled lines.
         const jit = smoothNoise(x * 1.9 + 41, y * 1.9 - 23);
@@ -396,9 +400,9 @@ export class Hoof {
           const dIn = Math.min(y - GEOM.dishY0, GEOM.dishY1 - y, GEOM.dishW - ax);
           const [f0, f1] = GEOM.dishFeather;
           const w = this.zone[i] & Z.WALL ? 0 : smoothstep(f0 + jit * 3, f1 + jit * 3, dIn);
-          this.thick[i] = sole;
           this.tgt[i] = T + (CFG.sole.dishTarget - T) * w;
-          this.rough[i] = 0.5;
+          this.thick[i] = done ? (fault.nodish === c ? T : this.tgt[i]) + excess + nz * 0.1 : sole;
+          this.rough[i] = done ? (fault.rough ? 0.45 : 0.1) : 0.5;
         }
       }
     }
@@ -409,7 +413,9 @@ export class Hoof {
     const H = cd.looseHorn;
     this.stampExact(H.x, H.y, H.r, (i) => {
       if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== H.claw) return;
-      this.loose[i] = this.looseInit[i] = LOOSE.HEEL;
+      // The apprentice flicked it off already, unless that's one of the faults (WP17.1).
+      this.looseInit[i] = LOOSE.HEEL;
+      this.loose[i] = cd.apprentice && !cd.apprentice.heel ? 0 : LOOSE.HEEL;
     });
 
     // A tempting bruise (WP14.2): the horn over it is barely above target, so levelling hardly

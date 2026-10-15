@@ -30,13 +30,16 @@ export function tutorialBeats(caseDef) {
   const inner = (m) => m.claws[CLAW.INNER];
   const outer = (m) => m.claws[CLAW.OUTER];
   const TOL = tolOf(caseDef);
+  // A routine cow (#2) has no lesion: the run has her test one of her marks instead, and has no
+  // opening, block or treatment to teach.
+  const M = L ?? caseDef.findings[0];
   // The ulcer's cap, ringed red on the steps that work that claw: grinder and dish keep off it.
-  const capRing = { x: L.x, y: L.y, r: L.r * 1.75 };
-  const avoidOn = (c) => (L.claw === c ? { avoid: capRing } : {});
-  const keepOff = (c, what) => (L.claw === c ? ` ${what}` : '');
+  const capRing = L && { x: L.x, y: L.y, r: L.r * 1.75 };
+  const avoidOn = (c) => (L?.claw === c ? { avoid: capRing } : {});
+  const keepOff = (c, what) => (L?.claw === c ? ` ${what}` : '');
   // Paring the rim: the blade's centre on this ring keeps its flat clear of the open core.
-  const pareR = L.r + CFG.tools.knife.radius * Math.sqrt(1 - KNIFE_FLAT) + 3;
-  return [
+  const pareR = L && L.r + CFG.tools.knife.radius * Math.sqrt(1 - KNIFE_FLAT) + 3;
+  const beats = [
     {
       id: 'clean', tool: 'brush', title: 'Clean the foot',
       text: 'Hold the wire brush on the foot and scrub back and forth. You can’t read a dirty foot.',
@@ -45,9 +48,10 @@ export function tutorialBeats(caseDef) {
       done: step('clean'),
     },
     {
-      id: 'probe', tool: 'probe', title: 'Test the dark patch',
-      text: `Tap the circled spot on the ${where(L.claw)} claw with the hoof testers. If it springs, something soft is under there.`,
-      target: { kind: 'ring', x: L.x, y: L.y, r: L.r * 2 },
+      id: 'probe', tool: 'probe', title: L ? 'Test the dark patch' : 'Test the mark',
+      text: L ? `Tap the circled spot on the ${where(L.claw)} claw with the hoof testers. If it springs, something soft is under there.`
+        : `Tap the circled mark on the ${where(M.claw)} claw with the hoof testers. Something sore springs or makes her flinch; an old mark stays firm.`,
+      target: { kind: 'ring', x: M.x, y: M.y, r: M.r * 2 },
       done: step('diagnose'),
     },
     {
@@ -80,8 +84,9 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'dish', tool: 'knife', title: 'Dish out both claws',
-      text: 'With the hoof knife, press, hold and pull down the blue channels along the inner edge of each claw. That takes weight off the ulcer site. Dish around the red ring, not through it: the ulcer comes later.',
-      target: { kind: 'rects', list: [dishRect(CLAW.INNER, side), dishRect(CLAW.OUTER, side)], avoid: capRing },
+      text: L ? 'With the hoof knife, press, hold and pull down the blue channels along the inner edge of each claw. That takes weight off the ulcer site. Dish around the red ring, not through it: the ulcer comes later.'
+        : 'With the hoof knife, press, hold and pull down the blue channels along the inner edge of each claw. That takes weight off the spot where ulcers start.',
+      target: { kind: 'rects', list: [dishRect(CLAW.INNER, side), dishRect(CLAW.OUTER, side)], ...(L ? { avoid: capRing } : {}) },
       measure: (m) => Math.max(inner(m).dishMean, outer(m).dishMean), goal: D + TOL,
       done: step('step3'),
     },
@@ -92,14 +97,14 @@ export function tutorialBeats(caseDef) {
       measure: (m) => m.roughMean, goal: 0.15,
       done: step('finish'),
     },
-    {
+    L && {
       id: 'openUlcer', tool: 'knife', title: 'Open the ulcer',
       text: 'Flick at the edge of the dark circle: short, quick strokes with the knife’s hook. The cap holds, then gives, and the knife comes off. Then flick the loose edge free with the knife on the ring, not inside it: the open ulcer is raw. Free it, but don’t strip the sole round it: if her block comes off, that ring is all she stands on.',
       target: { kind: 'ring', x: L.x, y: L.y, r: pareR },
       measure: (m) => m.looseRemain[LOOSE.ULCER], goal: 0.1,
       done: (m) => m.looseRemain[LOOSE.ULCER] < 0.1,
     },
-    {
+    L && {
       id: 'block', tool: 'block', title: 'Block the sound claw',
       text: `Tap the ${where(sound)} claw to glue the block on. The sound claw takes her weight so the ulcer can rest.`,
       target: { kind: 'ring', ...clawRing(box(sound)) },
@@ -112,20 +117,22 @@ export function tutorialBeats(caseDef) {
       measure: (m) => m.looseRemain[LOOSE.HEEL], goal: 0.1,
       done: step('step5'),
     },
-    {
+    L && {
       id: 'spray', tool: 'spray', title: 'Flush the ulcer',
       text: 'Press and hold the spray bottle over the opened ulcer until it’s soaked.',
       target: { kind: 'ring', x: L.x, y: L.y, r: L.r * 1.75 },
       measure: (m) => -m.lesionTint, goal: -CFG.treat.tintMin,
       done: (m) => m.lesionTint >= CFG.treat.tintMin,
     },
-    {
+    L && {
       id: 'wrap', tool: 'wrap', title: 'Pad and wrap',
       text: `Tap the treated ${CLAW_NAME[L.claw]} claw: the first tap presses on the white pad, the second wraps it in pink.`,
       target: { kind: 'ring', ...clawRing(box(L.claw)) },
       done: step('treat'),
     },
   ];
+  // The beats that work the lesion are left out for a routine cow.
+  return beats.filter(Boolean);
 }
 
 // Tracks which beat is current and how far along it is.

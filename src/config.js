@@ -53,8 +53,12 @@ export const CFG = {
     // (radius `hook`) takes at most flickCut mm of live sole and counts capFlick px of work on a
     // closed cap; a carve works the cap at capCarve of its travel.
     knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4, wall: 0.5, pryTaps: 3, dull: 0.55, wearPer: 0.0004,
-               flickMax: 40, flickTime: 160, tapMax: 12, hook: 9, flickCut: 0.25, capFlick: 35, capCarve: 0.5 },
-    grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15, wall: 0.7 },
+               flickMax: 40, flickTime: 160, tapMax: 12, hook: 9, flickCut: 0.25, capFlick: 35, capCarve: 0.5,
+               capFlickKeen: 46 }, // the better knife (WP17.3): two flicks open a cap
+    grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15, wall: 0.7,
+               // The finer disc (WP17.3): within `near` mm of the line it cuts at `rate` of the
+               // usual speed and leaves `rough` swirl marks instead of 0.45.
+               fine: { near: 1.5, rate: 0.6, rough: 0.25 } },
     // wall (knife, grinder): cut-rate multiplier on living wall, harder horn than the sole.
     // pryTaps: knife taps that lever an old block off (WP9 J2).
     // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take.
@@ -63,6 +67,9 @@ export const CFG = {
     // tint gained per second at full strength; pareWash is lost per px of knife travel.
     spray:   { radius: 22, rate: 1.6, hornRate: 0.3, rinse: 0.6, pareWash: 0.05 },
   },
+
+  // The hose helper (WP17.3): the share of muck left on a hosed foot.
+  hose: 0.5,
 
   // Blood: the first shallow cut (at most `maxCells` cells in one stroke) is a nick she flinches at.
   // A second nick, or a deeper cut, fails the case. A nick caps the grade and costs Restraint.
