@@ -218,7 +218,7 @@ function newCase() {
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
   if (game.guideMode) setGuides(game.guideMode === 'on');
   game.found = [];      // marks the testers have read this case, in order
-  game.temper = temperament(caseDef.temper);
+  game.temper = temperament(caseDef.temper, { guards: game.hoof.kit?.guards, kicker: caseDef.kicker });
   game.fidgetT = game.temper.fidgetEvery * (0.6 + Math.random() * 0.8);
   // Nothing carries over from the last foot: no held stroke, shake or half-pulled strip.
   stopHoldSounds();

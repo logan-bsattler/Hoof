@@ -254,7 +254,9 @@ export function applyStroke(hoof, tool, x, y, dist, knife = null) {
   } else if (tool === 'knife') {
     // Flat-of-blade cells on a closed cap, per claw.
     const onCap = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
-    const rate = knife?.sand ? cfg.rate * (1 - (1 - cfg.dull) * knife.wear) : cfg.rate;
+    // The strop wheel (WP17.5, hoof.kit) keeps a keener edge: it pares faster and wears slower.
+    const strop = hoof.kit?.strop ? cfg.strop : null;
+    const rate = (knife?.sand ? cfg.rate * (1 - (1 - cfg.dull) * knife.wear) : cfg.rate) * (strop ? strop.rate : 1);
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
       hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.03 * dist * f);
@@ -272,7 +274,7 @@ export function applyStroke(hoof, tool, x, y, dist, knife = null) {
     });
     // A carve rides over the cap more than it works it: the flick is the way in (WP16).
     for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, x, y, cfg.capCarve * dist * Math.min(1, onCap[c] / 6), ev);
-    if (knife?.sand) knife.wear = Math.min(1, knife.wear + ev.removed * cfg.wearPer);
+    if (knife?.sand) knife.wear = Math.min(1, knife.wear + ev.removed * cfg.wearPer * (strop ? strop.wear : 1));
   } else if (tool === 'rasp') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
       // The rasp has no edge to bite skin: it just rides over the cleft.
@@ -380,7 +382,7 @@ export function applyBite(hoof, x, y) {
   let bit = false;
   for (const c of [CLAW.OUTER, CLAW.INNER]) {
     if (!chunk[c].length) continue;
-    if (reach[c] > cfg.jawDepth) { ev.tooDeep = true; continue; }
+    if (reach[c] > (hoof.kit?.nippers ? cfg.jawLong : cfg.jawDepth)) { ev.tooDeep = true; continue; }
     bit = true;
     for (const i of chunk[c]) if (!blocked(hoof, i, ev)) cut(hoof, i, hoof.thick[i], ev, 1);
   }

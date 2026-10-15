@@ -54,15 +54,19 @@ export const CFG = {
     // closed cap; a carve works the cap at capCarve of its travel.
     knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4, wall: 0.5, pryTaps: 3, dull: 0.55, wearPer: 0.0004,
                flickMax: 40, flickTime: 160, tapMax: 12, hook: 9, flickCut: 0.25, capFlick: 35, capCarve: 0.5,
-               capFlickKeen: 46 }, // the better knife (WP17.3): two flicks open a cap
+               capFlickKeen: 46, // the better knife (WP17.3): two flicks open a cap
+               // The strop wheel (WP17.5): a carve pares at `rate` of the usual speed, and on sand the
+               // blade wears at `wear` of the usual pace. The flick is unchanged.
+               strop: { rate: 1.2, wear: 0.5 } },
     grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15, wall: 0.7,
                // The finer disc (WP17.3): within `near` mm of the line it cuts at `rate` of the
                // usual speed and leaves `rough` swirl marks instead of 0.45.
                fine: { near: 1.5, rate: 0.6, rough: 0.25 } },
     // wall (knife, grinder): cut-rate multiplier on living wall, harder horn than the sole.
     // pryTaps: knife taps that lever an old block off (WP9 J2).
-    // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take.
-    nippers: { radius: 17, liveBite: 3.5, liveCore: 0.4, spacing: 16, jawDepth: 22 },
+    // jawDepth: most dead horn (px, from the cut to the far tip) one bite can take; jawLong with
+    // the long-handled nippers (WP17.5).
+    nippers: { radius: 17, liveBite: 3.5, liveCore: 0.4, spacing: 16, jawDepth: 22, jawLong: 28 },
     rasp:    { radius: 26, smooth: 0.02, rate: 0.003 },
     // tint gained per second at full strength; pareWash is lost per px of knife travel.
     spray:   { radius: 22, rate: 1.6, hornRate: 0.3, rinse: 0.6, pareWash: 0.05 },
@@ -97,7 +101,10 @@ export const CFG = {
   // Above `fidgetFrom` she shifts her weight every `fidgetEvery` s or so while you work;
   // above `kickFrom` a shift knocks a held tool off the foot.
   // remember (WP12.1): a returning cow's shift after going off lame (or bled), or after a Textbook/Clean job.
-  temper: { flinchAt: [2.4, 3.6], shake: [0.6, 1.5], fidgetFrom: 0.45, fidgetEvery: [16, 6], kickFrom: 0.8, remember: { hurt: 0.15, easy: -0.1 } },
+  temper: { flinchAt: [2.4, 3.6], shake: [0.6, 1.5], fidgetFrom: 0.45, fidgetEvery: [16, 6], kickFrom: 0.8, remember: { hurt: 0.15, easy: -0.1 },
+    // Leg guards on the chute (WP17.5): a flinch jolts at `shake` of its force, she shifts `fidget`
+    // times less often, and only a known kicker still kicks. Where she flinches doesn't change.
+    guards: { shake: 0.6, fidget: 1.5 } },
 
   // Treatment: how well-flushed the opened ulcer must be before it's padded and wrapped.
   treat: { tintMin: 0.6 },

@@ -11,14 +11,16 @@ const lerp = ([a, b], t) => a + (b - a) * t;
 
 // What a cow's temperament (0 calm .. 1 lively) means in play: the sole thickness she flinches
 // at, how hard a flinch jolts, and how often she shifts while you work (0: she stands still).
-export function temperament(t = 0.5) {
+// Leg guards (WP17.5) soften the jolt and the shifting, and stop all but a known kicker kicking.
+export function temperament(t = 0.5, { guards = false, kicker = false } = {}) {
   const T = CFG.temper;
+  const G = guards ? T.guards : { shake: 1, fidget: 1 };
   const fidget = t >= T.fidgetFrom ? (t - T.fidgetFrom) / (1 - T.fidgetFrom) : -1;
   return {
     flinchAt: lerp(T.flinchAt, t),
-    shake: lerp(T.shake, t),
-    fidgetEvery: fidget < 0 ? 0 : lerp(T.fidgetEvery, fidget),
-    kicks: t >= T.kickFrom,
+    shake: lerp(T.shake, t) * G.shake,
+    fidgetEvery: fidget < 0 ? 0 : lerp(T.fidgetEvery, fidget) * G.fidget,
+    kicks: t >= T.kickFrom && (!guards || kicker),
   };
 }
 

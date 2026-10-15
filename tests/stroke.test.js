@@ -178,3 +178,21 @@ test('the finer disc cuts slower near the line and leaves finer swirls', () => {
   assert.ok(fine.took > 0 && fine.took < plain.took * 0.8, `fine ${fine.took} vs plain ${plain.took}`);
   assert.ok(fine.rough < plain.rough, `swirls ${fine.rough} vs ${plain.rough}`);
 });
+
+// WP17.5: more kit.
+test('the strop wheel: a carve pares faster, and on sand the blade wears slower', () => {
+  const run = (kit) => {
+    const h = new Hoof(CASE_B);
+    h.kit = kit;
+    const p = soundSole(h);
+    const i = h.cellAt(p.x, p.y);
+    h.stamp(p.x, p.y, 40, (j) => { if (h.zone[j] & Z.LIVE) h.thick[j] = h.zoneTarget(j) + 8; });
+    const before = h.thick[i];
+    const knife = { sand: true, wear: 0 };
+    for (let k = 0; k < 4; k++) applyStroke(h, 'knife', p.x + (k % 2 ? 4 : -4), p.y, 4, knife);
+    return { took: before - h.thick[i], wearPerMm: knife.wear / Math.max(1e-9, before - h.thick[i]) };
+  };
+  const plain = run(undefined), strop = run({ strop: true });
+  assert.ok(strop.took > plain.took * 1.1, `pared ${strop.took} vs ${plain.took}`);
+  assert.ok(strop.wearPerMm < plain.wearPerMm * 0.7, `wear ${strop.wearPerMm} vs ${plain.wearPerMm}`);
+});

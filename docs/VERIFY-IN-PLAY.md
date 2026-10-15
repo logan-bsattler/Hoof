@@ -51,6 +51,11 @@ round over** on the road map.
   - [ ] Finer disc (rep 165): slower near the line, finer swirls. Easier to stop on target?
   - [ ] Better knife (rep 330): a cap gives in two flicks (`?rep=330&cond=ulcer`).
   - [ ] Wood block (rep 480): tap the block tool again to swap.
+- [ ] **17.5 More kit:** three more small buffs (`?rep=n` to jump).
+  - [ ] Long-handled nippers (rep 100): a long toe comes off in fewer bites. Too easy now?
+  - [ ] Leg guards (rep 250): a lively cow jolts less and shifts less; a known kicker still kicks (`?rep=250&temper=0.9`). Does the calm show?
+  - [ ] Strop wheel (rep 600, about 60–80 cows in): carving pares a fifth faster; on Greystone's sand the knife lasts twice as long. Noticeable, or too faint?
+  - [ ] The road map's kit line with seven pieces: does it wrap cleanly on the phone?
 - [ ] **17.4 Pacing:** the bot now opens the whole road in 10 days at Textbook, 21 at Sound. Does the road still feel earned, or now too quick?
 
 ### Playtest log

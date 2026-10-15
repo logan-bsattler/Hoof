@@ -115,8 +115,10 @@ lately** (one claw already right). From Brackenford on, one cow a visit comes in
 the farm's **apprentice**, with one or two faults left (claws not level, no dish, a long toe, a
 rough sole, heel horn) or none: find them and fix them, or sign a good job off untouched.
 Reputation milestones open **kit**, never spent: a hose helper at 50 (the foot comes in half
-clean), a finer grinder disc at 165, a better knife at 330 (a cap gives in two flicks) and the wood
-block at 480. The road map shows what you have and what's next. Dev params:
+clean), long-handled nippers at 100 (a deeper bite), a finer grinder disc at 165, leg guards on the
+chute at 250 (less jolt and shifting; only a known kicker still kicks), a better knife at 330 (a cap
+gives in two flicks), the wood block at 480 and a strop wheel at 600 (a carve pares a fifth faster;
+the blade lasts twice as long on sand), about 60–80 cows in. The road map shows what you have and what's next. Dev params:
 `?cond=routine&partial=heifer|lately` and `?cond=routine&apprentice=unlevel,heel` (or
 `&apprentice=` for a clean job).
 

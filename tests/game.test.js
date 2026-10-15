@@ -1361,3 +1361,32 @@ test('she toes out on the walk-in only with a sore outer hind claw (WP14.3)', as
   const inner = Array.from({ length: 40 }, (_, k) => makeCase('ulcer', k + 1)).find((cd) => cd.lesion.claw === CLAW.INNER);
   assert.equal(stance(inner), 'square');
 });
+
+// WP17.5: more kit.
+test('long-handled nippers take a bite the short jaws refuse', () => {
+  // Find a bite on the inner toe whose dead horn runs between the short and the long jaw depth.
+  const N = CFG.tools.nippers;
+  let found = null;
+  for (let y = 640; y >= GEOM.overgrowY && !found; y -= 2) {
+    const h = new Hoof(CASE_B);
+    const ev = applyBite(h, 285, y);
+    if (!ev.tooDeep) continue;
+    const l = new Hoof(CASE_B);
+    l.kit = { nippers: true };
+    const evL = applyBite(l, 285, y);
+    if (!evL.tooDeep && evL.dead > 0) found = { y, evL };
+  }
+  assert.ok(found, `some bite between ${N.jawDepth} and ${N.jawLong} px goes with the long jaws`);
+  assert.equal(found.evL.blood, false);
+});
+
+test('leg guards soften the jolt and the shifting, and stop all but a known kicker kicking', () => {
+  const plain = temperament(0.9), guarded = temperament(0.9, { guards: true });
+  assert.equal(guarded.flinchAt, plain.flinchAt, 'she flinches at the same thickness');
+  assert.ok(guarded.shake < plain.shake);
+  assert.ok(guarded.fidgetEvery > plain.fidgetEvery);
+  assert.equal(plain.kicks, true);
+  assert.equal(guarded.kicks, false);
+  assert.equal(temperament(0.9, { guards: true, kicker: true }).kicks, true);
+  assert.equal(temperament(0.2, { guards: true }).fidgetEvery, 0, 'a calm cow still stands still');
+});

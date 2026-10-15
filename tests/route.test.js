@@ -339,11 +339,13 @@ test('the apprentice’s cow (WP17.1): one a visit from the Journeyman tier on, 
 });
 
 test('kit (WP17.3): milestones between farms, never spent, reported the day they open', () => {
-  assert.deepEqual(KIT.map((k) => k.id), ['hose', 'disc', 'knife', 'wood']);
+  assert.deepEqual(KIT.map((k) => k.id), ['hose', 'nippers', 'disc', 'guards', 'knife', 'wood', 'strop']);
   for (let k = 1; k < KIT.length; k++) assert.ok(KIT[k].rep > KIT[k - 1].rep);
   assert.equal(KIT.find((k) => k.id === 'wood').rep, farmById('ridgeway').rep, 'the wood block comes with Ridgeway');
-  assert.deepEqual(kitFor(0), { hose: false, disc: false, knife: false, wood: false });
-  assert.deepEqual(kitFor(200), { hose: true, disc: true, knife: false, wood: false });
+  for (const k of KIT) assert.ok(!FARMS.some((f) => f.rep === k.rep) || k.id === 'wood', `${k.id} falls between farms`);
+  assert.ok(KIT.at(-1).rep > farmById('ridgeway').rep, 'the last piece is something to work toward on the long road');
+  assert.deepEqual(kitFor(0), { hose: false, nippers: false, disc: false, guards: false, knife: false, wood: false, strop: false });
+  assert.deepEqual(kitFor(200), { hose: true, nippers: true, disc: true, guards: false, knife: false, wood: false, strop: false });
   assert.equal(nextKit(0).id, 'hose');
   assert.equal(nextKit(10000), null);
   const route = newRoute();

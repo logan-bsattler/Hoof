@@ -88,18 +88,24 @@ export const FARMS = [
   },
 ];
 
-// ------------------------------------------------------------------ kit (WP17.3)
+// ------------------------------------------------------------------ kit (WP17.3, WP17.5)
 // What reputation opens besides farms: milestones, never spent (D65), placed between farms so
 // there's always something near to work toward. `tool` is the tool page the guide notes it on.
 export const KIT = [
   { id: 'hose', name: 'Hose helper', rep: 50, tool: 'brush',
     text: 'The farm hoses each foot before she comes in: half the muck is gone before you start.' },
+  { id: 'nippers', name: 'Long-handled nippers', rep: 100, tool: 'nippers',
+    text: 'Longer jaws: a bite takes a deeper slice of dead toe, so a long toe comes off in fewer bites.' },
   { id: 'disc', name: 'Finer grinder disc', rep: 165, tool: 'grinder',
     text: 'A finer grit: it cuts cleaner and slows near the trim line, so it’s easier to stop on target.' },
+  { id: 'guards', name: 'Leg guards', rep: 250, tool: null,
+    text: 'Guards on the chute’s front legs: a flinch jolts less, she shifts less, and only a known kicker still kicks.' },
   { id: 'knife', name: 'Better knife', rep: 330, tool: 'knife',
     text: 'A keener hook: a closed cap gives in two flicks instead of three.' },
   { id: 'wood', name: 'Wood block', rep: 480, tool: 'block',
     text: 'Taller than rubber, for a claw that has to stay right off the floor. Tap the block tool again to swap.' },
+  { id: 'strop', name: 'Strop wheel', rep: 600, tool: 'knife',
+    text: 'A stropped edge: a carve pares a fifth faster, and on sand the blade holds its edge twice as long.' },
 ];
 // Which kit this reputation has opened, by id.
 export const kitFor = (rep) => Object.fromEntries(KIT.map((k) => [k.id, rep >= k.rep]));
