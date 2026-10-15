@@ -246,6 +246,11 @@ export const Sound = {
     if (sample(['knife1', 'knife2', 'knife3'], { gain: 0.32, jitter: 0.08, minGap: 0.08 })) return;
     burst({ dur: 0.07, freq: 3800 + Math.random() * 1200, q: 1.4, type: 'bandpass', gain: 0.22 });
   },
+  // A flick of the hook (WP16): a dry, short tick, higher and quicker than a pull.
+  flick() {
+    burst({ dur: 0.025, freq: 4400 + Math.random() * 900, q: 2.2, type: 'bandpass', gain: 0.2 });
+    tone({ freq: 1500, to: 1100, dur: 0.02, type: 'triangle', gain: 0.03 });
+  },
   // A fresh knife out of the pouch (WP12.4): a short ring of steel.
   swap() {
     burst({ dur: 0.05, freq: 5200, q: 3, gain: 0.16 });

@@ -4,7 +4,8 @@
 import { CFG, touchAngle, tolOf } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_B, dealCase, makeCase, temperament } from './case.js';
-import { TOOLS, TOOL_ORDER, applyStroke, applyGrind, applyBite, applySpray, applyWrap, applyPry } from './tools.js';
+import { TOOLS, TOOL_ORDER, applyStroke, applyFlick, applyGrind, applyBite, applySpray, applyWrap, applyPry } from './tools.js';
+import { startStroke, strokeMove, strokeTick, strokeEnd } from './stroke.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
 import { newSession, scoreCase, judgeBlood, trimUnderway, blockOn } from './scoring.js';
 import { CALLS, CONDITIONS } from './conditions.js';
@@ -315,7 +316,8 @@ canvas.addEventListener('pointerdown', (e) => {
   if (game.state !== 'play' || game.ptr.down) return;
   canvas.setPointerCapture(e.pointerId);
   const p = toLogical(e);
-  Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId, cut: false, holeCut: false, sepsisCut: false });
+  Object.assign(game.ptr, { ...p, down: true, over: true, downX: p.x, downY: p.y, moved: 0, biteAccum: 0, id: e.pointerId, cut: false, holeCut: false, sepsisCut: false,
+    cssX: e.clientX, cssY: e.clientY, stroke: game.tool === 'knife' ? startStroke(p.x, p.y) : null });
   const mode = TOOLS[game.tool].mode;
   if (mode === 'bite') bite(p.x, p.y);
   if (mode === 'hold') {
@@ -332,21 +334,15 @@ canvas.addEventListener('pointermove', (e) => {
   const dx = p.x - ptr.x, dy = p.y - ptr.y;
   const dist = Math.hypot(dx, dy);
   ptr.moved += dist;
+  const css = Math.hypot(e.clientX - ptr.cssX, e.clientY - ptr.cssY);
+  ptr.cssX = e.clientX; ptr.cssY = e.clientY;
   if (game.state === 'play') {
     const mode = TOOLS[game.tool].mode;
-    // The knife only bites once it's been pulled: a press alone does nothing.
-    const engaged = game.tool !== 'knife' || ptr.moved >= CFG.tools.knife.engage;
-    if (mode === 'stroke' && dist > 0 && engaged) {
-      // Interpolate stamps so fast strokes don't skip cells.
-      const steps = Math.ceil(dist / 3);
-      for (let s = 1; s <= steps; s++) {
-        const x = ptr.x + (dx * s) / steps, y = ptr.y + (dy * s) / steps;
-        renderer.stroke(game.tool, x, y, dx / steps, dy / steps);
-        handle(applyStroke(game.hoof, game.tool, x, y, dist / steps, game.knife), x, y);
-        if (game.state !== 'play' || !ptr.down) break;
-      }
-      if (game.tool === 'knife' && game.knife.sand) showWear();
-      game.scrubLevel = Math.min(1, game.scrubLevel + dist / 60);
+    // A knife stroke is held back until it's known to be a carve, not a flick (WP16).
+    if (game.tool === 'knife' && ptr.stroke?.kind === 'pending') {
+      if (strokeMove(ptr.stroke, p.x, p.y, css, ptr.moved, performance.now())) carveHeld();
+    } else if (mode === 'stroke' && dist > 0) {
+      strokeAlong(ptr.x, ptr.y, p.x, p.y);
     } else if (mode === 'bite') {
       ptr.biteAccum += dist;
       if (ptr.biteAccum >= CFG.tools.nippers.spacing) {
@@ -358,19 +354,66 @@ canvas.addEventListener('pointermove', (e) => {
   ptr.x = p.x; ptr.y = p.y; ptr.touch = p.touch;
 });
 
+// Cut a stroke from (x0, y0) to (x1, y1), interpolating stamps so fast strokes don't skip cells.
+function strokeAlong(x0, y0, x1, y1) {
+  const ptr = game.ptr;
+  const dx = x1 - x0, dy = y1 - y0, dist = Math.hypot(dx, dy);
+  if (!dist) return;
+  const steps = Math.ceil(dist / 3);
+  for (let s = 1; s <= steps; s++) {
+    const x = x0 + (dx * s) / steps, y = y0 + (dy * s) / steps;
+    renderer.stroke(game.tool, x, y, dx / steps, dy / steps);
+    handle(applyStroke(game.hoof, game.tool, x, y, dist / steps, game.knife), x, y);
+    if (game.state !== 'play' || !ptr.down) break;
+  }
+  if (game.tool === 'knife' && game.knife.sand) showWear();
+  game.scrubLevel = Math.min(1, game.scrubLevel + dist / 60);
+}
+
+// The knife stroke turned out to be a carve: cut the points held back so far. As before WP16,
+// the knife only bites once it's been pulled `engage` px: a press alone does nothing.
+function carveHeld() {
+  const path = game.ptr.stroke.path;
+  let run = 0;
+  for (let k = 1; k < path.length && game.ptr.down; k++) {
+    const a = path[k - 1], b = path[k];
+    run += Math.hypot(b.x - a.x, b.y - a.y);
+    if (run >= CFG.tools.knife.engage) strokeAlong(a.x, a.y, b.x, b.y);
+  }
+}
+
+// A flick of the hook (WP16): one short, quick stroke, worked in one go when the finger lifts.
+function flick(path) {
+  const a = path[0], b = path[path.length - 1];
+  const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
+  for (const p of path) renderer.stroke('knife', p.x, p.y, dx / l, dy / l);
+  const ev = applyFlick(game.hoof, path, game.knife);
+  // A chip of horn off the tip, thrown the way the hook went.
+  particles.spawn('flake', b.x, b.y, '#e8dcbc', 2, [(dx / l) * 160, (dy / l) * 160]);
+  Sound.flick();
+  buzz(6);
+  handle(ev, b.x, b.y);
+  if (game.knife.sand) showWear();
+}
+
 function endPointer(e) {
   const ptr = game.ptr;
   if (!ptr.down || e.pointerId !== ptr.id) return;
+  // A cancelled stroke (the browser took the touch) is never a flick or a tap.
+  const knifeStroke = game.state === 'play' && game.tool === 'knife' && ptr.stroke;
+  const sorted = knifeStroke ? strokeEnd(ptr.stroke, ptr.moved, performance.now()) : null;
+  if (sorted === 'carve' && ptr.stroke.kind === 'pending') { ptr.stroke.kind = 'carve'; carveHeld(); }
   ptr.down = false;
   if (TOOLS[game.tool].mode === 'hold') stopHoldSounds();
   // End of a knife pull: the strip curls off the blade.
-  if (game.tool === 'knife' && game.pullRemoved > 1) {
+  if (sorted === 'carve' && game.pullRemoved > 1) {
     particles.spawn('shaving', ptr.x, ptr.y, '#f4ead2', Math.min(6, 1 + Math.round(game.pullRemoved / 15)));
     Sound.knife();
   }
+  if (sorted === 'flick' && e.type !== 'pointercancel') flick(ptr.stroke.path);
   game.pullRemoved = 0;
   if (game.state === 'play' && TOOLS[game.tool].mode === 'tap' && ptr.moved < 12) tap(ptr.x, ptr.y);
-  else if (game.state === 'play' && game.tool === 'knife' && ptr.moved < 12) pry(ptr.x, ptr.y);
+  else if (sorted === 'tap' && e.type !== 'pointercancel') pry(ptr.x, ptr.y);
   if (e.pointerType !== 'mouse') ptr.over = false;
 }
 canvas.addEventListener('pointerup', endPointer);
@@ -1079,6 +1122,8 @@ function frame(now) {
     const ptr = game.ptr;
     fidget(dt);
     renderer.fx.grindOn = ptr.down && game.tool === 'grinder';
+    // A knife stroke held past the flick time is a carve, even with the finger still (WP16).
+    if (ptr.down && game.tool === 'knife' && ptr.stroke && strokeTick(ptr.stroke, performance.now())) carveHeld();
     if (ptr.down && TOOLS[game.tool].mode === 'hold') {
       const last = game.holdLast ?? { x: ptr.x, y: ptr.y };
       const dx = ptr.x - last.x, dy = ptr.y - last.y;

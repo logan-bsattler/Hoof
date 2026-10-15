@@ -270,7 +270,8 @@ export function applyStroke(hoof, tool, x, y, dist, knife = null) {
       // A clean knife pass leaves a smooth surface.
       hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
     });
-    for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, x, y, dist * Math.min(1, onCap[c] / 6), ev);
+    // A carve rides over the cap more than it works it: the flick is the way in (WP16).
+    for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, x, y, cfg.capCarve * dist * Math.min(1, onCap[c] / 6), ev);
     if (knife?.sand) knife.wear = Math.min(1, knife.wear + ev.removed * cfg.wearPer);
   } else if (tool === 'rasp') {
     hoof.stamp(x, y, cfg.radius, (i, f) => {
@@ -284,6 +285,34 @@ export function applyStroke(hoof, tool, x, y, dist, knife = null) {
     });
   }
   return aimedAtSepsis(hoof, x, y, ev);
+}
+
+// A flick of the knife's hook along `path` (WP16): a short, quick stroke. Each cell under the hook
+// is worked once, however many points pass over it. Loose horn lifts as under a carve; live sole
+// loses at most a shaving, so a flick nicks and never gouges. On a closed cap the hook's tip gets
+// under it and levers: a few flicks open it.
+export function applyFlick(hoof, path, knife = null) {
+  const ev = newEvents();
+  const cfg = CFG.tools.knife;
+  const under = new Map();
+  for (const p of path) hoof.stamp(p.x, p.y, cfg.hook, (i, f) => { if (f > (under.get(i) ?? 0)) under.set(i, f); });
+  const onCap = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
+  const rate = knife?.sand ? 1 - (1 - cfg.dull) * knife.wear : 1;
+  for (const [i, f] of under) {
+    if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) continue;
+    hoof.mud[i] = Math.max(0, hoof.mud[i] - 0.3 * f);
+    hoof.tint[i] *= 1 - Math.min(1, CFG.tools.spray.pareWash * 4 * f);
+    if (closedCap(hoof, i)) { if (f >= KNIFE_FLAT) onCap[hoof.claw[i]]++; continue; }
+    if ((hoof.zone[i] & Z.ULCER) && f < KNIFE_FLAT) continue;
+    if (pareTract(hoof, i, ev) || pareNecro(hoof, i, ev) || pareDouble(hoof, i, ev)) continue;
+    if (hoof.looseInit[i] !== LOOSE.TRACT && clearLoose(hoof, i, ev)) continue;
+    const d = cut(hoof, i, cfg.flickCut * rate * Math.min(1, f / KNIFE_FLAT), ev, cfg.resist, cfg.resist, cfg.wall);
+    hoof.rough[i] = hoof.rough[i] * (1 - Math.min(1, d * 2)) + d * 0.02;
+  }
+  const end = path[path.length - 1];
+  for (const c of [CLAW.OUTER, CLAW.INNER]) if (onCap[c]) workCap(hoof, c, end.x, end.y, cfg.capFlick, ev);
+  if (knife?.sand) knife.wear = Math.min(1, knife.wear + ev.removed * cfg.wearPer);
+  return aimedAtSepsis(hoof, end.x, end.y, ev);
 }
 
 // Grinder: continuous removal while held, scaled by time.
