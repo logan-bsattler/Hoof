@@ -95,6 +95,14 @@ export const CFG = {
   // so it shows pink at once and a full knife pull a time bleeds on the third.
   decoy: { haemOver: 0.3, haemLift: 5.1 },
 
+  // Stain islands (WP10.3): low spots in the sole. The core starts `lowBy` mm under target, so a
+  // level pass skims over it, and the manure soaked `soak` mm into it, never deeper than `stainTo`
+  // mm of sole: grinding one clean takes it to where the danger cues sound, before the thin line.
+  // The grinder's disc rides on the horn round a hollow: a cell `skim` mm under the highest sole
+  // under it is cut at `skimRate` of the usual speed. Cells more than `wbSkip` mm low are left out
+  // of the claw's depth reading.
+  isle: { lowBy: [1.6, 2.6], soak: 1, stainTo: 3.8, skim: [0.4, 1.6], skimRate: 0.08, wbSkip: 0.75 },
+
   // Cow temperament, 0 calm to 1 lively (0.5 is the old default cow). Each pair runs calm → lively.
   // flinchAt: the living sole (mm) she flinches at under a blade; kept under the dish target's
   // band so a correct dish never sets her off. shake: how hard every flinch jolts the view.

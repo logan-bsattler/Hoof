@@ -260,6 +260,10 @@ export class Hoof {
     this.lift = new Float32Array(n);
     this.noise = new Float32Array(n);
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
+    // Stain islands (WP10.3): how far (mm) the sole starts under the plain sole round it, and how
+    // deep (mm, below where it started) the manure stain soaked in. 0 off the islands.
+    this.low = new Float32Array(n);
+    this.isle = new Float32Array(n);
     this.drained = false;           // the abscess pocket has been opened and has drained
     // A sole ulcer's cap holds firm under the knife until it's been worked enough, then gives.
     // Per claw, since both claws can carry one (J3): knife travel over the closed cap so far
@@ -430,7 +434,62 @@ export class Hoof {
       });
     }
 
+    this.buildIslands();
     this.init.set(this.thick);
+  }
+
+  // Stain islands (WP10.3): a few low spots per claw, placed per cow, where the manure stain
+  // soaked in deeper. Biased toward the axial half but kept out of the dish band, off the wall,
+  // the toe triangle, the dead toe, any lesion's horn and the marks.
+  buildIslands() {
+    const T = CFG.sole.target, I = CFG.isle;
+    const rand = mulberry32(((this.caseDef.seed ?? 214) * 7919 + 31) >>> 0);
+    for (const c of [CLAW.OUTER, CLAW.INNER]) {
+      let axMax = 0, y0 = Infinity, y1 = -Infinity;
+      for (let i = 0; i < this.n; i++) {
+        if (this.claw[i] !== c || this.edge[i] < 10) continue;
+        axMax = Math.max(axMax, axialDist(this.cellX(i)));
+        y0 = Math.min(y0, this.cellY(i)); y1 = Math.max(y1, this.cellY(i));
+      }
+      if (!axMax) continue;
+      const blobs = [];
+      for (let k = 2 + Math.floor(rand() * 3); k > 0; k--) {
+        const lo = Math.max(GEOM.heelY + 6, y0 + 20), hi = Math.min(y1 - 30, 520);
+        const b = {
+          ax: 14 + (axMax - 14) * Math.pow(rand(), 1.6) * 0.75, y: lo + (hi - lo) * rand(),
+          rx: 6 + 9 * rand(), ry: 12 + 22 * rand(), lowBy: I.lowBy[0] + (I.lowBy[1] - I.lowBy[0]) * rand(),
+          tilt: (rand() - 0.5) * 0.6, ph: rand() * 6.28,
+        };
+        // The dish is knife work to its own depth: an island in its band sits just past it.
+        if (b.y > GEOM.dishY0 - b.ry * 0.5 && b.y < GEOM.dishY1 + b.ry * 0.5) {
+          b.ax = Math.max(b.ax, Math.min(axMax - 12, GEOM.dishW + 4 + b.rx * 0.6));
+        }
+        blobs.push(b);
+      }
+      for (let i = 0; i < this.n; i++) {
+        const z = this.zone[i];
+        if (this.claw[i] !== c || this.edge[i] < 9 || this.looseInit[i] || this.keepOut[i] || this.lift[i]
+          || (z & (Z.DEAD | Z.HEEL | Z.WALL | Z.CLEFT | Z.TRI)) || this.findingAt(i)) continue;
+        const ax = axialDist(this.cellX(i)), y = this.cellY(i);
+        let k = 0, floor = T;
+        for (const b of blobs) {
+          const dx = ax - b.ax - (y - b.y) * b.tilt, dy = y - b.y;
+          // A lobed outline, so no patch is a plain ellipse.
+          const a = Math.atan2(dy / b.ry, dx / b.rx);
+          const r2 = (dx * dx) / (b.rx * b.rx) + (dy * dy) / (b.ry * b.ry);
+          const lobe = 1 + 0.22 * Math.sin(3 * a + b.ph) + 0.12 * Math.sin(5 * a - b.ph);
+          const t = Math.min(1, (1 - r2 / (lobe * lobe)) * 1.6);
+          if (t > k) { k = t; floor = T - b.lowBy; }
+        }
+        // Fade out toward the wall and into the dish's feather rather than stop on a ruled line.
+        k *= smoothstep(9, 13, this.edge[i]) * smoothstep(T - 1.5, T - 0.05, this.tgt[i]);
+        const plain = this.thick[i];
+        if (k <= 0.01 || plain <= floor) continue;
+        this.low[i] = k * (plain - floor);
+        this.thick[i] = plain - this.low[i];
+        this.isle[i] = k * Math.max(0, Math.min(I.soak, this.thick[i] - I.stainTo));
+      }
+    }
   }
 
   // Lay one lesion into the grid. A sole ulcer is a core of exposed corium hidden under a cap of loose horn.
@@ -608,6 +667,10 @@ export class Hoof {
       const f = thinFinding(this.caseDef, this.claw[i]);
       return { kind: 'thinsole', finding: f, text: `${diagnosed ? f.diagnosedText : f.probeText} ${t.toFixed(1)} mm.` };
     }
+    // A stain island (WP10.3): low, and firm under the stain.
+    if (this.low[i] > CFG.isle.wbSkip) {
+      return { kind: 'firm', text: `A low spot, stained deep. Firm, and already under the level: leave it. ${t.toFixed(1)} mm.` };
+    }
     return { kind: 'firm', text: `Firm, healthy horn. ${t.toFixed(1)} mm of sole.` };
   }
 
@@ -713,8 +776,12 @@ export class Hoof {
           m.triN++;
           if (t < from - 0.75) m.triCut++;
         } else if (!this.keepOut[i]) {
-          k.wbSum += t; k.wbN++;
-          k.wbTaken += Math.max(0, this.init[i] - t);
+          // A stain island (WP10.3) starts low: left out of the claw's depth, so a level trim
+          // reads level, but still judged for over-trimming from where it started.
+          if (this.low[i] <= CFG.isle.wbSkip) {
+            k.wbSum += t; k.wbN++;
+            k.wbTaken += Math.max(0, this.init[i] - t);
+          }
           m.wbN++;
           if (t < from - 1.25) m.overWB++;
         }

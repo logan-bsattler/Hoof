@@ -324,10 +324,17 @@ export function applyGrind(hoof, x, y, dt) {
   const ev = newEvents();
   const cfg = CFG.tools.grinder;
   ev.danger = 0;
+  // The flat disc rides on the highest sole under its middle, so it skims over a stain island (WP10.3).
+  const I = CFG.isle;
+  let top = 0;
+  hoof.stamp(x, y, cfg.radius, (i, f) => {
+    if (f > 0.75 && !hoof.low[i] && !hoof.loose[i] && (hoof.zone[i] & Z.LIVE) && !(hoof.zone[i] & (Z.WALL | Z.HEEL | Z.ULCER | Z.CLEFT | Z.SEPSIS))) top = Math.max(top, hoof.thick[i]);
+  });
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
+    const skim = hoof.low[i] ? 1 - (1 - I.skimRate) * smoothstep(I.skim[0], I.skim[1], top - hoof.thick[i]) : 1;
     if (f > 0.5 && (hoof.zone[i] & Z.LIVE) && hoof.thick[i] > 0) {
-      ev.danger = Math.max(ev.danger, 1 - smoothstep(CFG.sole.thin, hoof.zoneTarget(i), hoof.thick[i] - hoof.lift[i]));
+      ev.danger = Math.max(ev.danger, skim * (1 - smoothstep(CFG.sole.thin, hoof.zoneTarget(i), hoof.thick[i] - hoof.lift[i])));
     }
     hoof.mud[i] = Math.max(0, hoof.mud[i] - 2 * dt * f);
     if (hoof.zone[i] & Z.ULCER) ev.grinderLesion = true;
@@ -350,7 +357,7 @@ export function applyGrind(hoof, x, y, dt) {
     // The finer disc (WP17.3, hoof.kit) slows near the line and leaves finer swirls.
     const fine = hoof.kit?.disc ? cfg.fine : null;
     const slow = fine && hoof.thick[i] - hoof.zoneTarget(i) < fine.near ? fine.rate : 1;
-    const d = cut(hoof, i, cfg.rate * dt * f * slow, ev, cfg.resist, cfg.resistThin, cfg.wall);
+    const d = cut(hoof, i, cfg.rate * dt * f * slow * skim, ev, cfg.resist, cfg.resistThin, cfg.wall);
     // The disc leaves swirl marks the rasp has to true up.
     hoof.rough[i] += ((fine ? fine.rough : 0.45) - hoof.rough[i]) * Math.min(1, d * 2);
   });

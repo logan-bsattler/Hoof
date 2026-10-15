@@ -24,6 +24,12 @@ round over** on the road map.
 
 ## 1. This round (review fixes 2026-10-15)
 
+### Stain islands are low spots (WP10.3 follow-up)
+- [ ] After a level grinder pass, the brown islands stay as dark hollows and the level gauge still reads level. `?cond=routine`
+- [ ] Tap one with the testers: "A low spot, stained deep … leave it."
+- [ ] Hold the grinder on one: the disc mostly skates over it. Keep going and the tone and buzz tighten as the stain goes, and it clears before the thin warning or blood.
+- [ ] On the dirty foot, before trimming, do the islands read as hollows under the muck, or too obviously?
+
 ### The read (#1)
 - [ ] The right answer is not always the top button on the read card, and the order looks random from cow to cow.
 - [ ] Before the read, the intro card and top bar name her by ear tag (`Holstein #904`), not by her condition; the condition appears in the top bar only after you commit the read.

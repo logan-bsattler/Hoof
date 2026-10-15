@@ -57,6 +57,11 @@ function idealTrim(hoof) {
 }
 
 // Centre of the first cell matching a predicate.
+// Fill a hoof's stain islands (WP10.3) back up to the plain sole round them.
+function fillIslands(h) {
+  for (let i = 0; i < h.n; i++) if (h.low[i]) { h.thick[i] += h.low[i]; h.init[i] = h.thick[i]; h.low[i] = h.isle[i] = 0; }
+}
+
 function findCell(hoof, pred) {
   for (let i = 0; i < hoof.n; i++) if (hoof.claw[i] && pred(i)) return [hoof.cellX(i), hoof.cellY(i)];
   throw new Error('no matching cell');
@@ -393,6 +398,7 @@ test('cuts ease in above target: full rate well above, slowed near, `resist` bel
   const [x, y] = findCell(h, (i) => (h.zone[i] & Z.LIVE) && !(h.zone[i] & (Z.HEEL | Z.DISH | Z.ULCER | Z.WALL)) &&
     !h.looseInit[i] && h.claw[i] === CLAW.INNER && h.cellY(i) > 380 && h.zoneTarget(i) === T);
   const i = h.cellAt(x, y);
+  fillIslands(h); // plain sole: no stain island for the disc to skim over
   const { rate, resist } = CFG.tools.grinder;
   const dt = 0.001;
   // Removal at the cell itself (falloff 1 at the disc centre) from a given starting thickness.
@@ -408,6 +414,7 @@ test('cuts ease in above target: full rate well above, slowed near, `resist` bel
 
 test('grinder danger is quiet on a fresh hoof and loud over thin horn', () => {
   const h = new Hoof(CASE_B);
+  fillIslands(h); // plain sole: no stain island for the disc to skim over
   const [x, y] = [280, 400];
   assert.ok(applyGrind(h, x, y, 0.001).danger < 0.05, 'fresh hoof');
   h.thick[h.cellAt(x, y)] = 3.2;
@@ -1389,4 +1396,87 @@ test('leg guards soften the jolt and the shifting, and stop all but a known kick
   assert.equal(guarded.kicks, false);
   assert.equal(temperament(0.9, { guards: true, kicker: true }).kicks, true);
   assert.equal(temperament(0.2, { guards: true }).fidgetEvery, 0, 'a calm cow still stands still');
+});
+
+// WP10.3: stain islands are real low spots. A level pass leaves them stained; grinding one clean
+// takes it to where the danger cue sounds, before the sole goes thin.
+const isleCows = () => [CASE_B, ...Array.from({ length: 30 }, (_, k) => dealCase(k * 7717 + 3))];
+// Sweep the grinder over both claws the way the bot does, lifting off at target.
+function levelPass(h) {
+  for (const c of [CLAW.OUTER, CLAW.INNER]) {
+    const b = clawBox(c, h.side);
+    for (let q = 0; q < 3; q++) for (let y = 270 + q * 5; y < 580; y += 14) {
+      for (let x = b.x + 15; x < b.x + b.w - 15; x += 2) {
+        const i = h.cellAt(x, y);
+        if (i < 0 || h.thick[i] > h.zoneTarget(i) + 0.4) applyGrind(h, x, y, 1 / 120);
+      }
+    }
+  }
+}
+
+test('stain islands start low on every cow, never at the thin line, and only on plain sole', () => {
+  const { thin } = CFG.sole, I = CFG.isle;
+  for (const cd of isleCows()) {
+    const h = new Hoof(cd);
+    let n = 0;
+    for (let i = 0; i < h.n; i++) {
+      if (!h.low[i]) continue;
+      n++;
+      assert.ok(h.thick[i] >= T - I.lowBy[1] - 1e-4 && h.thick[i] > thin + 1, `island at ${h.thick[i].toFixed(2)} mm, seed ${cd.seed}`);
+      assert.ok(!(h.zone[i] & (Z.WALL | Z.DEAD | Z.HEEL | Z.TRI | Z.CLEFT)) && !h.looseInit[i] && !h.keepOut[i], 'off the wall, toe, heel and lesions');
+      assert.ok(h.thick[i] - h.isle[i] >= I.stainTo - 1e-4, 'the stain stops short of the thin line');
+    }
+    assert.ok(n > 20, `seed ${cd.seed}: islands on the sole`);
+  }
+});
+
+test('a level pass skims over the islands and still reads level', () => {
+  let left = 0, tot = 0;
+  for (const cd of isleCows().slice(0, 12)) {
+    const h = new Hoof(cd), flat = new Hoof(cd);
+    levelPass(h);
+    for (let i = 0; i < h.n; i++) {
+      if (h.isle[i] < 0.3) continue;
+      tot++;
+      if (h.init[i] - h.thick[i] < h.isle[i] * 0.7) left++;
+    }
+    // The same pass with the islands filled in: the claw's depth reading barely moves.
+    fillIslands(flat);
+    levelPass(flat);
+    const m = h.metrics(), mf = flat.metrics();
+    for (const c of [CLAW.OUTER, CLAW.INNER]) {
+      assert.ok(Math.abs(m.claws[c].wbMean - mf.claws[c].wbMean) < 0.3, `seed ${cd.seed} claw ${c}: wbMean ${m.claws[c].wbMean.toFixed(2)} vs ${mf.claws[c].wbMean.toFixed(2)}`);
+      assert.ok(Math.abs(m.claws[c].dishMean - mf.claws[c].dishMean) < 0.2, 'dishMean');
+    }
+    assert.ok(Math.abs(m.levelDiff - mf.levelDiff) < 0.3, 'levelDiff');
+    assert.equal(m.overWB, mf.overWB, 'the untouched islands are not over-trimmed');
+  }
+  assert.ok(left / tot > 0.75, `most island stain survives a level pass (${(left / tot).toFixed(2)})`);
+});
+
+test('grinding an island clean sounds the danger cue before anything under the disc goes thin', () => {
+  for (const cd of isleCows()) {
+    const h = new Hoof(cd);
+    levelPass(h);
+    let core = -1;
+    for (let i = 0; i < h.n; i++) if (h.low[i] > 1.2 && (core < 0 || h.isle[i] > h.isle[core])) core = i;
+    const [x, y] = [h.cellX(core), h.cellY(core)];
+    let ev, k = 0;
+    while (h.init[core] - h.thick[core] < h.isle[core] && k++ < 20000) ev = applyGrind(h, x, y, 1 / 120);
+    assert.equal(ev.blood, false);
+    assert.ok(ev.danger > 0.5, `seed ${cd.seed}: danger ${ev.danger.toFixed(2)} when the stain clears`);
+    h.stamp(x, y, CFG.tools.grinder.radius * 0.5, (i) => {
+      if ((h.zone[i] & Z.LIVE) && !(h.zone[i] & Z.WALL)) assert.ok(h.thick[i] > CFG.sole.thin, `seed ${cd.seed}: ${h.thick[i].toFixed(2)} mm under the disc`);
+    });
+  }
+});
+
+test('the testers call an island low and firm', () => {
+  const h = new Hoof(CASE_B);
+  let i = 0;
+  while (h.low[i] <= 1.2) i++;
+  h.mud.fill(0);
+  const r = h.probe(i, false);
+  assert.equal(r.kind, 'firm');
+  assert.match(r.text, /low spot/);
 });
