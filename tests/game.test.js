@@ -6,7 +6,7 @@ import { Hoof, Z, CLAW, LOOSE, TRACT, LESION_LOOSE, GEOM, clawBox, soundClaw, in
 import { CASE_B, makeCase, dealCase, dealMods, temperament } from '../src/case.js';
 import { CONDITIONS } from '../src/conditions.js';
 import { stepsFor, stepLabel } from '../src/steps.js';
-import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, applyPry, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
+import { applyStroke, applyGrind, applyBite, applySpray, applyWrap, applyPry, BURST_POCKET, TOOL_ORDER as TOOLS_OK } from '../src/tools.js';
 import { evaluateSteps } from '../src/steps.js';
 import { newSession, scoreCase, judgeBlood } from '../src/scoring.js';
 
@@ -561,6 +561,35 @@ test('whiteline: following the track from the wall drains the pocket, once', () 
   assert.equal(drains, 1, 'drain fires once');
   knifeAlong(h, [[L.pocket.x - 5, L.pocket.y], [L.pocket.x + 5, L.pocket.y]]);
   assert.equal(h.probe(h.cellAt(L.pocket.x, L.pocket.y), true).kind, 'firm', 'reads drained afterwards');
+});
+
+test('a burst abscess reads as an old crusted hole and drains dry, its pocket shallower (WP15.3)', () => {
+  const sealed = makeCase('whiteline', 1), cd = makeCase('whiteline', 1, { stage: 'burst' });
+  assert.equal(cd.lesion.stage, 'burst');
+  assert.deepEqual(cd.lesion.path, sealed.lesion.path, 'the same track');
+  assert.equal(makeCase('ulcer', 1, { stage: 'burst' }).lesion.stage, undefined, 'only a white line bursts');
+  const h = new Hoof(cd);
+  const L = cd.lesion;
+  h.mud.fill(0);
+  assert.match(h.probe(h.cellAt(L.x, L.y), false).text, /broken out on its own/);
+  let dry = 0, drains = 0;
+  for (let k = 0; k < 4 && !h.drained; k++) {
+    const evs = knifeAlong(h, [...L.path, [L.pocket.x, L.pocket.y], [L.pocket.x + 4, L.pocket.y + 4], [L.pocket.x - 4, L.pocket.y - 4]]);
+    drains += evs.filter((e) => e.drain).length;
+    dry += evs.filter((e) => e.dry).length;
+  }
+  assert.ok(h.drained);
+  assert.deepEqual([drains, dry], [1, 1], 'one drain, and it is dry');
+  // The opened pocket goes to target −1.5 (later strokes over it can go deeper, as anywhere).
+  const depth = (hf) => { let d = -99; for (let j = 0; j < hf.n; j++) if (hf.tract[j] === TRACT.POCKET && !hf.loose[j]) d = Math.max(d, hf.thick[j] - hf.zoneTarget(j)); return d; };
+  assert.equal(BURST_POCKET, 1.5);
+  assert.match(h.probe(h.cellAt(L.pocket.x, L.pocket.y), true).text, /dry/);
+  // A sealed one goes to −2.5 and drains wet.
+  const hs = new Hoof(sealed); hs.mud.fill(0);
+  let wet = 0;
+  for (let k = 0; k < 4 && !hs.drained; k++) wet += knifeAlong(hs, [...sealed.lesion.path, [sealed.lesion.pocket.x, sealed.lesion.pocket.y]]).filter((e) => e.dry).length;
+  assert.equal(wet, 0);
+  assert.ok(depth(h) > depth(hs) + 0.4, `burst pocket ${depth(h).toFixed(2)} vs sealed ${depth(hs).toFixed(2)}`);
 });
 
 test('whiteline: the pocket will not open from the sole, the grinder or the nippers', () => {

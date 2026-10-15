@@ -89,6 +89,13 @@ export const FINDING = {
   },
 };
 
+// A white-line abscess that has broken out on its own (WP15.3): the read changes, the job doesn't.
+export const FINDING_BURST = {
+  look: 'an old dark hole at the wall, crusted round', feel: 'tender along the line, not hot',
+  probeText: 'An old hole at the white line, dry, crusted: it has broken out on its own. She’s tender along the line from it.',
+  diagnosedText: 'A burst white-line abscess. Still pare the track open to the pocket so it stays clean: there’s no pus left to chase.',
+};
+
 // The other ways a cow leaves the crush besides release (WP8.1, D22): the hospital pen (soft
 // bedding near the parlour, no vet), the pen with the vet called, or back to the herd untrimmed
 // till dry-off. A condition's `call` says which one it needs (null: release her as usual).
@@ -367,14 +374,18 @@ export const CONDITIONS = {
     copy({ cow, limb, lesion }) {
       const sore = CLAW_NAME[lesion.claw], sound = CLAW_NAME[soundClaw({ lesion })];
       return {
-        intro:
-          `#${cow} went hopping lame on the ${limb} overnight and won't put the toe down. ` +
-          'Lift the foot: look along the wall as well as the sole.',
+        intro: lesion.stage === 'burst'
+          ? `#${cow} has been short on the ${limb} for a week or two, though the farmer thinks she's a bit better since the weekend. ` +
+            'Lift the foot: look along the wall as well as the sole.'
+          : `#${cow} went hopping lame on the ${limb} overnight and won't put the toe down. ` +
+            'Lift the foot: look along the wall as well as the sole.',
         diagnosisPrompt: 'She’s very sore on this foot. What are you looking at?',
         diagnosisOptions: [
           {
             id: 'whiteline', label: 'White-line abscess',
-            feedback: `Right. A dark track in the white line of the ${sore} claw, with pus building at its end.`,
+            feedback: lesion.stage === 'burst'
+              ? `Right. A track in the white line of the ${sore} claw that has already broken out at the wall: the old hole is crusted dry.`
+              : `Right. A dark track in the white line of the ${sore} claw, with pus building at its end.`,
           },
           {
             id: 'ulcer', label: 'Sole ulcer',

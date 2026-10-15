@@ -25,6 +25,8 @@ const ONLY = Q.has('stage') ? Number(Q.get('stage')) : -1;
 // &kinds=fade,pigment,haem deals those decoys, one each (WP14.2); &pits=1 turns them into old pits.
 const OLD = Q.get('oldblock');
 const MODS = OLD ? { oldBlock: { claw: CLAW.OUTER, kind: OLD === 'wood' ? 'wood' : 'rubber' } } : {};
+// &burst=1 on a white line deals the abscess that has broken out on its own (WP15.3).
+if (Q.has('burst')) MODS.stage = 'burst';
 if (Q.has('kinds')) { MODS.decoyKinds = Q.get('kinds').split(','); MODS.decoyCount = MODS.decoyKinds.length; }
 const dealt = (mods) => makeCase(Q.get('cond'), Number(Q.get('seed')) || 1, mods);
 const pitsOf = (cd) => cd.findings.filter((f) => f.kind !== cd.lesion?.type).slice(0, 2).map(({ claw, x, y }) => ({ claw, x, y }));
@@ -95,6 +97,11 @@ const STAGES = OLD ? [
   ...(L?.type === 'foreign' ? [['Ground, funnel pared', () => {
     const s = session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
     for (let k = 0; k < 6 && !s.hoof.drained; k++) s.funnel();
+    return s;
+  }]] : []),
+  ...(L?.type === 'whiteline' ? [['Ground, track pared to the pocket', () => {
+    const s = session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
+    for (let k = 0; k < 6 && !s.hoof.drained; k++) s.followTrack(L);
     return s;
   }]] : []),
   ...(L?.type === 'toenecrosis' ? [['Ground, black toe pared', () => {

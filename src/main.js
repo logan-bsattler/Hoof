@@ -713,7 +713,9 @@ function handle(ev, x, y) {
     if (game.temper.kicks) Sound.moo(true);
     warnOnce('flinchTip', 'She flinched: the sole’s getting thin under there.', 'info', 8);
   }
-  if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.', game.hoof.lesions().find((l) => l.pocket) ?? caseDef.lesion);
+  // A burst abscess (WP15.3) opens dry: no pus, no sigh, just the reason to open it anyway.
+  if (ev.dry) ui.toast('Dry: it broke out on its own a while back. Open it so it stays clean.', 'info', 4200);
+  else if (ev.drain) releasePressure('The pus is out. Pressure off: you can almost hear her sigh.', game.hoof.lesions().find((l) => l.pocket) ?? caseDef.lesion);
   if (ev.offTrack) warnOnce('offTrack', caseDef.lesion?.type === 'foreign' ? 'Nothing opens from here. Start right on the mark and work outward.' : 'Nothing opens from here. Follow the dark line in from the wall.', 'info');
   if (ev.cleftCut) {
     s.cleftCuts++;

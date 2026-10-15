@@ -60,7 +60,8 @@ function newEvents() {
     sprayed: 0, sprayLesion: 0,
     // White-line abscess: drain fires once, when the pared track reaches the pocket of pus.
     // offTrack: the knife dug at the pocket's sole without following the track there.
-    drain: false, offTrack: false,
+    // dry: it was a burst abscess (WP15.3), so the drain has no pus and no release.
+    drain: false, dry: false, offTrack: false,
     // Sole ulcer: how far the closed cap has been worked toward giving (0..1), and the stamp it gave.
     capStrain: 0, capPop: false,
     // A blade (knife, grinder, nippers) bit into the skin of the heel cleft.
@@ -182,6 +183,8 @@ function workCap(hoof, claw, x, y, amount, ev) {
 const GROOVE = { [TRACT.ENTRY]: 1.5, [TRACT.TRACK]: 1.5, [TRACT.POCKET]: 2.5 };
 // A puncture is pared as a funnel: deepest on the mark, shallower round it.
 const FUNNEL = { [TRACT.ENTRY]: 2.5, [TRACT.POCKET]: 1.5 };
+// A burst abscess's pocket (WP15.3): it drained itself a while back, so less to open.
+export const BURST_POCKET = 1.5;
 
 // Knife on the white-line tract. Under-run horn lifts away only where it joins an opened cell,
 // so the track has to be followed from the wall. Elsewhere it is ordinary sole: false, cut it.
@@ -192,11 +195,14 @@ function pareTract(hoof, i, ev) {
     return false;
   }
   clearLoose(hoof, i, ev);
-  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - (hoof.lesionOn(hoof.claw[i]).type === 'foreign' ? FUNNEL : GROOVE)[hoof.tract[i]]);
+  const L = hoof.lesionOn(hoof.claw[i]);
+  // A burst abscess (WP15.3) has emptied itself: its pocket is shallower.
+  const depth = L.type === 'foreign' ? FUNNEL[hoof.tract[i]] : L.stage === 'burst' && hoof.tract[i] === TRACT.POCKET ? BURST_POCKET : GROOVE[hoof.tract[i]];
+  hoof.thick[i] = Math.min(hoof.thick[i], hoof.zoneTarget(i) - depth);
   if (!hoof.drained && hoof.tract[i] === TRACT.POCKET) {
     let n = 0, open = 0;
     for (let j = 0; j < hoof.n; j++) if (hoof.tract[j] === TRACT.POCKET) { n++; if (!hoof.loose[j]) open++; }
-    if (open >= n * 0.5) { hoof.drained = true; ev.drain = true; }
+    if (open >= n * 0.5) { hoof.drained = true; ev.drain = true; if (L.stage === 'burst') ev.dry = true; }
   }
   return true;
 }

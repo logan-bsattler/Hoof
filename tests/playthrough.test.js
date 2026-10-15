@@ -300,6 +300,10 @@ test('the careful player also wins on mirrored feet and inner-claw ulcers', () =
   assert.equal(want.size, 0, 'every layout dealt');
 });
 
+test('a burst white line plays to Textbook too, over a seed sweep (WP15.3)', () => {
+  for (let seed = 1; seed <= 8; seed++) playthrough(makeCase('whiteline', seed, { ...dealMods(seed), stage: 'burst' }), true);
+});
+
 test('the careful player follows the white line on both feet and both claws', () => {
   const want = new Set(['LH1', 'LH2', 'RH1', 'RH2']);
   for (let seed = 1; want.size && seed < 500; seed++) {

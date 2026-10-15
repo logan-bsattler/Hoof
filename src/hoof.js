@@ -575,7 +575,7 @@ export class Hoof {
     if (LL) {
       const L = LL;
       const finding = this.lesionFinding(L);
-      if (this.drained && LESION_LOOSE[L.type] === LOOSE.TRACT) return { kind: 'firm', text: 'Drained. The pressure’s off: keep weight off this claw.' };
+      if (this.drained && LESION_LOOSE[L.type] === LOOSE.TRACT) return { kind: 'firm', text: L.stage === 'burst' ? 'Opened and clean. It was dry: keep weight off this claw.' : 'Drained. The pressure’s off: keep weight off this claw.' };
       if (L.type === 'toenecrosis' && !this.loose[i]) return { kind: 'firm', text: 'Pared back to healthy horn. What’s under it is the bone: that’s the vet’s.' };
       if (L.type === 'doublesole' && !this.loose[i]) return { kind: 'firm', text: `New sole underneath: thinner, but firm and sound. ${this.thick[i].toFixed(1)} mm.` };
       return { kind: 'lesion', finding, text: diagnosed ? finding?.diagnosedText : finding?.probeText };

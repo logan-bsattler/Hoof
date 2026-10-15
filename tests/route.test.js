@@ -596,6 +596,21 @@ test('Case B healed may bring her hand-placed ulcer back on a later visit (WP15.
   assert.deepEqual([...seen].sort(), ['again', 'healed']);
 });
 
+test('burst abscesses: about 1 in 3 white lines from Brackenford on, never at Willow Bank or Hollins (WP15.3)', () => {
+  for (const id of ['willowbank', 'hollins']) {
+    for (let v = 1; v <= 40; v++) for (const cd of visitCases(farmById(id), v)) assert.notEqual(cd.lesion?.stage, 'burst');
+  }
+  let burst = 0, all = 0;
+  for (const f of FARMS.filter((f) => f.rep >= farmById('brackenford').rep)) {
+    for (let seed = 1; seed <= 600; seed++) {
+      const { mods } = farmMods(f, seed);
+      all++;
+      if (mods.stage === 'burst') burst++;
+    }
+  }
+  assert.ok(burst / all > 0.28 && burst / all < 0.39, `${burst} of ${all}`);
+});
+
 test('a dug decoy comes back as an old pit, recheck or healed (WP14.2)', () => {
   const farm = farmById('hollins');
   const route = newRoute();

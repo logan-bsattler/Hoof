@@ -4,7 +4,7 @@
 import { CFG } from './config.js';
 import { CLAW } from './hoof.js';
 import { mulberry32 } from './noise.js';
-import { CONDITIONS, DECOY_KINDS, FINDING } from './conditions.js';
+import { CONDITIONS, DECOY_KINDS, FINDING, FINDING_BURST } from './conditions.js';
 
 const lerp = ([a, b], t) => a + (b - a) * t;
 
@@ -85,7 +85,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     looseHorn,
 
     // Marks the testers can read: the lesion and the decoys that only look like trouble.
-    findings: [...all.map(({ type, ...l }) => ({ kind: type, ...l })), ...decoys].map((f) => ({ ...f, ...FINDING[f.kind] })),
+    findings: [...all.map(({ type, ...l }) => ({ kind: type, ...l })), ...decoys].map((f) => ({ ...f, ...FINDING[f.kind], ...(f.stage === 'burst' ? FINDING_BURST : {}) })),
 
     diagnosis: C.diagnosis,
     ...C.copy({ cow, leg, limb, lesion, lesions }),
@@ -113,6 +113,7 @@ function withPits({ decoys, lesion, lesions, looseHorn }, pits) {
 //   oldBlock   { claw, kind }: last visit's block, still glued on (WP9 J2)
 //   kicker     true: a known kicker; her temper is floored where kicks start (WP12.2)
 //   pits       [{ claw, x, y }]: decoys dug out last visit, back as old black pits (WP14.2)
+//   stage      'burst': a white-line abscess that has broken out on its own (WP15.3)
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).
 // With no mods she comes out exactly as before the variations existed.
 export function makeCase(condition, seed, mods = {}) {
@@ -136,7 +137,9 @@ export function makeCase(condition, seed, mods = {}) {
   const excess = C.thinSole
     ? { [big]: -0.5 - (hi - 3.5) / 2 + (lo - 1.8) / 6, [small]: -0.5 - (hi - 3.5) / 2 }
     : { [big]: hi * growth, [small]: lo * growth };
-  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, ...over } = mods;
+  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, stage, ...over } = mods;
+  // A white-line abscess that has burst on its own (WP15.3); every other condition ignores it.
+  if (stage === 'burst' && condition === 'whiteline') placed.lesion = { ...placed.lesion, stage };
   if (pits?.length) placed.decoys = withPits(placed, pits);
   if (over.kicker) over.temper = Math.max(over.temper ?? 0.5, CFG.temper.kickFrom);
   const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });

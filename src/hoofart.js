@@ -1051,8 +1051,21 @@ export class HoofArt {
             const sw = T.w * (0.45 + 0.35 * ncv);
             const seam = smoothstep(sw, sw * 0.3, dT + (ngr - 0.5) * 1.2) * lf * 0.85;
             R += (58 - R) * seam; G += (48 - G) * seam; B += (40 - B) * seam;
-            const pool = smoothstep(K.r * 1.3, K.r * 0.3, dP) * 0.16 * lf;
+            const burst = T.stage === 'burst';
+            const pool = smoothstep(K.r * 1.3, K.r * 0.3, dP) * (burst ? 0.06 : 0.16) * lf;
             R *= 1 - pool; G *= 1 - pool; B *= 1 - pool * 0.8;
+            // Burst (WP15.3): where the line meets the wall it has already broken out, a small dark
+            // hole with a ring of dried, cracked, yellow-brown crust round it.
+            if (burst) {
+              const dE = Math.hypot(lx - T.x, ly - T.y) + (ncv - 0.5) * 2.4 + (ngr - 0.5) * 1.2;
+              const ring = smoothstep(10, 7, dE) * smoothstep(3, 4.5, dE) * lf;
+              const cr = 176 - 34 * ngr + 16 * ncv, cg = 138 - 30 * ngr + 12 * ncv, cb = 70 - 18 * ngr;
+              R += (cr - R) * ring * 0.9; G += (cg - G) * ring * 0.9; B += (cb - B) * ring * 0.9;
+              crust = Math.max(crust, ring);
+              const hole = smoothstep(4.5, 2.8, dE) * lf;
+              R += (30 - R) * hole; G += (24 - G) * hole; B += (20 - B) * hole;
+              sheen = Math.min(sheen, 1 - 0.4 * (ring + hole));
+            }
             // Opened: walls of clean pale horn, grey grit and pus along the bottom, heaviest in the
             // pocket. The footprint is read through a warped lookup so the groove's edge is ragged.
             const tf = fieldAt(tractF, lx + (nIsle[p] / 255 - 0.5) * 5, ly + (nStain[p] / 255 - 0.5) * 5);
@@ -1061,13 +1074,14 @@ export class HoofArt {
               const inPocket = smoothstep(K.r * 1.1, K.r * 0.6, dP);
               const bottom = Math.max(smoothstep(T.w * 0.9, T.w * 0.2, dT), inPocket);
               let cr = 228 - 10 * ngr, cg = 210 - 10 * ngr, cb = 176 - 8 * ngr;
-              const pus = bottom * (0.5 + 0.35 * inPocket) * (0.8 + 0.4 * ncv);
+              // A burst one is dry: a little grey grit along the bottom, hardly any pus.
+              const pus = bottom * (0.5 + 0.35 * inPocket) * (0.8 + 0.4 * ncv) * (burst ? 0.35 : 1);
               cr += (74 - cr) * pus; cg += (70 - cg) * pus; cb += (62 - cb) * pus;
               // Pink-grey corium shows through at the pocket's centre once it has drained.
               const core = smoothstep(0.55, 0.2, dP / K.r + (ncv - 0.5) * 0.4) * inPocket * 0.6;
               cr += (168 - cr) * core; cg += (110 - cg) * core; cb += (106 - cb) * core;
               R += (cr - R) * open; G += (cg - G) * open; B += (cb - B) * open;
-              wetness = Math.max(wetness, open * (0.4 + 0.6 * bottom));
+              wetness = Math.max(wetness, open * (burst ? 0.25 : 0.4 + 0.6 * bottom));
             }
           }
 

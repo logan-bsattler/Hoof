@@ -72,6 +72,7 @@ export function guideBook({ history = [], all = false } = {}) {
       id, locked: false, title: C.title, plain: g.plain,
       look: cap(g.look ?? F.look), feel: cap(g.feel ?? F.feel), todo: g.todo ?? F.diagnosedText,
       call: C.call ? CALLS[C.call].label : 'Release her',
+      ...(id === 'whiteline' ? { burst: 'Sometimes it has broken out on its own: an old hole at the wall, dry and crusted, and little pus. Still pare the track open to the pocket so it stays clean, but don’t dig for pus that isn’t there.' } : {}),
       ...(TOE_OUT_GUIDE.has(id) ? { walkIn: 'On a hind foot with the outer claw sore, she toes out on the walk-in: that’s the outer claw talking.' } : {}),
       img: `assets/guide/${id}.png`,
     };
@@ -216,6 +217,7 @@ export class Guide {
         <dl class="guide-facts">
           <dt>Looks</dt><dd>${esc(e.look)}</dd>
           <dt>Testers</dt><dd>${esc(e.feel)}</dd>
+          ${e.burst ? `<dt>Burst</dt><dd>${esc(e.burst)}</dd>` : ''}
           ${e.walkIn ? `<dt>Walk-in</dt><dd>${esc(e.walkIn)}</dd>` : ''}
           <dt>Do</dt><dd>${esc(e.todo)}</dd>
           <dt>Then</dt><dd>${esc(e.call)}</dd>
