@@ -903,11 +903,14 @@ Tier 2 of Nate's "Top ideas" (`docs/NOTES-NATE-LIVES.md`), items 4, 6 and 7, plu
 - **What it is:** the 14.1 side finding: J3 `twoclaw` dealt with `dealMods` on seeds 12 and 16 fails the bot with a cut into the open ulcer. The sweep only runs seeds 1–6, so it's never been seen in the test run.
 - **Change:** find out whether the bot or the game is at fault. If the bot (most likely: it already had to learn to keep the knife off an opened ulcer core in 7.3), fix the bot. If the placement puts the second lesion where a Textbook trim can't avoid it, fix `place` for twoclaw. Then widen the J3 sweep to seeds 1–20.
 - **Cost:** small, unless it turns out to be placement.
+- **Built 2026-10-14.** The bot, not the game. On seeds 12 and 16 both claws carry an ulcer near the cleft (cores about 45 px apart, 15 px of horn between them), and the bot's orbit round the second ulcer swept its blade over the first one's opened core. `openUlcer` now breaks the orbit into arcs that keep the blade clear of any other opened ulcer. Seeds 1–30 all play Textbook; a new test sweeps J3 over seeds 1–20. 159 tests green.
 
 ### Build order (D52)
 15.4 → 15.1 → 15.2 → 15.3. 15.4 first because it's small and clears a known red seed before more variety goes in. 15.1 next as the headline. 15.2 is small and independent. 15.3 last, being mostly art.
 
 ### Decisions for Ben
+
+**Taken 2026-10-14: Ben took all the defaults.**
 
 | # | Decision | Default |
 |---|---|---|

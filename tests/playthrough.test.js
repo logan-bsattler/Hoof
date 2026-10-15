@@ -256,9 +256,17 @@ function playthrough(cd, quiet = false, knife = null) {
     for (let k = 0; k < 40 && !hoof.capOpenAt[U.claw]; k++) p.drag('knife', [[U.x - U.r, U.y], [U.x + U.r, U.y], [U.x - U.r, U.y]], 160);
     assert.ok(hoof.capOpenAt[U.claw], 'cap gave');
     const ring = U.r + flat + 3;
-    const orbit = [];
-    for (let a = 0; a <= 48; a++) orbit.push([U.x + ring * Math.cos((a / 48) * 2 * Math.PI), U.y + ring * Math.sin((a / 48) * 2 * Math.PI)]);
-    for (let k = 0; k < 6 && remain() >= 0.1; k++) p.drag('knife', orbit, 90);
+    // On a J3 pair the other claw's ulcer may already be open across the cleft: the blade keeps
+    // clear of its core, so the orbit breaks into arcs round it.
+    const reach = CFG.tools.knife.radius + 2;
+    const others = hoof.lesions().filter((o) => o !== U && o.type === 'ulcer' && hoof.capOpenAt[o.claw]);
+    const arcs = [[]];
+    for (let a = 0; a <= 48; a++) {
+      const pt = [U.x + ring * Math.cos((a / 48) * 2 * Math.PI), U.y + ring * Math.sin((a / 48) * 2 * Math.PI)];
+      if (others.some((o) => Math.hypot(pt[0] - o.x, pt[1] - o.y) < o.r + reach)) { if (arcs.at(-1).length) arcs.push([]); }
+      else arcs.at(-1).push(pt);
+    }
+    for (let k = 0; k < 6 && remain() >= 0.1; k++) for (const arc of arcs) if (arc.length > 1) p.drag('knife', arc, 90);
     assert.ok(remain() < 0.1, 'ulcer opened');
   }
 
@@ -343,6 +351,11 @@ test('dealt cows, with all their variations at once, play to Textbook across a s
   for (const id of Object.keys(CONDITIONS)) {
     for (let seed = 1; seed <= 6; seed++) playthrough(makeCase(id, seed, dealMods(seed)), true);
   }
+});
+
+// J3 pairs are the tightest layout: two ulcers can face each other across the cleft (seeds 12, 16).
+test('both-claws cows play to Textbook over a wider seed sweep (WP15.4)', () => {
+  for (let seed = 1; seed <= 20; seed++) playthrough(makeCase('twoclaw', seed, dealMods(seed)), true);
 });
 
 test('the careful player trims front feet on both sides, outer claw first', () => {
