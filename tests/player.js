@@ -3,7 +3,7 @@
 
 import { Z, LOOSE, GEOM, clawBox, clawSide } from '../src/hoof.js';
 import { CFG } from '../src/config.js';
-import { applyStroke, applyGrind, applyBite, applySpray } from '../src/tools.js';
+import { applyStroke, applyFlick, applyGrind, applyBite, applySpray } from '../src/tools.js';
 
 const DT = 1 / 60;
 
@@ -56,6 +56,22 @@ export function makePlayer(hoof, opts = {}) {
       }
       if (onAction) onAction();
       return p;
+    },
+    // A flick of the knife's hook (WP16) from a to b: a short, quick stroke, worked in one go as
+    // main.js does when the finger lifts. It must be long enough not to be a tap, short enough
+    // not to be a carve.
+    flick(a, b) {
+      const K = CFG.tools.knife;
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < K.tapMax || len > K.flickMax) throw new Error(`a ${len.toFixed(0)} px stroke is no flick`);
+      if (knife?.wear > 0.6) { knife.wear = 0; knife.swaps = (knife.swaps ?? 0) + 1; }
+      const steps = Math.ceil(len / 3), path = [];
+      for (let j = 0; j <= steps; j++) path.push({ x: a[0] + ((b[0] - a[0]) * j) / steps, y: a[1] + ((b[1] - a[1]) * j) / steps });
+      const ev = applyFlick(hoof, path, knife);
+      if (onStamp) for (const q of path) onStamp('knife', q.x, q.y, (b[0] - a[0]) / len, (b[1] - a[1]) / len);
+      emit(ev, 'knife', b[0], b[1]);
+      if (onAction) onAction();
+      return ev;
     },
     brushAll() {
       for (let y = 180; y < 640; y += 14) p.drag('brush', [[30, y], [370, y + 6], [30, y + 12]], 900);

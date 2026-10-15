@@ -242,31 +242,43 @@ function playthrough(cd, quiet = false, knife = null) {
 
   return verdict();
 
-  // Step 5: flick the loose heel horn off.
+  // Step 5: flick the loose heel horn off, in short quick strokes across it, row by row.
   function heelHorn() {
     const H = cd.looseHorn;
     until('step5', () => {
-      for (let d = -H.r; d <= H.r; d += 5) p.drag('knife', [[H.x - H.r, H.y + d], [H.x + H.r, H.y + d]], 90);
+      for (let d = -H.r; d <= H.r; d += 5) {
+        for (let x = H.x - H.r; x < H.x + H.r; x += 16) p.flick([x, H.y + d], [x + 20, H.y + d]);
+      }
     });
   }
 
-  // Step 4, as the guided run says: saw back and forth across the dark circle until the cap
-  // gives (the knife comes off), then pare the loose edge with the blade's centre on the ring.
+  // Step 4, as the guided run says: flick the dark circle until the cap gives, then flick the
+  // loose edge free with the hook on a ring just clear of the open core (WP16).
   function openUlcer(U, remain) {
-    for (let k = 0; k < 40 && !hoof.capOpenAt[U.claw]; k++) p.drag('knife', [[U.x - U.r, U.y], [U.x + U.r, U.y], [U.x - U.r, U.y]], 160);
+    const K = CFG.tools.knife;
+    // The hook kept wholly on the cap, from its abaxial side in toward the cleft: no live sole
+    // under it, so nothing to nick.
+    const s = Math.sign(U.x - GEOM.midX) || 1, e = U.r * 1.75 - K.hook;
+    for (let k = 0; k < 8 && !hoof.capOpenAt[U.claw]; k++) p.flick([U.x + s * e, U.y], [U.x + s * (e - 16), U.y]);
     assert.ok(hoof.capOpenAt[U.claw], 'cap gave');
-    const ring = U.r + flat + 3;
-    // On a J3 pair the other claw's ulcer may already be open across the cleft: the blade keeps
-    // clear of its core, so the orbit breaks into arcs round it.
-    const reach = CFG.tools.knife.radius + 2;
+    assert.equal(hoof.capWorkAt[U.claw] <= K.capGive + K.capFlick, true, 'a few flicks opened it');
+    // The hook's flat stays clear of the open core; its edge reaches the cap's rim.
+    const hookFlat = K.hook * Math.sqrt(1 - KNIFE_FLAT);
+    // Each flick is a 16 px chord, which dips toward the centre mid-stroke: the ring sits out by that.
+    const near = U.r + hookFlat + 1, ring = near + 16 * 16 / (8 * near);
+    // On a J3 pair the other claw's ulcer may already be open across the cleft: the hook keeps
+    // clear of its core too.
     const others = hoof.lesions().filter((o) => o !== U && o.type === 'ulcer' && hoof.capOpenAt[o.claw]);
-    const arcs = [[]];
-    for (let a = 0; a <= 48; a++) {
-      const pt = [U.x + ring * Math.cos((a / 48) * 2 * Math.PI), U.y + ring * Math.sin((a / 48) * 2 * Math.PI)];
-      if (others.some((o) => Math.hypot(pt[0] - o.x, pt[1] - o.y) < o.r + reach)) { if (arcs.at(-1).length) arcs.push([]); }
-      else arcs.at(-1).push(pt);
+    const at = (t) => [U.x + ring * Math.cos(t), U.y + ring * Math.sin(t)];
+    const clear = (pt) => !others.some((o) => Math.hypot(pt[0] - o.x, pt[1] - o.y) < o.r + K.hook + 2);
+    // Overlapping chords round the ring, each a flick.
+    const dt = 2 * Math.asin(8 / ring), n = Math.ceil((2 * Math.PI * ring) / 12);
+    for (let k = 0; k < 6 && remain() >= 0.1; k++) {
+      for (let a = 0; a < n; a++) {
+        const t = (a / n) * 2 * Math.PI + k * 0.3, A = at(t), B = at(t + dt);
+        if (clear(A) && clear(B)) p.flick(A, B);
+      }
     }
-    for (let k = 0; k < 6 && remain() >= 0.1; k++) for (const arc of arcs) if (arc.length > 1) p.drag('knife', arc, 90);
     assert.ok(remain() < 0.1, 'ulcer opened');
   }
 

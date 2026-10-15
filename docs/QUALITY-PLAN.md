@@ -962,6 +962,7 @@ No condition is added and no score changes, so the 7.2 recipe doesn't apply and 
 ### 16.4 The bot flicks (small)
 - **Change:** the bot opens caps with flicks, frees an ulcer rim and the heel curl with flicks, and keeps carving for the dish and the white-line track. Sweep seeds 1–8 at Textbook for every condition, J3 seeds 1–20.
 - **Check:** the full sweep green; the pacing test unchanged.
+- **Built 2026-10-14.** `player.flick(a, b)` works one short stroke through `applyFlick`, as `main.js` does when the finger lifts, and refuses any stroke shorter than `tapMax` or longer than `flickMax`. The bot opens a cap with flicks kept wholly on it (3 flicks), frees any rim left with 16 px flicks on a ring just clear of the open core (the J3 pair's other core too), and flicks the heel curl off row by row (about 10 flicks). The dish and the white-line track stay carved. On ulcer seeds 1–3 the cap's crack takes all but 0–2% of the rim, so the rim flicks rarely run. Scores match the sawing bot or edge up (two finish 99 → 100). Full sweep green (seeds 1–10 every condition, J3 1–20), pacing test untouched; 182 tests green. Tests only, so no sw bump.
 
 ### Not taken
 - **A mode button** (tap the knife again to switch). It's explicit, but it adds a mode the player forgets they're in, and on sand farms a second tap already swaps in a fresh knife (WP12.4).
