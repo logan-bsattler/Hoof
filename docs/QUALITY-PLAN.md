@@ -847,6 +847,77 @@ Three new kinds in `DECOY_KINDS`, each with a `FINDING`, a `DECOY_DEPTH` and its
 | D50 | Toe-out: never on a sound cow for now (no false positives)? | Yes. Add the metabolic toe-out as a later variation once the cue is learned |
 | D51 | Hollins: swap its ulcer for a puncture, which brings the puncture in at rep 30 instead of 180? | Yes. The farm's intro already sets it up, and the guides are on at that tier. If two new lesions on farm 2 feel like too much, swap the white line for the puncture instead and keep the ulcer |
 
+## WP15: the calendar, and cows that come back (medium; scoped 2026-10-14 at `4aa8a13`)
+
+Tier 2 of Nate's "Top ideas" (`docs/NOTES-NATE-LIVES.md`), items 4, 6 and 7, plus the 14.1 side finding. **Recommendation: build 15.1 first.** A season knob is the idea Nate repeats most (×6), and the road has no sense of time today: every visit to a farm is the same week of the year. 15.2 and 15.3 are smaller and give returning cows and abscesses a second face. 15.4 is a bug hunt that can go any time.
+
+### Fact checks (done 2026-10-14, by reading the code)
+
+| Question | Answer | So |
+|---|---|---|
+| Does the road keep a date? | No. `route` holds `rep`, `visits` per farm, `best`, `history` and the day in progress. Nothing counts days across farms. | 15.1 needs a clock. The total of `route.visits` (days finished) is one already, and it's in the save. |
+| Is a visit's herd fixed? | Yes. `visitCases(farm, visit, history, tier)` is seeded per farm and visit, and `visitHerd` rebuilds the day from the history before it, so a reload deals the same herd. | The season must be passed in the same way as the tier: worked out from the days finished *before* this one, so it can't change mid-day. |
+| How does a mix become cows? | `farmMix` (footbath on DD) → `herdDeck` shares the mix out over the herd by largest remainder → `visitDeck` shuffles it. | A season is one more multiplier in `farmMix`. With 3–4 cows a herd, a ×1.5 only changes the deck when it crosses a remainder, so the effect is lumpy. That's fine, but the tests should measure it over many visits. |
+| Which farms deal what the season would push? | White line: Hollins, Brackenford, Top Lane, Marsh End, Coldharbour. DD: Marsh End, Greystone, Coldharbour, Ridgeway. Foot rot: Marsh End and Coldharbour. | Summer has something to push at every farm past Hollins; DD and foot rot only bite from Marsh End on. |
+| Who comes back healed today? | `returningCows`: every recheck, every calved cow, then `healedBack(farm)` = ⌊cows/3⌋ of the cows who went off well, picked at random. A healed cow always comes back as a routine trim (`returnCase`). | 15.2 is a weighting in the healed pick plus one new outcome. |
+| What happens when an abscess drains? | `pareTract` fires `ev.drain` once at 50% of the pocket opened. `main.js:711` plays the release beat (sigh, pus) for every white line. | 15.3 adds a second stage with no pus and no beat. |
+| Save format | `save.js:27` allows `back` to be null, 'recheck', 'healed' or 'calved'. | A new outcome means a save change (as J1 did for 'calved'). |
+
+### 15.1 A season knob (medium)
+- **What it is:** Nate, ×6: summer (above about 65–68 °F) means cows stand more to shed heat, so it's "abscess season" (white line) and DD's worst time, and lesions heal slower. Winter is tame: cows lie down and foot problems "pretty much disappear" except DD. Wet spring and autumn bring mud and foot rot. Summer runs about 10–15% problem cows to 1–2% in winter.
+- **Change:** a season clock on the road. Each finished day moves it on: `seasonFor(daysDone)`, with **3 days a season** (D53), starting in spring. The season rides on the visit like the tier (`visitCases(farm, visit, history, tier, season)`), worked out from the days finished before this one. It multiplies the mix in `farmMix`:
+
+  | Season | White line | DD | Foot rot | Routine | Mud |
+  |---|---|---|---|---|---|
+  | Spring | ×1 | ×1 | ×1.5 | ×1 | +0.1 |
+  | Summer | ×1.75 | ×1.5 | ×1 | ×0.75 | ×1 |
+  | Autumn | ×1 | ×1 | ×1.5 | ×1 | +0.1 |
+  | Winter | ×0.5 | ×1 | ×0.5 | ×1.5 | ×1 |
+
+  The visit card gets a season line under the farm intro ("High summer: the herd has been standing in the shade all week"), and the road map shows the season. Willow Bank and Hollins keep their decks in every season (D54), so the opening is the same for everyone.
+- **Effects:** on the pacing test (13 days at Textbook today), the road runs through spring → summer → autumn → winter → spring once. A summer Top Lane deals more white line and DD; a winter one is mostly routine and easier. Points per cow don't change, so a winter day isn't worth less. Rechecks and returning cows are untouched: a season changes who's *new*, not who comes back.
+- **Not taken:** season art (snow on the yard, summer light). Worth a look later, but the scenery is one painted set today. Slower healing in summer (more summer rechecks): it's real, but it would make summer a penalty rather than a different mix. Temperature as a number on the card.
+- **Check:** route tests: the season is fixed for a day across a reload; over 40 visits to Top Lane, summer deals at least half again as many white lines as winter; Willow Bank and Hollins decks never change; the pacing test still opens the road within a fortnight. The sweep is untouched (the bot plays whatever is dealt).
+- **Cost:** medium. A small `season.js` (or a block in route.js), the farmMix multiplier, the card line, the map line, save field none (days finished are already saved), tests.
+
+### 15.2 Ulcer cows come back; white-line cows don't (small)
+- **What it is:** Nate, ×2: ulcers recur because the pedal bone grows little spurs under the site and enlarges. White lines and abscesses are one-offs. Toe necrosis recurs too (already a recheck since WP8.4).
+- **Change:** in `returningCows`, the healed pick prefers cows whose condition was an ulcer (they're drawn first, then the rest at random). A healed ulcer cow then comes back with **the same ulcer again half the time** (D55), from the visit's own seed: same claw, same site, at the bottom of the size band. New `back.outcome: 'again'`, with the intro line "Back for her trim, and the ulcer is back where it was: the bone under it has a spur now." She earns points as a fresh ulcer. A healed white-line cow is never picked first and always comes back routine (as today).
+- **Effects:** more repeat ulcers at every farm that deals them; Willow Bank's Case B cow, if she healed, may come back with her ulcer on visit 2. That's a nice beat on the first farm. Save: `back` accepts 'again'.
+- **Not taken:** a bigger pedal bone in the art or the probe text. Only the recurrence is modelled.
+- **Check:** route tests: over many visits, a healed ulcer cow comes back as an ulcer about half the time and on the same claw; a healed white-line cow never does; a save with 'again' loads and an unknown outcome is still refused.
+- **Cost:** small.
+
+### 15.3 Abscess stage: sealed or burst (medium)
+- **What it is:** Nate, ×2: a sealed abscess squirts pus when opened and she walks out better straight away. One that has already burst has a dry track and little pus; she's been finding her own relief.
+- **Change:** a white-line mod `stage: 'sealed' | 'burst'`, drawn per cow from Brackenford on (1 in 3 burst, D56); Hollins and every guided run stay sealed. A burst abscess:
+  - *Read:* the entry at the wall is already open, a small dark hole with a dried crust round it, not a closed black line. The probe text says so ("an old hole at the white line, dry, crusted: it has broken out on its own").
+  - *Trim:* the track still has to be opened to the pocket, since the dead horn over it still traps muck, but the pocket is shallower (pared at target −1.5, not −2.5) and `ev.drain` gives a dry beat: no squirt, no sigh, a toast "Dry: it broke out on its own a while back. Open it so it stays clean."
+  - *Score:* the same as a sealed one. The lesson is the read (and not over-digging for pus that isn't there): `soleDugBesideTrack` already costs digging round the track.
+- **Effects:** the white line's guide page gains a "Burst" row. The art needs the open entry and crust (in `hoofart.js` next to the existing track art) and an art-lab stage for it.
+- **Not taken:** the gait difference (a sealed cow walking out better than she walked in). The walk-off already shows sound vs lame; a "better than before" beat needs the walk-in gait, which 14.3 only sketches.
+- **Check:** game tests: a burst abscess drains dry (no release sound, the dry toast), its pocket depth is −1.5; the sweep plays Textbook with `stage: 'burst'` forced; art lab shows both stages at 1× and 2×.
+- **Cost:** medium, most of it art.
+
+### 15.4 J3 seeds 12 and 16 fail the bot (small; diagnose first)
+- **What it is:** the 14.1 side finding: J3 `twoclaw` dealt with `dealMods` on seeds 12 and 16 fails the bot with a cut into the open ulcer. The sweep only runs seeds 1–6, so it's never been seen in the test run.
+- **Change:** find out whether the bot or the game is at fault. If the bot (most likely: it already had to learn to keep the knife off an opened ulcer core in 7.3), fix the bot. If the placement puts the second lesion where a Textbook trim can't avoid it, fix `place` for twoclaw. Then widen the J3 sweep to seeds 1–20.
+- **Cost:** small, unless it turns out to be placement.
+
+### Build order (D52)
+15.4 → 15.1 → 15.2 → 15.3. 15.4 first because it's small and clears a known red seed before more variety goes in. 15.1 next as the headline. 15.2 is small and independent. 15.3 last, being mostly art.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D52 | Build order: J3 seeds (15.4), season (15.1), ulcer recurrence (15.2), abscess stage (15.3)? | Yes |
+| D53 | Season length: 3 finished days a season, starting in spring? | Yes. A road of about 13 days then sees every season once. 2 days a season flickers; 4 means most players never see winter |
+| D54 | Leave Willow Bank and Hollins out of the season, so the opening is the same for everyone? | Yes. The first two farms are the teaching ramp, and a summer Hollins would deal two white lines on farm 2 |
+| D55 | A healed ulcer cow comes back with her ulcer half the time? | Yes. Always would make "healed" meaningless for ulcers; a quarter would barely be seen |
+| D56 | Burst abscesses: 1 in 3 white lines from Brackenford on, never on Hollins or a guided run? | Yes |
+| D57 | Knife stroke modes (your carve-vs-flick idea from 2026-10-11) stay out of WP15? | Yes. It's a feel change to the core tool and deserves its own WP with a phone design first. It's the obvious WP16 candidate |
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
