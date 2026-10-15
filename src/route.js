@@ -45,8 +45,8 @@ export const FARMS = [
   },
   {
     id: 'hollins', footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30,
-    intro: 'Dev grazes his herd out until the frosts. Their feet wear well on grass, but the lane to the parlour is all stones.',
-    mix: { routine: 0.5, whiteline: 0.3, ulcer: 0.2 }, growth: [0.75, 1.0], mud: [0.8, 1.15], temper: [0.2, 0.5], front: 0,
+    intro: 'Dev grazes his herd out until the frosts. Their feet wear well on grass, but the lane to the parlour is all stones, and the odd nail in the gateway.',
+    mix: { routine: 0.5, whiteline: 0.3, puncture: 0.2 }, growth: [0.75, 1.0], mud: [0.8, 1.15], temper: [0.2, 0.5], front: 0,
   },
   {
     id: 'brackenford', footbath: 'good', name: 'Brackenford', farmer: 'the Pryce brothers', housing: 'freestall', cows: 4, rep: 100,

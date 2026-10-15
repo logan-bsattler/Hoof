@@ -59,7 +59,7 @@ test('a visit deals the farm’s fixed number of cows, the same herd every time,
 test('a first visit deals the farm’s mix as a deck, not a streak', () => {
   const count = (list) => list.reduce((m, c) => ({ ...m, [c]: (m[c] ?? 0) + 1 }), {});
   assert.deepEqual(count(herdDeck(FARMS[0])), { routine: 2, ulcer: 1 }, 'Willow Bank: one ulcer, two routine');
-  assert.deepEqual(count(herdDeck(FARMS[1])), { routine: 2, whiteline: 1, ulcer: 1 }, 'Hollins brings its white line');
+  assert.deepEqual(count(herdDeck(FARMS[1])), { routine: 2, whiteline: 1, puncture: 1 }, 'Hollins brings its white line and a puncture');
   assert.equal(count(herdDeck(farmById('greystone'))).nonfoot, 1, 'Greystone brings a cow lame up the leg (D26)');
   for (const f of FARMS) {
     const deck = herdDeck(f);
@@ -492,13 +492,13 @@ test('footbath: every farm has one; no footbath raises the DD share, a good one 
 });
 
 test('a stripped ulcer in a block always comes back a recheck, block thrown, and she remembers it (WP14.1)', () => {
-  const farm = farmById('hollins');
+  const farm = farmById('brackenford');
   const route = newRoute();
   route.rep = farm.rep;
   const herd = startVisit(route, farm.id);
   // Every cow goes off sound in a block, the first with the ring round her ulcer stripped.
   const ulcer = herd.find((cd) => cd.condition === 'ulcer');
-  assert.ok(ulcer, 'Hollins deals an ulcer');
+  assert.ok(ulcer, 'Brackenford deals an ulcer');
   for (const cd of herd) recordCow(route, cd, { ...result('Clean'), block: { claw: CLAW.INNER, kind: 'rubber' }, ...(cd === ulcer ? { stripped: true } : {}) });
   endVisit(route);
   const row = route.history.find((h) => h.tag === tag(ulcer));
@@ -510,7 +510,7 @@ test('a stripped ulcer in a block always comes back a recheck, block thrown, and
   assert.equal(cd.condition, 'ulcer');
   assert.equal(cd.oldBlock, undefined, 'the block is gone');
   assert.equal(cd.back.mood, 'hurt');
-  assert.match(backLine(cd), /threw her block ten days on .* Dev Hollins rang you back\./);
+  assert.match(backLine(cd), /threw her block ten days on .* The Pryce brothers rang you back\./);
   assert.ok(!backLine(cd).includes('still wearing'));
   // Stripped but never blocked: nothing to throw, so she heals as any sound cow does.
   const r2 = newRoute();

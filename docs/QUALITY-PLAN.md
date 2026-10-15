@@ -824,6 +824,7 @@ Three new kinds in `DECOY_KINDS`, each with a `FINDING`, a `DECOY_DEPTH` and its
 - **Change:** Hollins's mix becomes `{routine .5, whiteline .3, puncture .2}`, so the deck is 2 routine, 1 white line, 1 puncture. Its intro already says the lane is all stones; add "and the odd nail in the gateway". Update route.test.js:62.
 - **Effects:** the puncture's first appearance moves from Top Lane (rep 180) to Hollins (rep 30), on the Apprentice tier with guides on. Farm 2 then brings two lesions the player hasn't met (white line, puncture) instead of one. Old saves are fine: a Hollins ulcer cow still comes back as an ulcer, since `returnCase` reads her own record. A Hollins visit in progress when the update lands re-deals a different herd on reload (`visitHerd` deals from the mix); that's acceptable.
 - **Not taken:** foot rot at Hollins. It's the right condition for pasture, but it needs the vet call, which the road introduces at Marsh End.
+- **Built 2026-10-14.** Mix and intro as above; the deck test now expects the puncture. The WP14.1 route test (stripped ulcer in a block) moved to Brackenford, since Hollins no longer deals an ulcer. 158 tests green, sweep included. sw v51.
 - **Cost:** tiny. One data line, one copy line, one test.
 - **Check:** the deck test, and the full route tests.
 
