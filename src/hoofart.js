@@ -525,10 +525,14 @@ export class HoofArt {
     }
     const heelY = GEOM.heelY;
     // A toe-dragger (D26): each claw's lowest dead-toe row, where the tip scuffs on the ground.
+    // Any other cow's toe has no worn tip: it sits below every pixel, so nothing is cut off.
     if (this.tipFor !== hoof) {
       this.tipFor = hoof;
-      this.tipY = { [CLAW.OUTER]: -1e9, [CLAW.INNER]: -1e9 };
-      if (hoof.caseDef.toeDrag) for (let i = 0; i < hoof.n; i++) if (hoof.zone[i] & Z.DEAD) this.tipY[hoof.claw[i]] = Math.max(this.tipY[hoof.claw[i]], hoof.cellY(i));
+      this.tipY = { [CLAW.OUTER]: 1e9, [CLAW.INNER]: 1e9 };
+      if (hoof.caseDef.toeDrag) {
+        this.tipY = { [CLAW.OUTER]: -1e9, [CLAW.INNER]: -1e9 };
+        for (let i = 0; i < hoof.n; i++) if (hoof.zone[i] & Z.DEAD) this.tipY[hoof.claw[i]] = Math.max(this.tipY[hoof.claw[i]], hoof.cellY(i));
+      }
     }
     const tipY = this.tipY;
     const decoys = (hoof.caseDef.findings ?? []).filter((f) => !hoof.isLesionFinding(f));
