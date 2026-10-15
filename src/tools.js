@@ -25,7 +25,7 @@ export const TOOLS = {
   },
   knife: {
     name: 'Hoof knife', mode: 'stroke', key: '5',
-    hint: 'Press, hold and pull to take off a strip of horn. For the dish and for loose horn.',
+    hint: 'Pull for a long, even strip: the dish. Flick, a short quick stroke, and the hook lifts loose horn.',
   },
   rasp: {
     name: 'Rasp', mode: 'stroke', key: '6',

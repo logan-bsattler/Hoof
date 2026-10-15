@@ -94,7 +94,7 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'openUlcer', tool: 'knife', title: 'Open the ulcer',
-      text: 'Work the knife back and forth across the dark circle. The cap holds, then gives, and the knife comes off. Then pare the loose edge with the knife on the ring, not inside it: the open ulcer is raw. Free it, but don’t strip the sole round it: if her block comes off, that ring is all she stands on.',
+      text: 'Flick at the edge of the dark circle: short, quick strokes with the knife’s hook. The cap holds, then gives, and the knife comes off. Then flick the loose edge free with the knife on the ring, not inside it: the open ulcer is raw. Free it, but don’t strip the sole round it: if her block comes off, that ring is all she stands on.',
       target: { kind: 'ring', x: L.x, y: L.y, r: pareR },
       measure: (m) => m.looseRemain[LOOSE.ULCER], goal: 0.1,
       done: (m) => m.looseRemain[LOOSE.ULCER] < 0.1,
@@ -107,7 +107,7 @@ export function tutorialBeats(caseDef) {
     },
     {
       id: 'heelHorn', tool: 'knife', title: 'Flick off the loose heel horn',
-      text: `There’s a curl of loose horn at the ${CLAW_NAME[H.claw]} heel. One or two short pulls with the knife flick it off. Leave the heel bulb itself alone.`,
+      text: `There’s a curl of loose horn at the ${CLAW_NAME[H.claw]} heel. One or two quick flicks of the knife lift it off. Leave the heel bulb itself alone.`,
       target: { kind: 'ring', x: H.x, y: H.y, r: H.r * 1.4 },
       measure: (m) => m.looseRemain[LOOSE.HEEL], goal: 0.1,
       done: step('step5'),

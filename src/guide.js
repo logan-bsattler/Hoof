@@ -13,7 +13,7 @@ const TOOL_NOTES = {
   probe: ['On anything that looks wrong once she’s clean: dark, red, lifted or raw.', 'Squeeze, then commit your read before you start opening things.'],
   nippers: ['The overgrown toe only, from the tip back toward the dashed line.', 'Too blunt for the sole, and a big bite can reach the trim line.'],
   grinder: ['Levelling each claw’s sole to about 7 mm, in smooth passes.', 'Not near a lesion or on a false sole: it tears. Linger in one spot and she bleeds.'],
-  knife: ['The dish along the inner edge, opening lesions, loose horn at the heel.', 'Pare the rim of an opened lesion, never the raw middle. A tap prises off an old block.'],
+  knife: ['Pull for the dish along the inner edge. Flick (a short, quick stroke) to open a cap and lift loose horn.', 'Flick the rim of an opened lesion, never the raw middle: a long carve there strips the ring she stands on. A tap prises off an old block.'],
   rasp: ['After the grinder, to true the sole before a block covers it.', 'Smoothing only: it won’t take a claw down.'],
   block: ['On the sound claw, so the sore one is off the floor.', 'Never on the sore claw, nor when both claws are sore. Tap the tool again for the taller wood block.'],
   spray: ['Flushing an opened lesion, or soaking sore skin in the cleft.', 'Flush again after each round of paring: fresh cuts need it too.'],

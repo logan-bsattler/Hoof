@@ -957,6 +957,7 @@ No condition is added and no score changes, so the 7.2 recipe doesn't apply and 
 ### 16.3 Teach it (small)
 - **Change:** the knife hint ("Pull for a long strip; flick, a short quick stroke, to lift loose horn"); the guided run's `openUlcer` step ("Flick at the edge of the dark circle: short, quick strokes. The cap holds, then gives") and `heelHorn` step; the knife page in the guide gains a carve and flick row; a flick on the guide-run heel horn is enough to pass it.
 - **Check:** guide tests; the guided run plays through with the new texts at 375 × 812.
+- **Built 2026-10-14.** New knife hint, guided-run `openUlcer` (flick at the edge, then flick the loose edge free) and `heelHorn` ("one or two quick flicks") texts, and the guide's knife notes name both strokes. The heel step still passes on any stroke that clears the horn. Not yet played through in the browser. sw v56.
 
 ### 16.4 The bot flicks (small)
 - **Change:** the bot opens caps with flicks, frees an ulcer rim and the heel curl with flicks, and keeps carving for the dish and the white-line track. Sweep seeds 1–8 at Textbook for every condition, J3 seeds 1–20.
