@@ -817,6 +817,7 @@ Three new kinds in `DECOY_KINDS`, each with a `FINDING`, a `DECOY_DEPTH` and its
 - **Feedback:** the result card adds one line when she toed out: "She was toeing out on the walk-in: that's the outer claw talking." The field guide pages for those conditions get the same line.
 - **Cost:** medium. All new art and one rule (`stance(caseDef)`), with no scoring and no grid change.
 - **Check:** phone check (375 × 667): the turned foot reads at a glance against a square one, in the art lab with both sides. Unit test for `stance()` over the conditions above. The sweep is untouched.
+- **Built 2026-10-14.** `src/stance.js`: `stance(caseDef)` gives 'out', 'square' or null (front foot, no sketch), and `drawStance` paints the 160 × 120 rear view on the intro card under a neutral caption ("Walking in, from behind"). The turned foot is rotated 15° on the floor plane with the hock 4 px in; the eye is set high enough (floor foreshortened to 0.7) that the claws show past the heels, which is what makes the turn read at 1×. The result card shows the toe-out line; the guide pages for ulcer, white line, puncture, toe necrosis and deep sepsis gain a Walk-in row. Checked in `dev/stance.html` (both sides, 1× and 2×) and on the intro card at 375 × 667. Not checked by Ben in play.
 
 ### 14.4 Hollins deals the wrong mix (tiny)
 - **What it is:** a pasture herd gets stones, punctures, sticks and foot rot, and *fewer* ulcers than housed cows (Nate's pasture videos, ×4). Hollins deals an ulcer.

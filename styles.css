@@ -562,3 +562,8 @@ p.back.healed { border-left-color: var(--sound); }
   .chip { padding: 4px 7px; }
   .brand { letter-spacing: 0.06em; }
 }
+
+/* The walk-in stance sketch on the intro card (WP14.3). */
+figure.stance { margin: 6px auto 10px; width: 160px; }
+figure.stance canvas { display: block; width: 160px; height: 120px; border-radius: 6px; }
+figure.stance figcaption { font-size: 11px; color: var(--muted); text-align: center; margin-top: 3px; }

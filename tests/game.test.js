@@ -1247,3 +1247,20 @@ test('each dug decoy has its own note, and the result carries its pit', () => {
   idealTrim(h);
   assert.equal(scoreCase(h.metrics(), idealSession(cd), h, cd).pits, undefined, 'nothing dug, no pits');
 });
+
+test('she toes out on the walk-in only with a sore outer hind claw (WP14.3)', async () => {
+  const { stance } = await import('../src/stance.js');
+  const { CLAW } = await import('../src/hoof.js');
+  for (const cond of ['ulcer', 'whiteline', 'puncture', 'toenecrosis', 'dds', 'routine', 'dd', 'footrot', 'doublesole', 'twoclaw', 'thinsole', 'nonfoot']) {
+    for (let seed = 1; seed <= 12; seed++) {
+      const cd = makeCase(cond, seed);
+      const L = cd.lesion;
+      const want = cd.foot === 'front' ? null
+        : ['ulcer', 'whiteline', 'puncture', 'toenecrosis', 'dds'].includes(cond) && L?.claw === CLAW.OUTER ? 'out' : 'square';
+      assert.equal(stance(cd), want, `${cond} seed ${seed}`);
+    }
+  }
+  assert.equal(stance(makeCase('ulcer', 1, { foot: 'front' })), null);
+  const inner = Array.from({ length: 40 }, (_, k) => makeCase('ulcer', k + 1)).find((cd) => cd.lesion.claw === CLAW.INNER);
+  assert.equal(stance(inner), 'square');
+});

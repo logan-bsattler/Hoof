@@ -18,6 +18,7 @@ import { UI } from './ui.js';
 import { Tutorial } from './tutorial.js';
 import { Guide } from './guide.js';
 import { drawToolIcon } from './toolart.js';
+import { stance, drawStance, TOE_OUT_LINE } from './stance.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
 import { FARMS, FOOTBATH, HOUSING, onSand, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
 
@@ -197,12 +198,14 @@ async function showIntro() {
   newCase();
   const best = loadBest();
   const v = route.visit;
-  const mode = await ui.modal(
+  const walkIn = stance(caseDef);
+  const shown = ui.modal(
     `<div class="eyebrow">${v ? `${farmById(v.farm).name} · Cow ${v.k + 1} of ${herd.length}${caseDef.back?.outcome === 'recheck' ? ' · Recheck' : ''}` : `Case ${caseDef.id} · Trimmer tier`}</div>
      <h1>${caseDef.title}</h1>
      <p class="sub">${caseDef.subtitle}</p>
      ${caseDef.back ? `<p class="back ${caseDef.back.outcome}">${backLine(caseDef)}</p>` : ''}
      <p>${caseDef.intro}</p>
+     ${walkIn ? '<figure class="stance"><canvas width="160" height="120" aria-label="Her hind legs from behind as she walked in"></canvas><figcaption>Walking in, from behind</figcaption></figure>' : ''}
      ${caseDef.traits ? `<p class="sub">${caseDef.traits}</p>` : ''}
      ${best ? `<p class="sub">Your best on this case: <b>${best.grade}</b> · ${best.total}</p>` : ''}
      <ul class="howto">
@@ -220,6 +223,8 @@ async function showIntro() {
       ? [{ id: 'guided', label: 'Guided first trim', primary: true }, { id: 'start', label: 'Lift the foot' }]
       : [{ id: 'start', label: 'Lift the foot', primary: true }],
   );
+  if (walkIn) drawStance(document.querySelector('#modalCard .stance canvas'), caseDef);
+  const mode = await shown;
   Sound.init();
   Sound.setEnabled(game.sound);
   game.state = 'play';
@@ -820,6 +825,7 @@ async function showResults() {
      <p class="sub">Score ${r.total} / 100 · ${r.call ? `<b>${CALLS[r.call].ticket}</b>` : `walked off <b>${r.gait}</b>`}${newBest ? ' · <b>New best</b>' : ''}</p>
      ${earned ? repLine(earned) : ''}
      ${bars}
+     ${stance(caseDef) === 'out' ? `<p class="sub">${TOE_OUT_LINE}</p>` : ''}
      <ul class="notes">${r.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`,
     [{ id: 'again', label: earned ? nextLabel(earned) : 'Trim another', primary: true }],
   );

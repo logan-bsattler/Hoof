@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stance Lab</title>
+  <style>
+    body { margin: 0; background: #16120f; color: #d8c8b0; font: 13px system-ui, sans-serif; }
+    #grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; }
+    figure { margin: 0; }
+    figcaption { padding: 4px 2px; color: #a89478; }
+    canvas { display: block; width: 160px; height: 120px; background: #241d17; }
+    .big canvas { width: 320px; height: 240px; }
+  </style>
+</head>
+<body>
+  <!-- Dev only (WP14.3): the walk-in stance sketch, square and turned out on each side. -->
+  <div id="grid"></div>
+  <div id="big" class="big" style="display:flex;flex-wrap:wrap;gap:12px;padding:0 12px 12px"></div>
+  <script type="module">
+    import { drawStance } from '../src/stance.js';
+    const CASES = [
+      ['Square (sound)', { foot: 'hind', side: 'LH', lesion: null }],
+      ['LH, outer ulcer', { foot: 'hind', side: 'LH', lesion: { type: 'ulcer', claw: 1 } }],
+      ['RH, outer ulcer', { foot: 'hind', side: 'RH', lesion: { type: 'ulcer', claw: 1 } }],
+      ['RH, inner ulcer', { foot: 'hind', side: 'RH', lesion: { type: 'ulcer', claw: 2 } }],
+    ];
+    for (const [id, zoom] of [['grid', 1], ['big', 2]]) {
+      for (const [label, cd] of CASES) {
+        const fig = document.createElement('figure');
+        const cv = document.createElement('canvas');
+        fig.append(cv, Object.assign(document.createElement('figcaption'), { textContent: label }));
+        document.getElementById(id).append(fig);
+        drawStance(cv, cd);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -50,6 +50,9 @@ export const TRIM_PAGE = [
   ['5 · Loose horn', 'Flick off loose horn at the heel. Then treat what needs it, and release her.'],
 ];
 
+// The conditions whose sore outer hind claw turns her toe out (WP14.3, stance.js).
+const TOE_OUT_GUIDE = new Set(['ulcer', 'whiteline', 'puncture', 'toenecrosis', 'dds']);
+
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 // The conditions met on the round so far: a cow with it was finished (any way off the line).
@@ -68,7 +71,9 @@ export function guideBook({ history = [], all = false } = {}) {
     return {
       id, locked: false, title: C.title, plain: g.plain,
       look: cap(g.look ?? F.look), feel: cap(g.feel ?? F.feel), todo: g.todo ?? F.diagnosedText,
-      call: C.call ? CALLS[C.call].label : 'Release her', img: `assets/guide/${id}.png`,
+      call: C.call ? CALLS[C.call].label : 'Release her',
+      ...(TOE_OUT_GUIDE.has(id) ? { walkIn: 'On a hind foot with the outer claw sore, she toes out on the walk-in: that’s the outer claw talking.' } : {}),
+      img: `assets/guide/${id}.png`,
     };
   });
   return { tools, conditions, trim: TRIM_PAGE };
@@ -211,6 +216,7 @@ export class Guide {
         <dl class="guide-facts">
           <dt>Looks</dt><dd>${esc(e.look)}</dd>
           <dt>Testers</dt><dd>${esc(e.feel)}</dd>
+          ${e.walkIn ? `<dt>Walk-in</dt><dd>${esc(e.walkIn)}</dd>` : ''}
           <dt>Do</dt><dd>${esc(e.todo)}</dd>
           <dt>Then</dt><dd>${esc(e.call)}</dd>
         </dl>`;
