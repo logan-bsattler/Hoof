@@ -410,7 +410,7 @@ function endPointer(e) {
     particles.spawn('shaving', ptr.x, ptr.y, '#f4ead2', Math.min(6, 1 + Math.round(game.pullRemoved / 15)));
     Sound.knife();
   }
-  if (sorted === 'flick' && e.type !== 'pointercancel') flick(ptr.stroke.path);
+  if (sorted === 'flick' && e.type !== 'pointercancel') { ptr.stroke.kind = 'flick'; flick(ptr.stroke.path); }
   game.pullRemoved = 0;
   if (game.state === 'play' && TOOLS[game.tool].mode === 'tap' && ptr.moved < 12) tap(ptr.x, ptr.y);
   else if (sorted === 'tap' && e.type !== 'pointercancel') pry(ptr.x, ptr.y);
@@ -636,7 +636,9 @@ function strainCap(strain, x, y) {
   buzz(6 + Math.round(strain * 10));
   jolt(0.6 + strain * 1.4);
   particles.spawn('flake', x, y, '#d9c79c', 1);
-  warnOnce('capFirm', 'The cap’s firm. Keep working the knife across it: it’ll give.', 'info', 30);
+  // A carve rides over the cap; the hook gets under it (WP16).
+  if (game.ptr.stroke?.kind === 'flick') warnOnce('capFirm', 'The cap’s firm. A few more flicks at its edge and it’ll give.', 'info', 30);
+  else warnOnce('capCarve', 'Carving rides over the cap. Flick at its edge: short, quick strokes with the hook.', 'info', 30);
 }
 
 // The cap gives: horn and core come away in one piece and the pocket floods. The knife comes

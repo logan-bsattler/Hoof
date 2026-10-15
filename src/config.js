@@ -53,7 +53,7 @@ export const CFG = {
     // (radius `hook`) takes at most flickCut mm of live sole and counts capFlick px of work on a
     // closed cap; a carve works the cap at capCarve of its travel.
     knife:   { radius: 14, rate: 0.075, resist: 0.35, engage: 6, capGive: 90, capLift: 1.75, flat: 0.4, wall: 0.5, pryTaps: 3, dull: 0.55, wearPer: 0.0004,
-               flickMax: 40, flickTime: 160, tapMax: 12, hook: 9, flickCut: 0.25, capFlick: 35, capCarve: 1 },
+               flickMax: 40, flickTime: 160, tapMax: 12, hook: 9, flickCut: 0.25, capFlick: 35, capCarve: 0.5 },
     grinder: { radius: 20, rate: 8.5, resist: 0.3, resistThin: 0.15, wall: 0.7 },
     // wall (knife, grinder): cut-rate multiplier on living wall, harder horn than the sole.
     // pryTaps: knife taps that lever an old block off (WP9 J2).

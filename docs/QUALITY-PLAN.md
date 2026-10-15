@@ -952,6 +952,7 @@ No condition is added and no score changes, so the 7.2 recipe doesn't apply and 
 - **Change:** in `workCap`, a flick whose hook lands on the cap counts `capFlick` (about 35 px) of work, so about three flicks open it. A carve still works it, at half its travel (a carve over the cap counts 0.5 per px, so 180 px of sawing). The first carve on a cap toasts once: "Carving rides over the cap. Flick at its edge: short, quick strokes with the hook."
 - **Effects:** an ulcer is opened by a few deliberate flicks with creaks in between, then the crack. Sawing still gets there, slowly, so nobody gets stuck.
 - **Check:** game tests: three flicks pop a cap; 90 px of carve doesn't, 180 px does.
+- **Built 2026-10-14.** `capCarve` 0.5 in `workCap`'s carve call. The first creak of a carved cap says "Carving rides over the cap. Flick at its edge: short, quick strokes with the hook." (again after 30 s of carving it); a flicked cap says "A few more flicks at its edge and it'll give." Browser-checked: sawing the cap fires the carve line and opens it at 180 px. The bot still opens caps by sawing, at half speed. 182 tests green.
 
 ### 16.3 Teach it (small)
 - **Change:** the knife hint ("Pull for a long strip; flick, a short quick stroke, to lift loose horn"); the guided run's `openUlcer` step ("Flick at the edge of the dark circle: short, quick strokes. The cap holds, then gives") and `heelHorn` step; the knife page in the guide gains a carve and flick row; a flick on the guide-run heel horn is enough to pass it.

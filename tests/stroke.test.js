@@ -131,3 +131,23 @@ test('a flick into the opened core is still a cut into raw tissue', () => {
   do ev = applyStroke(h, 'knife', L.x + (k++ % 2 ? 6 : -6), L.y, 3); while (!ev.capPop && k < 400);
   assert.equal(applyFlick(h, [{ x: L.x - 3, y: L.y }, { x: L.x + 3, y: L.y }]).lesionCut, true);
 });
+
+// WP16.2: the cap answers to the flick.
+test('three flicks at the cap open it', () => {
+  const h = new Hoof(CASE_B);
+  const L = CASE_B.lesion;
+  const flickAt = (dir) => applyFlick(h, [0, 1, 2, 3, 4].map((k) => ({ x: L.x - dir * (8 - k * 3), y: L.y })));
+  assert.equal(flickAt(1).capPop, false);
+  assert.equal(flickAt(-1).capPop, false);
+  assert.equal(flickAt(1).capPop, true);
+  assert.ok(h.capOpen);
+});
+
+test('carving works the cap at half speed: 90 px of sawing holds, 180 px gives', () => {
+  const h = new Hoof(CASE_B);
+  const L = CASE_B.lesion;
+  const saw = (px) => { let ev; for (let k = 0; k < px / 3; k++) { ev = applyStroke(h, 'knife', L.x + (k % 2 ? 6 : -6), L.y, 3); if (ev.capPop) return true; } return false; };
+  assert.equal(saw(K.capGive), false);
+  assert.equal(h.capOpen, false);
+  assert.equal(saw(K.capGive), true);
+});
