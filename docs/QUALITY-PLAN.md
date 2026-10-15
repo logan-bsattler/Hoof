@@ -924,6 +924,61 @@ Tier 2 of Nate's "Top ideas" (`docs/NOTES-NATE-LIVES.md`), items 4, 6 and 7, plu
 | D56 | Burst abscesses: 1 in 3 white lines from Brackenford on, never on Hollins or a guided run? | Yes |
 | D57 | Knife stroke modes (your carve-vs-flick idea from 2026-10-11) stay out of WP15? | Yes. It's a feel change to the core tool and deserves its own WP with a phone design first. It's the obvious WP16 candidate |
 
+## WP16: knife stroke modes, carve and flick (medium; scoped 2026-10-14 at `e60555a`)
+
+Ben's idea from 2026-10-11 (D57): opening an ulcer feels the same as carving the dish, because the knife has one stroke. **Recommendation: no mode switch. The stroke you make picks the mode.** A long pull carves, as today. A short, quick stroke flicks: the hook at the knife's tip lifts loose horn and takes only a shaving of live sole. Real trimmers don't flip a switch; they change how they move the knife. Nate: "the knife's hook lifts the loose horn away along the line of separation", and corium is nicked, never gouged (`docs/NOTES-NATE-LIVES.md`, 1:01:09 and 34:00). The flick becomes how a cap is opened and how loose horn by a lesion is freed without stripping the ring round it.
+
+No condition is added and no score changes, so the 7.2 recipe doesn't apply and the save is untouched. Each step ships with the bot sweep, as before.
+
+### Fact checks (done 2026-10-14, by reading the code)
+
+| Question | Answer | So |
+|---|---|---|
+| How does a knife stroke reach the hoof? | `main.js` pointermove: once the pointer has moved `engage` (6 px), each move is cut at once as interpolated stamps through `applyStroke`. On release, a stroke under 12 px is a tap, and a knife tap pries an old block (J2). | A flick must be at least 12 px, or it collides with the pry. A flick can't be known until the finger lifts, so the start of every knife stroke has to be held back briefly (see 16.1). |
+| What opens a closed cap today? | `workCap`: 90 px (`capGive`) of flat-of-blade travel over the cap, from any stroke. Sawing back and forth opens it. | That's why it feels like carving. 16.2 makes the flick the quick way in. |
+| Who calls `applyStroke` besides the game? | The bot (`tests/player.js`) calls it directly with drags, and opens caps by sawing (player.js:100–104). `game.test.js:122–146` saws caps open too. | `applyStroke` takes the stroke as an argument (`'carve'` by default), so the bot and old tests keep working, and the bot is taught to flick where a player should. |
+| Does anything punish heavy knife work round a lesion? | Yes. WP14.1's ring metric costs Restraint when the sound sole round an opened ulcer is stripped. `soleDugBesideTrack` does the same round a white-line track. | No new score is needed. A flick takes a shaving, so flicking the loose rim keeps the ring, and the existing costs already reward it. |
+| Does the game already use the word? | Yes. The guided run's `heelHorn` step says "One or two short pulls with the knife flick it off." | The heel step needs no new idea, only for the flick to really be different. |
+
+### 16.1 Tell a flick from a carve (medium; the core)
+- **Change:** in `main.js`, a knife stroke starts *undecided*. Its points are buffered, not cut, until either it has travelled more than `flickMax` (about 40 CSS px) or `flickTime` (about 160 ms) has passed. Then it's a **carve**: the buffer is replayed as stamps at once, and the stroke goes on cutting live as today. If the finger lifts first, having moved at least 12 px, it's a **flick**: applied once along the buffered path with `applyStroke(..., 'flick')`. Under 12 px stays a tap (the pry). Thresholds are in CSS px, like `CFG.touch.grip`, so zoom doesn't change them.
+- **What a flick does** (`applyStroke` with stroke `'flick'`): the hook is smaller than the blade's flat (radius about 9 against 14). Loose horn under it lifts as now (heel curl, ulcer rim, the white-line track where it's openable, necrosis, double sole). Live sole loses at most `flickCut` (about 0.25 mm) a flick, with the usual near-target resistance, so it nicks and never gouges. The open ulcer core is still raw: a flick into it is a cut into the lesion, as a carve is.
+- **Feel:** a flick gets its own short sound (a dry "tk", synthesized in `audio.js`), a short buzz, and a flake that flies off in the stroke's direction. A carve keeps the strip that curls off at the end of the pull.
+- **Effects:** the carve start is held back by at most about 160 ms. The cut is replayed as soon as the stroke is known, so a steady pull should feel the same; this needs Ben's phone to confirm.
+- **Check:** game tests (a flick takes loose horn and at most `flickCut` of live sole; the cap and core rules hold); a unit test of the recogniser with fake pointer timings (tap, flick, slow short pull, fast long pull).
+
+### 16.2 The cap answers to the flick (small)
+- **Change:** in `workCap`, a flick whose hook lands on the cap counts `capFlick` (about 35 px) of work, so about three flicks open it. A carve still works it, at half its travel (a carve over the cap counts 0.5 per px, so 180 px of sawing). The first carve on a cap toasts once: "Carving rides over the cap. Flick at its edge: short, quick strokes with the hook."
+- **Effects:** an ulcer is opened by a few deliberate flicks with creaks in between, then the crack. Sawing still gets there, slowly, so nobody gets stuck.
+- **Check:** game tests: three flicks pop a cap; 90 px of carve doesn't, 180 px does.
+
+### 16.3 Teach it (small)
+- **Change:** the knife hint ("Pull for a long strip; flick, a short quick stroke, to lift loose horn"); the guided run's `openUlcer` step ("Flick at the edge of the dark circle: short, quick strokes. The cap holds, then gives") and `heelHorn` step; the knife page in the guide gains a carve and flick row; a flick on the guide-run heel horn is enough to pass it.
+- **Check:** guide tests; the guided run plays through with the new texts at 375 × 812.
+
+### 16.4 The bot flicks (small)
+- **Change:** the bot opens caps with flicks, frees an ulcer rim and the heel curl with flicks, and keeps carving for the dish and the white-line track. Sweep seeds 1–8 at Textbook for every condition, J3 seeds 1–20.
+- **Check:** the full sweep green; the pacing test unchanged.
+
+### Not taken
+- **A mode button** (tap the knife again to switch). It's explicit, but it adds a mode the player forgets they're in, and on sand farms a second tap already swaps in a fresh knife (WP12.4).
+- **Soft heel-bulb horn that a hard carve zips through** (Nate, 3:01). A good later feel item now that carves are distinct, but it adds a new way to bleed.
+- **Thin worn knives that cut finer but can snap** (Nate, 5:41). Belongs with WP12.4's wear, not here.
+- **Scoring the stroke.** The ring and track costs already reward the flick; a separate "you carved near the lesion" cost would double-count.
+
+### Build order (D58)
+16.1 → 16.2 → 16.3 → 16.4, shipping after each with the sweep. 16.1 first because the rest needs the flick to exist. The bot (16.4) stays green through 16.1–16.3 because carving still opens a cap.
+
+### Decisions for Ben
+
+| # | Decision | Default |
+|---|---|---|
+| D58 | Build order 16.1 → 16.4? | Yes |
+| D59 | The stroke picks the mode (short and quick is a flick), with no mode button? | Yes. It's how the real knife works, and a button collides with the sand farm's fresh knife |
+| D60 | Where's the line? A flick is 12–40 CSS px and lifted within 160 ms | Yes, as a start. Tune on your phone; both are config numbers |
+| D61 | Carving can still open a cap, at half speed? | Yes. Flicks are the way in, but nobody gets stuck. "Only a flick opens it" is stricter and more deliberate, but a player who never finds the flick can't finish an ulcer |
+| D62 | A flick takes at most 0.25 mm of live sole? | Yes. Enough to feel, too little to bleed unless the sole is already at the line |
+
 ## Done criteria for the whole plan
 - `npm test` is green, including the WP0 playthrough at Textbook and the variation sweep.
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
