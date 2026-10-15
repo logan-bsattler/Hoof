@@ -92,6 +92,16 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
   };
 }
 
+// Last visit's dug decoys, back as old black pits (WP14.2, D48). A pit takes the place of any
+// decoy dealt on the same spot, and is dropped if it would land on the heel horn or a lesion.
+function withPits({ decoys, lesion, lesions, looseHorn }, pits) {
+  const busy = [...(lesions ?? (lesion ? [lesion] : [])).map((L) => ({ x: L.x, y: L.y, r: L.r * 1.75 + 14 })),
+    ...(looseHorn ? [{ ...looseHorn, r: looseHorn.r + 20 }] : [])];
+  const ok = pits.filter((p) => busy.every((b) => Math.hypot(p.x - b.x, p.y - b.y) > b.r + 9));
+  const kept = decoys.filter((d) => ok.every((p) => Math.hypot(p.x - d.x, p.y - d.y) > 30));
+  return [...kept, ...ok.map((p) => ({ kind: 'pit', claw: p.claw, x: p.x, y: p.y, r: 9 }))];
+}
+
 // A fresh cow with the given condition. Deterministic per seed. `mods` (WP7.3) varies her:
 //   side 'LH'|'RH', foot 'hind'|'front'
 //   growth     scales the excess horn on both claws (1 = usual)
@@ -102,6 +112,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
 //   calving    true: a routine cow close to calving, to be left till dry-off (WP9 J1)
 //   oldBlock   { claw, kind }: last visit's block, still glued on (WP9 J2)
 //   kicker     true: a known kicker; her temper is floored where kicks start (WP12.2)
+//   pits       [{ claw, x, y }]: decoys dug out last visit, back as old black pits (WP14.2)
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).
 // With no mods she comes out exactly as before the variations existed.
 export function makeCase(condition, seed, mods = {}) {
@@ -125,7 +136,8 @@ export function makeCase(condition, seed, mods = {}) {
   const excess = C.thinSole
     ? { [big]: -0.5 - (hi - 3.5) / 2 + (lo - 1.8) / 6, [small]: -0.5 - (hi - 3.5) / 2 }
     : { [big]: hi * growth, [small]: lo * growth };
-  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, ...over } = mods;
+  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, ...over } = mods;
+  if (pits?.length) placed.decoys = withPits(placed, pits);
   if (over.kicker) over.temper = Math.max(over.temper ?? 0.5, CFG.temper.kickFrom);
   const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });
   if (oldBlock) return { ...cd, oldBlock, steps: ['unblock', ...cd.steps] };

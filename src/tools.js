@@ -79,14 +79,16 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist, wall = 1) {
   // The deep sepsis hole takes no blade: opening it further is the vet's work.
   if (z & Z.SEPSIS) { if (depth > 0.005) ev.holeCut = true; return 0; }
   const t = hoof.thick[i];
-  if (t <= 0) return 0;
+  // Under a tempting bruise the corium sits `lift` mm closer than the horn's thickness says.
+  const lift = hoof.lift[i];
+  if (t - lift <= 0) return 0;
   if ((z & Z.WALL) && !(z & Z.DEAD)) depth *= wall;
   if (z & Z.LIVE) {
-    if (t < CFG.sole.thin || (z & Z.ULCER)) depth *= resistThin;
+    if (t - lift < CFG.sole.thin || (z & Z.ULCER)) depth *= resistThin;
     // The horn firms up over the last `ramp` mm, so a steady hand can stop on target.
     else depth *= resistAt(t, hoof.zoneTarget(i), resist);
   }
-  const d = Math.min(depth, t);
+  const d = Math.min(depth, t - lift);
   hoof.thick[i] = t - d;
   ev.removed += d;
   if (hoof.claw[i] === hoof.sepsisClaw) ev.sepsisTaken += d;
@@ -99,11 +101,12 @@ function cut(hoof, i, depth, ev, resist, resistThin = resist, wall = 1) {
   if (hoof.mud[i] > 0.5) ev.dirtyCut = true;
   if (z & Z.ULCER) ev.lesionCut = true;
   else {
-    if (hoof.thick[i] < CFG.sole.thin) ev.thin = true;
-    if (d > 0.005 && hoof.thick[i] < ev.minLive) ev.minLive = hoof.thick[i];
+    const live = hoof.thick[i] - lift;
+    if (live < CFG.sole.thin) ev.thin = true;
+    if (d > 0.005 && live < ev.minLive) ev.minLive = live;
   }
-  if (hoof.thick[i] <= 0.05) {
-    hoof.thick[i] = 0;
+  if (hoof.thick[i] - lift <= 0.05) {
+    hoof.thick[i] = lift;
     hoof.blood[i] = 1;
     ev.blood = true;
     ev.bloodCells++;
@@ -287,7 +290,7 @@ export function applyGrind(hoof, x, y, dt) {
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (blocked(hoof, i, ev) || inCleft(hoof, i, f, ev)) return;
     if (f > 0.5 && (hoof.zone[i] & Z.LIVE) && hoof.thick[i] > 0) {
-      ev.danger = Math.max(ev.danger, 1 - smoothstep(CFG.sole.thin, hoof.zoneTarget(i), hoof.thick[i]));
+      ev.danger = Math.max(ev.danger, 1 - smoothstep(CFG.sole.thin, hoof.zoneTarget(i), hoof.thick[i] - hoof.lift[i]));
     }
     hoof.mud[i] = Math.max(0, hoof.mud[i] - 2 * dt * f);
     if (hoof.zone[i] & Z.ULCER) ev.grinderLesion = true;

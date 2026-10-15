@@ -7,7 +7,7 @@
 // wear their feet down and come in cleaner, with the odd stone bruise or white-line track.
 
 import { CASE_B, CASE_B_MODS, makeCase } from './case.js';
-import { CONDITIONS } from './conditions.js';
+import { CONDITIONS, DECOY_KINDS_ALL } from './conditions.js';
 import { mulberry32 } from './noise.js';
 import { CFG } from './config.js';
 
@@ -33,7 +33,8 @@ export const HERD_BONUS = 5;
 // share of front feet. `calving` is the chance a routine cow is close to calving and should be
 // left till dry-off (WP9 J1). `kicker` is the chance a visit has one known kicker among its new
 // cows (WP12.2). `footbath` none|poor|good scales the DD share (FOOTBATH, WP12.3). Housing
-// 'sand' wears the knife (onSand, WP12.4).
+// 'sand' wears the knife (onSand, WP12.4). `decoyKinds` widens the decoy pool from Top Lane on
+// (WP14.2, D47): the first three farms teach plain "firm means leave it" first.
 export const FARMS = [
   {
     id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
@@ -56,28 +57,31 @@ export const FARMS = [
     id: 'toplane', footbath: 'good', name: 'Top Lane', farmer: 'Mary Ashworth', housing: 'straw', cows: 4, rep: 180,
     intro: 'Mary wants her old girls done front and back. Front feet grow the other way round: mind which claw goes first.',
     mix: { routine: 0.25, ulcer: 0.25, whiteline: 0.25, puncture: 0.25 }, growth: [0.9, 1.25], mud: [0.7, 1.05], temper: [0.15, 0.45], front: 0.5, calving: 0.5, kicker: 0.33,
+    decoyKinds: DECOY_KINDS_ALL,
   },
   {
     id: 'marshend', name: 'Marsh End', farmer: 'Owen Tull', housing: 'wet', footbath: 'none', cows: 5, rep: 270,
     intro: 'The yard at Marsh End never dries out, and the slurry scraper broke in March. Expect muck, and what lives in it.',
     mix: { dd: 0.2, footrot: 0.2, dds: 0.2, whiteline: 0.2, routine: 0.2 }, growth: [0.95, 1.25], mud: [1.2, 1.5], temper: [0.3, 0.65], front: 0.15, calving: 0.5, kicker: 0.33,
+    decoyKinds: DECOY_KINDS_ALL,
   },
   {
     id: 'greystone', name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'sand', footbath: 'poor', cows: 5, rep: 380,
     intro: 'A big, busy unit on sand-bedded stalls. Priya’s heifers have never been in a crush before, and they let you know it.',
     mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5, kicker: 0.33,
+    decoyKinds: DECOY_KINDS_ALL,
   },
   {
     id: 'coldharbour', name: 'Coldharbour', farmer: 'old Mr Fenwick', housing: 'wet', footbath: 'none', cows: 6, rep: 500,
     intro: 'Nobody’s trimmed at Coldharbour for two years. Long feet, a wet yard and cows that don’t want handling.',
     mix: { ulcer: 0.2, dd: 0.15, whiteline: 0.15, footrot: 0.15, doublesole: 0.15, routine: 0.2 }, growth: [1.2, 1.4], mud: [1.15, 1.5], temper: [0.45, 0.95], front: 0.25, calving: 0.5, kicker: 0.33,
-    decoys: [1, 3],
+    decoys: [1, 3], decoyKinds: DECOY_KINDS_ALL,
   },
   {
     id: 'ridgeway', footbath: 'poor', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 640,
     intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
     mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, twoclaw: 0.1, thinsole: 0.15, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5, kicker: 0.33,
-    decoys: [1, 3],
+    decoys: [1, 3], decoyKinds: DECOY_KINDS_ALL,
   },
 ];
 
@@ -144,6 +148,7 @@ export function farmMods(farm, seed) {
     temper: between(farm.temper),
   };
   if (farm.decoys) mods.decoyCount = Math.floor(between([farm.decoys[0], farm.decoys[1] + 1]));
+  if (farm.decoyKinds) mods.decoyKinds = farm.decoyKinds;
   // Drawn last, so it leaves every earlier draw as it was. makeCase uses it on routine feet only.
   if (farm.calving && rand() < farm.calving) mods.calving = true;
   return { condition, mods };
@@ -231,8 +236,12 @@ export function returnCase(farm, h, visit, k) {
   const stillOn = h.blocked && !threw && ((h.lame || h.recheck) || mulberry32(cowSeed(farm, visit, 500 + k))() < 0.5);
   if (stillOn) cow.oldBlock = { claw: h.blockClaw, kind: h.blocked };
   if (h.kicker) cow.kicker = true;
+  // Decoys she had dug out last time are back as old black pits (WP14.2).
+  const pits = Array.isArray(h.pits) ? h.pits.filter((q) => (q?.claw === 1 || q?.claw === 2) && Number.isFinite(q.x) && Number.isFinite(q.y)).slice(0, 2) : [];
+  if (pits.length) cow.pits = pits;
   if (!h.lame && !h.recheck && !threw) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
+    if (now.decoyKinds) cow.decoyKinds = now.decoyKinds;
     return { ...makeCase('routine', h.seed, cow), back: { ...back, outcome: h.calving ? 'calved' : 'healed' } };
   }
   // Recheck: the lesion has spread to the top of its band (a hand-placed one grows 2 px).
@@ -325,7 +334,8 @@ export function cowPoints(result) {
 //             back, call, blocked?, blockClaw? } where back is 'recheck', 'healed', 'calved' or null for a cow new to the farm,
 //             and call is how she left the crush: null (released) or a CALLS id (WP8.1);
 //             blocked is the kind of block she went off in ('rubber' | 'wood') and blockClaw its claw;
-//             stripped is set when the ring round her ulcer was stripped (WP14.1)
+//             stripped is set when the ring round her ulcer was stripped (WP14.1);
+//             pits [{ claw, x, y }] are the decoys she had dug out, at most two (WP14.2)
 //   visit     the day in progress, or null: { farm, n, k, rows }
 
 export function newRoute() {
@@ -371,6 +381,7 @@ export function recordCow(route, caseDef, result) {
     ...(result.block ? { blocked: result.block.kind, blockClaw: result.block.claw } : {}),
     // The ring round her ulcer stripped (WP14.1): if she went off blocked, she throws it.
     ...(result.stripped ? { stripped: true } : {}),
+    ...(result.pits ? { pits: result.pits } : {}),
   });
   v.k++;
   return { points, lame, back, last: v.k >= farmById(v.farm).cows };

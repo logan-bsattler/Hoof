@@ -1194,3 +1194,56 @@ test('ring: both ulcers of a pair (J3) stripped cost the cap, not twice the cost
   for (const L of cd.lesions) stripRing(h, L);
   assert.equal(h.metrics().rings.filter((g) => g.stripped).length, 2, JSON.stringify(h.metrics().rings));
 });
+
+// WP14.2: decoys that teach when to stop.
+const decoyCase = (kind, seed = 2) => {
+  const cd = makeCase('routine', seed, { decoyKinds: [kind], decoyCount: 1 });
+  return { cd, f: cd.findings.find((q) => q.kind === kind) };
+};
+
+test('a fade by the wall pares out after 1.5 mm; pigment reads the same however deep', () => {
+  for (const [kind, gone] of [['fade', true], ['pigment', false]]) {
+    const { cd, f } = decoyCase(kind);
+    const h = new Hoof(cd);
+    for (let i = 0; i < h.n; i++) h.mud[i] = 0;
+    const c = h.cellAt(f.x, f.y);
+    assert.equal(h.probe(c, false).kind, kind);
+    assert.match(h.probe(c, false).text, /firm/i, 'the testers stay honest');
+    h.thick[c] = h.init[c] - (gone ? 1.6 : 5);
+    assert.equal(h.probe(c, false).kind === kind, !gone, `${kind} after paring`);
+  }
+});
+
+test('a tempting bruise: one knife pull after levelling shows pink, the third bleeds', () => {
+  const { cd, f } = decoyCase('haem');
+  const h = new Hoof(cd);
+  const c = h.cellAt(f.x, f.y);
+  assert.ok(h.thick[c] - h.tgt[c] < 0.35, 'levelling barely touches it');
+  h.mud.fill(0);
+  assert.match(h.probe(c, false).text, /tender, but no give/i);
+  for (let i = 0; i < h.n; i++) if (h.claw[i] && (h.zone[i] & Z.LIVE) && !(h.zone[i] & (Z.DISH | Z.HEEL | Z.WALL))) h.thick[i] = Math.min(h.thick[i], h.zoneTarget(i));
+  // One full knife pull, 48 px down across the bruise.
+  const pull = () => { let blood = false; for (let k = 0; k < 16; k++) blood = applyStroke(h, 'knife', f.x, f.y - 24 + k * 3, 3).blood || blood; return blood; };
+  assert.equal(pull(), false);
+  assert.ok(h.thick[c] - h.lift[c] < 2.5, `pink after one pull: ${(h.thick[c] - h.lift[c]).toFixed(2)} mm live`);
+  assert.equal(pull(), false);
+  assert.equal(pull(), true, 'the third pull bleeds');
+  // The corium sits close under the bruise only.
+  assert.equal(h.lift[h.cellAt(f.x, f.y - 60)], 0);
+});
+
+test('each dug decoy has its own note, and the result carries its pit', () => {
+  for (const [kind, note] of [['fade', /passing flaw/], ['pigment', /pigment, not a lesion/], ['haem', /Pink means stop/], ['stain', /dug into a mark/]]) {
+    const { cd, f } = decoyCase(kind);
+    const h = new Hoof(cd);
+    idealTrim(h);
+    h.stampExact(f.x, f.y, f.r, (i) => { if (h.claw[i] === f.claw) h.thick[i] = Math.max(h.lift[i] + 0.5, h.zoneTarget(i) - 2); });
+    const r = scoreCase(h.metrics(), idealSession(cd), h, cd);
+    assert.ok(r.notes.some((n) => note.test(n)), `${kind}: ${r.notes.join(' | ')}`);
+    assert.deepEqual(r.pits, [{ claw: f.claw, x: Math.round(f.x), y: Math.round(f.y) }]);
+  }
+  const { cd } = decoyCase('stain');
+  const h = new Hoof(cd);
+  idealTrim(h);
+  assert.equal(scoreCase(h.metrics(), idealSession(cd), h, cd).pits, undefined, 'nothing dug, no pits');
+});

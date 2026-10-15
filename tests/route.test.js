@@ -520,3 +520,41 @@ test('a stripped ulcer in a block always comes back a recheck, block thrown, and
   const again = visitCases(farm, 2, r2.history).find((c) => tag(c) === tag(ulcer));
   assert.ok(!again || again.back.outcome === 'healed');
 });
+
+test('the new decoys deal from Top Lane on; the first three farms keep stain and bruise (WP14.2)', () => {
+  const kinds = (farm) => new Set([1, 2, 3].flatMap((v) => visitCases(farm, v).flatMap((cd) => cd.findings.map((f) => f.kind))));
+  for (const f of FARMS) {
+    const early = FARMS.indexOf(f) < FARMS.indexOf(farmById('toplane'));
+    assert.equal(!!farmMods(f, 7).mods.decoyKinds, !early, f.name);
+    if (early) for (const k of kinds(f)) assert.ok(!['fade', 'pigment', 'haem'].includes(k), `${f.name} dealt ${k}`);
+  }
+  const late = new Set(FARMS.slice(FARMS.indexOf(farmById('toplane'))).flatMap((f) => [...kinds(f)]));
+  for (const k of ['fade', 'pigment', 'haem']) assert.ok(late.has(k), `${k} turns up past Top Lane`);
+});
+
+test('a dug decoy comes back as an old pit, recheck or healed (WP14.2)', () => {
+  const farm = farmById('hollins');
+  const route = newRoute();
+  route.rep = farm.rep;
+  const herd = startVisit(route, farm.id);
+  // The first cow goes off lame, the second sound; each had her first decoy dug out.
+  const decoyOf = (cd) => cd.findings.find((f) => !(cd.lesion && f.kind === cd.lesion.type && f.claw === cd.lesion.claw));
+  const pitOf = (cd) => { const f = decoyOf(cd); return { claw: f.claw, x: Math.round(f.x), y: Math.round(f.y) }; };
+  herd.forEach((cd, k) => recordCow(route, cd, { ...result('Clean', k === 0 ? 'lame' : 'sound'), pits: [pitOf(cd)] }));
+  endVisit(route);
+  assert.deepEqual(route.history.find((h) => h.tag === tag(herd[0])).pits, [pitOf(herd[0])]);
+  const back = visitCases(farm, 2, route.history);
+  const lame = back.find((c) => tag(c) === tag(herd[0]));
+  assert.equal(lame.back.outcome, 'recheck');
+  const pit = lame.findings.find((f) => f.kind === 'pit');
+  assert.ok(pit, 'the pit is back');
+  assert.deepEqual([pit.claw, pit.x, pit.y], [pitOf(herd[0]).claw, pitOf(herd[0]).x, pitOf(herd[0]).y]);
+  assert.match(pit.probeText, /old pared hole/);
+  // The mark she had there is gone: the pit takes its place.
+  assert.ok(lame.findings.every((f) => f === pit || Math.hypot(f.x - pit.x, f.y - pit.y) > 30));
+  const healed = back.filter((c) => c.back?.outcome === 'healed');
+  assert.ok(healed.some((c) => c.findings.some((f) => f.kind === 'pit')), 'at least one healed cow has her pit');
+  // A malformed pit in a save is dropped, never a throw.
+  route.history[0].pits = [{ claw: 7, x: 'a' }, null];
+  assert.ok(!visitCases(farm, 2, route.history).find((c) => tag(c) === tag(herd[0])).findings.some((f) => f.kind === 'pit'));
+});

@@ -62,7 +62,8 @@ function thinFinding(cd, claw) {
 }
 
 // How deep (mm) a decoy mark goes into the horn before trimming takes it off.
-export const DECOY_DEPTH = { stain: 1, bruise: 2.5 }; // centre line between the claws
+// Pigment runs all the way through: it never pares out (WP14.2).
+export const DECOY_DEPTH = { stain: 1, bruise: 2.5, fade: 1.5, pigment: Infinity, haem: 4, pit: 2.5 }; // centre line between the claws
 
 // Zone boundaries in view coords. The foot is presented the way a trimmer sees it in the
 // chute: sole facing the camera, heel bulbs at the top (toward the leg), toes pointing down.
@@ -254,6 +255,9 @@ export class Hoof {
     this.tgt = new Float32Array(n); // per-cell trim target (mm), feathered across zone edges
     // Sole the grinder is kept off (round an ulcer's cap): left out of the claw's depth reading.
     this.keepOut = new Uint8Array(n);
+    // How much closer (mm) the corium sits under a tempting bruise (WP14.2): it pinks and bleeds
+    // that much sooner. 0 everywhere else.
+    this.lift = new Float32Array(n);
     this.noise = new Float32Array(n);
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
     this.drained = false;           // the abscess pocket has been opened and has drained
@@ -407,6 +411,18 @@ export class Hoof {
       if (!(this.zone[i] & Z.LIVE) || this.claw[i] !== H.claw) return;
       this.loose[i] = this.looseInit[i] = LOOSE.HEEL;
     });
+
+    // A tempting bruise (WP14.2): the horn over it is barely above target, so levelling hardly
+    // touches it, and the corium lies close under it.
+    for (const f of cd.findings ?? []) {
+      if (f.kind !== 'haem') continue;
+      this.stampExact(f.x, f.y, f.r * 1.3, (i, d) => {
+        if (this.claw[i] !== f.claw || !(this.zone[i] & Z.LIVE) || (this.zone[i] & (Z.WALL | Z.DISH | Z.HEEL))) return;
+        const k = smoothstep(f.r * 1.3, f.r * 0.8, d);
+        this.thick[i] = Math.min(this.thick[i], this.tgt[i] + CFG.decoy.haemOver + (this.thick[i] - this.tgt[i] - CFG.decoy.haemOver) * (1 - k));
+        this.lift[i] = CFG.decoy.haemLift * k;
+      });
+    }
 
     this.init.set(this.thick);
   }
@@ -577,7 +593,7 @@ export class Hoof {
       return { kind: 'lesion', finding: this.caseDef.findings?.find((f) => f.kind === 'footrot') ?? null, text: FOOTROT_HEEL };
     }
     if (z & Z.HEEL) return { kind: 'heel', text: 'Heel bulb. Leave it be.' };
-    const t = this.thick[i];
+    const t = this.thick[i] - this.lift[i];
     if (t < CFG.sole.thin) {
       return { kind: 'thin', text: `Flexes under pressure: only ${t.toFixed(1)} mm left. Stop cutting here.` };
     }
@@ -667,6 +683,8 @@ export class Hoof {
         m.roughSum += this.rough[i];
         m.roughN++;
       }
+      // Plain thickness: the sole under a tempting bruise is thin by nature, and digging it is
+      // scored as a dug decoy (scoring.js decoysDug), not as over-trimming.
       if (t < thin) m.thinCells++;
 
       if (z & Z.HEEL) {

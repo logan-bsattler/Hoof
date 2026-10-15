@@ -69,6 +69,24 @@ export const FINDING = {
     look: 'reddish patch', feel: 'firm',
     probeText: 'Reddish horn, but it stays firm under the testers.',
   },
+  // WP14.2: marks that teach when to stop. Each has its own note when dug (scoring.js DUG_NOTE).
+  fade: {
+    look: 'dark nick at the wall', feel: 'firm',
+    probeText: 'Firm. A dark nick at the wall, but she doesn’t mind it.',
+  },
+  pigment: {
+    look: 'dark stripe from the wall', feel: 'firm',
+    probeText: 'Firm, and dark all the way through.',
+  },
+  haem: {
+    look: 'pink, streaked patch', feel: 'tender, no give',
+    probeText: 'Tender, but no give. Bruised, not soft.',
+  },
+  // A decoy dug out last visit, back as an old hole (route.js returnCase).
+  pit: {
+    look: 'small black pit', feel: 'firm',
+    probeText: 'Firm. An old pared hole, packed with black.',
+  },
 };
 
 // The other ways a cow leaves the crush besides release (WP8.1, D22): the hospital pen (soft
@@ -84,7 +102,13 @@ export const CALLS = {
 // The five-step functional trim every case shares (rasp after step 3).
 const TRIM = ['clean', 'diagnose', 'step1', 'step2', 'step3', 'finish'];
 
+// The plain decoys every farm deals: firm means leave it.
 export const DECOY_KINDS = ['stain', 'bruise'];
+// From Top Lane on (WP14.2, D47): a flaw at the wall that pares out, pigment that never does, and a
+// bruise with the corium right under it.
+export const DECOY_KINDS_ALL = [...DECOY_KINDS, 'fade', 'pigment', 'haem'];
+// Marks that sit at the abaxial wall rather than mid-sole.
+const AT_WALL = { fade: true, pigment: true };
 
 // A value in [lo, hi]: at fraction u of the band when given, else random. Always draws.
 const band = (rand, lo, hi, u) => { const r = rand(); return lo + (u ?? r) * (hi - lo); };
@@ -104,12 +128,23 @@ function placeDecoys(rand, at, side, avoid, v = {}) {
   for (const kind of kinds) {
     for (let tries = 0; tries < 60; tries++) {
       const claw = rand() < 0.5 ? CLAW.OUTER : CLAW.INNER;
-      const d = { kind, claw, x: at(claw, between(30, 120)), y: between(285, 470), r: between(10, 13) };
+      const d = AT_WALL[kind] ? wallDecoy(kind, claw, side, between(305, 445))
+        : { kind, claw, x: at(claw, between(kind === 'haem' ? 75 : 30, 120)), y: between(285, 470), r: between(10, 13) };
       const clear = [...avoid, ...decoys].every((o) => Math.hypot(o.x - d.x, o.y - d.y) > 55);
-      if (clear && insideClaw(claw, d.x, d.y, side, d.r + 6)) { decoys.push(d); break; }
+      if (clear && (AT_WALL[kind] || insideClaw(claw, d.x, d.y, side, d.r + 6))) { decoys.push(d); break; }
     }
   }
   return decoys;
+}
+
+// A decoy at the abaxial wall at height y. A fade is a short dark line in the white line, like the
+// entry of a white-line track; pigment is a stripe running in from the wall. Each carries its
+// `path`, which the art draws along.
+function wallDecoy(kind, claw, side, y) {
+  const s = clawSide(claw, side);
+  const wl = (yy, inset) => { const [l, r] = clawSpan(claw, yy, side); return (s > 0 ? r : l) - s * inset; };
+  if (kind === 'fade') return { kind, claw, x: wl(y, 11), y, r: 9, path: [[wl(y - 9, 11), y - 9], [wl(y + 9, 11.5), y + 9]] };
+  return { kind, claw, x: wl(y, 17), y, r: 14, path: [[wl(y, 1), y], [wl(y + 4, 36), y + 4]] };
 }
 
 // Loose heel horn for step 5 on `claw`, near the top of the sole.

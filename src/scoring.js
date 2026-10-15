@@ -37,9 +37,9 @@ export function judgeBlood(session, cells) {
   return 'fail';
 }
 
-// How many decoys were carved below the sole around them (mean > 0.75 mm under target).
+// The decoys carved below the sole around them (mean > 0.75 mm under target).
 function decoysDug(hoof, caseDef) {
-  let n = 0;
+  const dug = [];
   for (const f of caseDef.findings ?? []) {
     if (lesionsOf(caseDef).some((L) => L.type === f.kind && L.claw === f.claw)) continue;
     let sum = 0, k = 0;
@@ -49,10 +49,21 @@ function decoysDug(hoof, caseDef) {
       const from = caseDef.thinSole ? Math.min(hoof.zoneTarget(i), hoof.init[i]) : hoof.zoneTarget(i);
       sum += Math.max(0, from - hoof.thick[i]); k++;
     });
-    if (k && sum / k > 0.75) n++;
+    if (k && sum / k > 0.75) dug.push(f);
   }
-  return n;
+  return dug;
 }
+
+// What digging each kind of decoy teaches (WP14.2). Stain and bruise share the plain lesson.
+const FIRM_NOTE = 'You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.';
+const DUG_NOTE = {
+  stain: FIRM_NOTE,
+  bruise: FIRM_NOTE,
+  fade: 'That mark by the wall was a passing flaw: it went with one pass. Chasing it only takes wall and leaves a hole.',
+  pigment: 'The colour didn’t change as you pared: that’s pigment, not a lesion. If it doesn’t change, leave it.',
+  haem: 'That was a bruise with the corium right under it. Pink means stop.',
+  pit: 'You dug out that old pit again. It was firm: a hole only packs with muck and fills black. Leave it at sole height.',
+};
 
 // Sole cells beside the white-line track dug well below target: hunting for the pus
 // instead of following the line to it.
@@ -255,7 +266,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   const nickCost = session.nicks ? CFG.nick.restraint : 0;
   if (session.nicks) notes.push('You nicked the corium and she felt it. Ease off as the gauge drops and the sole turns pink.');
   // Digging a decoy out: the marks that stay firm are nothing to open.
-  const dug = decoysDug(hoof, caseDef);
+  const dugMarks = decoysDug(hoof, caseDef), dug = dugMarks.length;
   // Hunting for the abscess through the sole instead of following the track.
   const hunted = soleDugBesideTrack(hoof, L) > 6;
   // Stripping the ring of sound sole round an opened ulcer (WP14.1).
@@ -270,7 +281,7 @@ export function scoreCase(m, session, hoof, caseDef) {
   if (dds && holes) notes.push('That’s the vet’s job now: the infection’s deep in the joint. No blade in the hole.');
   if (dds && swollenCuts) notes.push(`Leave the swollen ${CLAW_NAME[L.claw]} claw: trim the sound one. Every stroke on it hurt her.`);
   const restraint = clamp(100 - needless - deep - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - ringCost - (session.cleftCuts ? 20 : 0));
-  if (dug) notes.push('You dug into a mark that stayed firm under the testers. Firm marks trim out; leave them at sole height.');
+  for (const note of new Set(dugMarks.map((f) => DUG_NOTE[f.kind] ?? FIRM_NOTE))) notes.push(note);
   if (hunted) notes.push(L.type === 'foreign' ? 'You opened a crater round the puncture. A narrow funnel straight down on the mark is all it needs.' : 'You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (stripped) notes.push('You stripped the horn round the ulcer. Free the loose horn, but leave a ring of sound sole: if her block comes off, that ring is all she stands on.');
   if (overFrac > 0.05) notes.push('Over-trimmed patches. Thin sole means lameness risk.');
@@ -328,5 +339,7 @@ export function scoreCase(m, session, hoof, caseDef) {
     : L ? 'Textbook. Level, relieved, and nothing taken that didn’t need to go.'
     : thin ? 'Textbook. Toes back to length, and the thin sole left alone.'
     : 'Textbook. Level, balanced, and nothing opened that didn’t need opening.');
-  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made, block: blockOn(hoof), stripped: stripped > 0 };
+  return { failed: false, total, grade: g.name, medal: g.medal, gait, mobility, parts, notes, call: made, block: blockOn(hoof), stripped: stripped > 0,
+    // Each dug decoy leaves a hole that packs black: it's back as a pit next visit (WP14.2, D48).
+    ...(dug ? { pits: dugMarks.slice(0, 2).map((f) => ({ claw: f.claw, x: Math.round(f.x), y: Math.round(f.y) })) } : {}) };
 }

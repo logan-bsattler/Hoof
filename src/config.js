@@ -74,6 +74,11 @@ export const CFG = {
   // thin, over 125 ulcers). A stripped ring costs `restraint` per ulcer, at most `cap`.
   ring: { width: 8, thin: 4, stripMean: 5, stripThin: 0.3, restraint: 20, cap: 30 },
 
+  // A tempting bruise (WP14.2): its horn starts `haemOver` mm above target, and the corium sits
+  // `haemLift` mm closer under it than its thickness says: about 2 mm of living sole once levelled,
+  // so it shows pink at once and a full knife pull a time bleeds on the third.
+  decoy: { haemOver: 0.3, haemLift: 5.1 },
+
   // Cow temperament, 0 calm to 1 lively (0.5 is the old default cow). Each pair runs calm → lively.
   // flinchAt: the living sole (mm) she flinches at under a blade; kept under the dish target's
   // band so a correct dish never sets her off. shake: how hard every flinch jolts the view.

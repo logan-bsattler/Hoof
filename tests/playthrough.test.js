@@ -316,6 +316,8 @@ const EXTREMES = {
   growth: [{ growth: 0.6 }, { growth: 1.5 }],
   mud: [{ mud: 0.6 }, { mud: 1.6 }],
   decoys: [{ decoyCount: 0 }, { decoyCount: 3 }, { decoyKinds: ['bruise'] }],
+  // WP14.2: the bot never digs a decoy, so each new kind, forced, leaves it at Textbook.
+  'new decoys': ['fade', 'pigment', 'haem'].map((k) => ({ decoyKinds: [k], decoyCount: 2 })),
   'lesion size and position': [{ lesionSize: 0, lesionAt: 0 }, { lesionSize: 1, lesionAt: 1 }],
 };
 for (const [name, list] of Object.entries(EXTREMES)) {
@@ -325,6 +327,17 @@ for (const [name, list] of Object.entries(EXTREMES)) {
     }
   });
 }
+
+test('a cow back with old pits where her decoys were still plays to Textbook (WP14.2)', () => {
+  for (const id of Object.keys(CONDITIONS)) {
+    for (const seed of [1, 2, 3]) {
+      const was = makeCase(id, seed);
+      const pits = was.findings.filter((f) => !(was.lesions ?? [was.lesion]).some((L) => L && L.type === f.kind && L.claw === f.claw))
+        .slice(0, 2).map(({ claw, x, y }) => ({ claw, x, y }));
+      playthrough(makeCase(id, seed, { pits }), true);
+    }
+  }
+});
 
 test('dealt cows, with all their variations at once, play to Textbook across a seed sweep', () => {
   for (const id of Object.keys(CONDITIONS)) {

@@ -502,7 +502,7 @@ export class HoofArt {
     const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec, straw, hash, markT, markA, arcX, arcY, growth, mudX, mudY } = this;
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell, gx0 = g.x0;
     const d = this.img.data;
-    const { thick, init, mud, rough, tint } = hoof;
+    const { thick, init, mud, rough, tint, lift } = hoof;
     const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF, isleF = this.isleF, mudK = this.mudK, mudThin = this.mudThin;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
@@ -532,6 +532,8 @@ export class HoofArt {
     }
     const tipY = this.tipY;
     const decoys = (hoof.caseDef.findings ?? []).filter((f) => !hoof.isLesionFinding(f));
+    // A tempting bruise (WP14.2) lifts the corium: its sole pinks that much sooner.
+    const anyLift = decoys.some((f) => f.kind === 'haem');
 
     // Plain bilinear sample of looseF at a logical point (for the cavity's inner shadow).
     const fieldAt = (a, lx, ly) => {
@@ -640,6 +642,8 @@ export class HoofArt {
         // The wall band wanders in width, and its inner edge is ragged where the crust broke off.
         const wallW = 5.5 + 5 * ns + (ncv - 0.5) * 2.2;
         let R, G, B, spec = 0, wetness = 0, crust = 0;
+        // Decoy marks, gathered in the horn pass and laid over the manure film (step 5).
+        let fadeK = 0, pigK = 0, haemK = 0, pitK = 0, pitRing = 0, onSole = false;
         // Surface slope (height per logical px): the claw's dome plus cut relief and tool marks.
         let gx = sx0[p], gy = sy0[p];
         let sheen = 1;
@@ -692,8 +696,9 @@ export class HoofArt {
           const dL = UL ? Math.sqrt((lx - UL.x) * (lx - UL.x) + (ly - UL.y) * (ly - UL.y)) : 1e9;
           let decoyDark = 0;
 
-          // 1. Ivory sole, coloured by thickness.
-          const rk = Math.max(0, Math.min(RAMP_N - 1, Math.round((t / RAMP_MAX) * (RAMP_N - 1)))) * 3;
+          // 1. Ivory sole, coloured by thickness (the living sole left, under a tempting bruise).
+          const tc = anyLift ? t - (lift[i0] * w0 + lift[i1] * w1 + lift[i2] * w2 + lift[i3] * w3) : t;
+          const rk = Math.max(0, Math.min(RAMP_N - 1, Math.round((tc / RAMP_MAX) * (RAMP_N - 1)))) * 3;
           R = RAMP[rk]; G = RAMP[rk + 1]; B = RAMP[rk + 2];
           // Heel bulb horn is softer and yellower.
           const heel = smoothstep(heelY + 8, heelY - 12, ly + (ns - 0.5) * 18);
@@ -749,7 +754,10 @@ export class HoofArt {
           }
 
           // Decoys: a reddish bruise in the horn, or a dark stain like the ulcer's, without the
-          // hole. Both are surface marks that trimming takes off (DECOY_DEPTH).
+          // hole. Both are surface marks that trimming takes off (DECOY_DEPTH). From Top Lane on
+          // (WP14.2): a pink, streaked bruise that runs toward the toe like a track, an old pared
+          // pit, and two marks at the wall (fade, pigment). Those four are drawn over the stain
+          // and the manure film (step 5), so they still show on a brushed foot.
           for (let k = 0; k < decoysHere.length; k++) {
             const f = decoysHere[k];
             if (f.claw !== c) continue;
@@ -759,6 +767,23 @@ export class HoofArt {
             if (f.kind === 'bruise') {
               const k = smoothstep(f.r * 2, f.r * 0.5, dd + (ncv - 0.5) * 8) * (0.35 + 0.4 * smoothstep(0.4, 0.75, nStreak[p] / 255)) * keep;
               R += (196 - R) * k; G += (96 - G) * k; B += (92 - B) * k;
+            } else if (f.kind === 'haem') {
+              // Stretched toward the toe, and streaked along it.
+              const de = Math.sqrt((lx - f.x) * (lx - f.x) * 1.5 + (ly - f.y) * (ly - f.y) * 0.45);
+              haemK = Math.max(haemK, smoothstep(f.r * 1.5, f.r * 0.3, de + (ncv - 0.5) * 7) * (0.3 + 0.55 * smoothstep(0.42, 0.72, nStreak[p] / 255)) * keep);
+            } else if (f.kind === 'fade') {
+              const k = smoothstep(3.2, 1.2, distToPath(lx, ly, f.path).d + (ncv - 0.5) * 1.4) * keep;
+              fadeK = Math.max(fadeK, k);
+            } else if (f.kind === 'pigment') {
+              // A dark brown band, widest at the wall, that thins and breaks up inward.
+              const { d: dp, u } = distToPath(lx, ly, f.path);
+              const k = smoothstep(7.5 - 3.5 * u, 5 - 2.5 * u, dp + (ncv - 0.5) * 3) * (0.75 + 0.25 * ngr) * smoothstep(1.02, 0.7, u + (ns - 0.5) * 0.3);
+              pigK = Math.max(pigK, k);
+            } else if (f.kind === 'pit') {
+              // An old pared hole, packed black: a round dark plug in a faint dished ring.
+              const hr = f.r * 0.42 + ncv * 1.2;
+              pitRing = Math.max(pitRing, smoothstep(hr * 2.2, hr, dd) * 0.25 * keep);
+              pitK = Math.max(pitK, smoothstep(hr, hr * 0.6, dd) * keep);
             } else {
               decoyDark = Math.max(decoyDark, smoothstep(f.r * 1.9, f.r * 0.4, dd + (ncv - 0.5) * 6) * 0.55 * keep);
             }
@@ -836,6 +861,8 @@ export class HoofArt {
               R += (sr - R) * st; G += (sg - G) * st; B += (sb - B) * st;
             }
           }
+
+          onSole = !isWall;
 
           // 4. Opened cavity: wet peach/pink tissue in layers, corium at the core.
           if (dL < Lr * 2.4) {
@@ -1138,6 +1165,7 @@ export class HoofArt {
             const k = smoothstep(0.2, 0.6, bl);
             R += (166 - R) * k; G += (12 - G) * k; B += (24 - B) * k;
             wetness = Math.max(wetness, k);
+            haemK *= 1 - k;
           }
         }
 
@@ -1146,6 +1174,18 @@ export class HoofArt {
         const mk = m > 0 ? mudK[i0] * w0 + mudK[i1] * w1 + mudK[i2] * w2 + mudK[i3] * w3 : 0;
         const film = smoothstep(0.03, 0.5, m) * (0.25 + 0.2 * mk);
         R += (104 - R) * film; G += (80 - G) * film; B += (48 - B) * film;
+        // The decoys over the stain and the film, under the clumps: the haem's pink streaks, the
+        // pit's packed plug, and the wall marks. A fade is a dark nick in the white line; pigment
+        // is dark brown horn that runs on through the wall and never pares out.
+        if (haemK > 0 && onSole) { R += (226 - R) * haemK; G += (118 - G) * haemK; B += (134 - B) * haemK; }
+        if (pitRing > 0 && onSole) { R *= 1 - pitRing; G *= 1 - pitRing * 1.05; B *= 1 - pitRing * 1.1; }
+        if (pitK > 0 && onSole) { R += (34 - R) * pitK; G += (28 - G) * pitK; B += (24 - B) * pitK; wetness = Math.max(wetness, pitK * 0.4); }
+        if (fadeK > 0) { R += (32 - R) * fadeK * 0.9; G += (22 - G) * fadeK * 0.9; B += (16 - B) * fadeK * 0.9; }
+        if (pigK > 0) {
+          // Only ever darker: the crusted wall rim is already near black.
+          const g = nStreak[p] / 255 * 14;
+          R += (Math.min(R, 50 + g) - R) * pigK; G += (Math.min(G, 33 + g * 0.7) - G) * pigK; B += (Math.min(B, 22 + g * 0.4) - B) * pigK;
+        }
         const thr = nMudThr[p] / 255 + 0.55 * Math.max(0, 0.32 - mk);
         // A thin smear is translucent and broken: grit and fibre specks stay opaque and dark.
         const thin = m > 0 ? mudThin[i0] * w0 + mudThin[i1] * w1 + mudThin[i2] * w2 + mudThin[i3] * w3 : 0;

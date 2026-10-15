@@ -6,6 +6,7 @@ import { CASE_B, makeCase } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
 import { makePlayer } from '../tests/player.js';
 import { drawBlock, drawPad, drawWrap } from '../src/toolart.js';
+import { applyStroke } from '../src/tools.js';
 
 const CROP = { x: 24, y: 165, w: 352, h: 480 };
 // ?focus=lesion crops a close-up around the ulcer; ?focus=toe the nipped toe tips.
@@ -21,9 +22,13 @@ const ONLY = Q.has('stage') ? Number(Q.get('stage')) : -1;
 
 // ?cond=<condition id>[&seed=n] stages a dealt cow of that condition instead of Case B.
 // &oldblock=1 (or =wood) glues last visit's block on the big claw (J2) and stages the pry.
+// &kinds=fade,pigment,haem deals those decoys, one each (WP14.2); &pits=1 turns them into old pits.
 const OLD = Q.get('oldblock');
 const MODS = OLD ? { oldBlock: { claw: CLAW.OUTER, kind: OLD === 'wood' ? 'wood' : 'rubber' } } : {};
-const CD = Q.has('cond') ? makeCase(Q.get('cond'), Number(Q.get('seed')) || 1, MODS) : CASE_B;
+if (Q.has('kinds')) { MODS.decoyKinds = Q.get('kinds').split(','); MODS.decoyCount = MODS.decoyKinds.length; }
+const dealt = (mods) => makeCase(Q.get('cond'), Number(Q.get('seed')) || 1, mods);
+const pitsOf = (cd) => cd.findings.filter((f) => f.kind !== cd.lesion?.type).slice(0, 2).map(({ claw, x, y }) => ({ claw, x, y }));
+const CD = !Q.has('cond') ? CASE_B : Q.has('pits') ? dealt({ ...MODS, pits: pitsOf(dealt(MODS)) }) : dealt(MODS);
 
 function session() {
   const hoof = new Hoof(CD);
@@ -75,6 +80,18 @@ const STAGES = OLD ? [
   ['Dirty', () => session()],
   ['Brushed', () => session().brushAll()],
   ['Brushed, lesion sprayed', () => sprayLesion(session().brushAll())],
+  // WP14.2: the decoys after the grinder, then pared into by hand (1, then 3 knife pulls on each).
+  ...(Q.has('kinds') || Q.has('pits') ? [1, 3].map((n) => [`Ground, decoys ${n} pull${n > 1 ? 's' : ''}`, () => {
+    const s = session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
+    // Straight to the tools: the bot's drag lifts off at target, and these go under it.
+    for (const f of CD.findings) if (f.kind !== L?.type) for (let k = 0; k < n * 16; k++) {
+      const y = f.y - 24 + (k % 16) * 3;
+      applyStroke(s.hoof, 'knife', f.x, y, 3);
+      s.art.mark('knife', f.x, y, 0, 3, 14);
+    }
+    s.art.sync(s.hoof);
+    return s;
+  }]) : []),
   ...(L?.type === 'foreign' ? [['Ground, funnel pared', () => {
     const s = session().brushAll().nip().grind(CLAW.OUTER).grind(CLAW.INNER);
     for (let k = 0; k < 6 && !s.hoof.drained; k++) s.funnel();
