@@ -919,6 +919,8 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const lame = rechecks.filter((cd) => !CONDITIONS[cd.back.was]?.recheck);
   const healed = back.filter((cd) => cd.back.outcome === 'healed').length;
   const calved = back.filter((cd) => cd.back.outcome === 'calved');
+  // A healed ulcer back again (WP15.2): the farmer has seen her going short on it.
+  const again = back.filter((cd) => cd.back.outcome === 'again');
   const pick = await ui.modal(
     `<div class="eyebrow">${HOUSING[farm.housing]} · ${season.name} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
      <h1>${farm.name}</h1>
@@ -930,6 +932,7 @@ async function showVisit(farm, { fromMap = true } = {}) {
      ${due.map((cd) => `<p class="back">${farmer} mentions ${tags([cd])}’s due to calve in ${cd.calving} days.</p>`).join('')}
      ${kicker ? `<p class="back recheck">“Mind ${tags([kicker])}: she kicks.”</p>` : ''}
      ${onSand(farm) ? '<p class="back">Sand in the stalls means grit in the horn: it takes the edge off a knife fast. Tap the knife again for a fresh one.</p>' : ''}
+     ${again.map((cd) => `<p class="back again">${farmer} thinks ${tags([cd])}’s old ulcer is back: she’s going short on that foot again.</p>`).join('')}
      ${calved.length ? `<p class="back healed">${tags(calved)} ${calved.length === 1 ? 'has' : 'have'} calved since last time and ${calved.length === 1 ? 'is' : 'are'} due ${calved.length === 1 ? 'her' : 'their'} trim.</p>` : ''}
      ${healed ? `<p class="back healed">${healed === 1 ? 'One cow' : `${healed} cows`} from last time ${healed === 1 ? 'is' : 'are'} back for ${healed === 1 ? 'her' : 'their'} next trim.</p>` : ''}`,
     fromMap

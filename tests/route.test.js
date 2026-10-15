@@ -11,6 +11,7 @@ import {
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
   farmCows, healedBack, backLine, TIERS, tierFor, tierMods, farmById,
   SEASONS, SEASON_DAYS, daysDone, seasonFor, seasonById, farmMix, visitHerd,
+  returningCows,
 } from '../src/route.js';
 import { Hoof, CLAW } from '../src/hoof.js';
 
@@ -531,6 +532,68 @@ test('the new decoys deal from Top Lane on; the first three farms keep stain and
   }
   const late = new Set(FARMS.slice(FARMS.indexOf(farmById('toplane'))).flatMap((f) => [...kinds(f)]));
   for (const k of ['fade', 'pigment', 'haem']) assert.ok(late.has(k), `${k} turns up past Top Lane`);
+});
+
+// A cow trimmed Clean on visit 1 who walked off well, dealt as the condition given.
+function wellCow(farm, condition, seed) {
+  const cd = makeCase(condition, seed, farmMods(farm, seed).mods);
+  const h = { farm: farm.id, visit: 1, tag: tag(cd), seed, condition, foot: cd.foot, side: cd.side, grade: 'Clean', lame: false, back: null, call: null };
+  return { cd, h };
+}
+
+test('a healed ulcer cow is picked first and comes back with her ulcer half the time, on the same claw (WP15.2)', () => {
+  const farm = farmById('toplane'); // 4 cows: one healed cow back a visit
+  const ulcer = wellCow(farm, 'ulcer', 4242);
+  const wl = wellCow(farm, 'whiteline', 5151);
+  const history = [wl.h, ulcer.h];
+  let again = 0, healed = 0;
+  for (let n = 2; n < 202; n++) {
+    assert.deepEqual(returningCows(farm, n, history).map((h) => h.tag), [ulcer.h.tag], 'the ulcer cow is the one picked');
+    const [cd] = visitCases(farm, n, history);
+    assert.equal(tag(cd), ulcer.h.tag);
+    if (cd.back.outcome === 'again') {
+      again++;
+      assert.equal(cd.condition, 'ulcer');
+      assert.deepEqual([cd.foot, cd.side, cd.lesion.claw], [ulcer.cd.foot, ulcer.cd.side, ulcer.cd.lesion.claw], 'same foot, same claw');
+      assert.ok(Math.hypot(cd.lesion.x - ulcer.cd.lesion.x, cd.lesion.y - ulcer.cd.lesion.y) < 1, 'same site');
+      assert.ok(cd.lesion.r <= ulcer.cd.lesion.r, `the bottom of the band: ${cd.lesion.r} vs ${ulcer.cd.lesion.r}`);
+      assert.match(backLine(cd), /ulcer is back where it was/);
+    } else {
+      healed++;
+      assert.equal(cd.back.outcome, 'healed');
+      assert.equal(cd.condition, 'routine');
+    }
+  }
+  assert.ok(again >= 80 && again <= 120, `back with the ulcer ${again} of 200 visits`);
+  assert.equal(again + healed, 200);
+});
+
+test('a healed white-line cow always comes back routine (WP15.2)', () => {
+  const farm = farmById('toplane');
+  const wl = wellCow(farm, 'whiteline', 5151);
+  for (let n = 2; n < 102; n++) {
+    const [cd] = visitCases(farm, n, [wl.h]);
+    assert.equal(tag(cd), wl.h.tag);
+    assert.equal(cd.back.outcome, 'healed');
+    assert.equal(cd.condition, 'routine');
+  }
+});
+
+test('Case B healed may bring her hand-placed ulcer back on a later visit (WP15.2)', () => {
+  const route = newRoute();
+  playDay(route, FARMS[0].id);
+  const history = route.history;
+  const seen = new Set();
+  for (let n = 2; n < 40; n++) {
+    const cd = visitCases(FARMS[0], n, history).find((c) => tag(c) === tag(CASE_B));
+    assert.ok(cd, 'Case B is the healed cow picked');
+    seen.add(cd.back.outcome);
+    if (cd.back.outcome === 'again') {
+      assert.deepEqual(cd.lesion, CASE_B.lesion);
+      assert.deepEqual(cd.looseHorn, CASE_B.looseHorn);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['again', 'healed']);
 });
 
 test('a dug decoy comes back as an old pit, recheck or healed (WP14.2)', () => {

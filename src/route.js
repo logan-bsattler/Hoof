@@ -232,8 +232,11 @@ export function returningCows(farm, visit, history) {
   const calved = (h) => h.calving && !recheck(h);
   const well = cows.filter((h) => !recheck(h) && !calved(h));
   const rand = mulberry32(cowSeed(farm, visit, 999));
+  // Healed ulcer cows are picked first (WP15.2): an ulcer is the lesion that comes back.
   const healed = [];
-  while (well.length && healed.length < healedBack(farm)) healed.push(well.splice(Math.floor(rand() * well.length), 1)[0]);
+  const pick = (pool) => { while (pool.length && healed.length < healedBack(farm)) healed.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]); };
+  pick(well.filter((h) => h.condition === 'ulcer'));
+  pick(well.filter((h) => h.condition !== 'ulcer'));
   return [...cows.filter(recheck), ...cows.filter(calved), ...healed].slice(0, farm.cows);
 }
 
@@ -260,6 +263,12 @@ export function returnCase(farm, h, visit, k, season = null) {
   // Decoys she had dug out last time are back as old black pits (WP14.2).
   const pits = Array.isArray(h.pits) ? h.pits.filter((q) => (q?.claw === 1 || q?.claw === 2) && Number.isFinite(q.x) && Number.isFinite(q.y)).slice(0, 2) : [];
   if (pits.length) cow.pits = pits;
+  // A healed ulcer is back half the time (WP15.2, D55): the bone under it has spurred. Same claw,
+  // same site, at the bottom of the size band; a hand-placed one comes back as it was.
+  if (!h.lame && !h.recheck && !threw && !h.calving && h.condition === 'ulcer' && ulcerAgain(farm, visit, k)) {
+    const again = base.lesion ? {} : { lesionSize: 0 };
+    return { ...makeCase('ulcer', h.seed, { ...base, ...cow, ...again }), back: { ...back, outcome: 'again' } };
+  }
   if (!h.lame && !h.recheck && !threw) {
     if (now.decoyCount !== undefined) cow.decoyCount = now.decoyCount;
     if (now.decoyKinds) cow.decoyKinds = now.decoyKinds;
@@ -271,6 +280,9 @@ export function returnCase(farm, h, visit, k, season = null) {
     : base.lesion ? { lesion: { ...base.lesion, r: base.lesion.r + 2 } } : { lesionSize: 1 };
   return { ...makeCase(h.condition, h.seed, { ...base, ...cow, ...worse }), back: { ...back, outcome: 'recheck' } };
 }
+
+// Whether a healed ulcer cow brings her ulcer back this visit: even odds, from the visit's own seed.
+export const ulcerAgain = (farm, visit, k) => mulberry32(cowSeed(farm, visit, 600 + k))() < 0.5;
 
 // How she took last time: 'hurt' if she went off lame (a blood fail is lame), 'easy' after a
 // Textbook or Clean job, else nothing.
@@ -292,6 +304,7 @@ export function backLine(cd) {
 }
 
 function backText(cd, b, was, last) {
+  if (b.outcome === 'again') return `${last}, and it healed. Back for her trim, and the ulcer is back where it was: the bone under it has a spur now.`;
   if (b.outcome === 'calved') return `Fresh now: she’s calved since visit ${b.visit}. Time for that trim.`;
   if (b.outcome === 'recheck') {
     if (b.was === 'thinsole') return `Back for a recheck. ${last}, and she went off sore: her soles were thin to start with. Still toes only, and leave the sole be.`;
@@ -352,7 +365,7 @@ export function cowPoints(result) {
 //   visits    { farmId: visits finished }
 //   best      { farmId: best day's earnings }
 //   history   every cow trimmed: { farm, visit, tag, seed, condition, foot, side, grade, lame,
-//             back, call, blocked?, blockClaw? } where back is 'recheck', 'healed', 'calved' or null for a cow new to the farm,
+//             back, call, blocked?, blockClaw? } where back is 'recheck', 'healed', 'again', 'calved' or null for a cow new to the farm,
 //             and call is how she left the crush: null (released) or a CALLS id (WP8.1);
 //             blocked is the kind of block she went off in ('rubber' | 'wood') and blockClaw its claw;
 //             stripped is set when the ring round her ulcer was stripped (WP14.1);

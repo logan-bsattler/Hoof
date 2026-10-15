@@ -100,7 +100,8 @@ Farms differ by housing: wet yards bring digital dermatitis, concrete brings ulc
 abscesses, and later farms have front feet, longer growth and livelier cows. On a return visit
 some cows come back by ear tag: a cow that went off lame is a recheck (same foot, the lesion a
 little worse, her points to earn this time), and a few that walked off well are back healed for a
-routine trim. The help turns down with reputation: guides on and a forgiving ±1 mm band at
+routine trim. Healed ulcer cows are picked first, and half the time the ulcer is back where it
+was: the bone under it has spurred. The help turns down with reputation: guides on and a forgiving ±1 mm band at
 first, guides only after a slip from Brackenford, guides off and today's ±0.75 mm band from Marsh
 End. The round saves on the device after each cow (`truehoof.round.v1`), so a reload mid-day
 picks the visit up at the next cow; the road map has a "Start the round over" link. Dev params:

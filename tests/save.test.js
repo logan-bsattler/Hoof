@@ -121,6 +121,19 @@ test('a saved call survives the reload; rows from before calls load; an unknown 
   assert.equal(parseRound(JSON.stringify(d)), null);
 });
 
+test('a cow back with her ulcer again survives the reload; an unknown outcome is refused (WP15.2)', () => {
+  const route = newRoute();
+  const herd = startVisit(route, FARMS[0].id);
+  recordCow(route, { ...herd[0], back: { visit: 1, grade: 'Clean', was: 'ulcer', outcome: 'again' } }, { failed: false, grade: 'Clean', gait: 'sound' });
+  const store = memory();
+  saveRound(route, store);
+  assert.deepEqual(loadRound(store), route);
+  const d = JSON.parse(store.getItem(SAVE_KEY));
+  assert.equal(d.visit.rows[0].back, 'again');
+  d.visit.rows[0].back = 'cured';
+  assert.equal(parseRound(JSON.stringify(d)).visit, null, 'the bad day is dropped');
+});
+
 test('the block a cow went off in survives the reload; a malformed one is refused (J2)', () => {
   const route = newRoute();
   const herd = startVisit(route, FARMS[0].id);

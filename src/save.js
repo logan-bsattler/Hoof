@@ -24,7 +24,7 @@ const cowOk = (h) => isObj(h) && farmIds.has(h.farm) && typeof h.tag === 'string
   ['hind', 'front'].includes(h.foot ?? 'hind') && Number.isInteger(h.visit) && h.visit >= 1 && callOk(h.call) && blockOk(h);
 // A day summary row, as recordCow writes it.
 const rowOk = (r) => isObj(r) && typeof r.tag === 'string' && typeof r.title === 'string' && typeof r.grade === 'string' &&
-  typeof r.gait === 'string' && count(r.points) && typeof r.lame === 'boolean' && [null, 'recheck', 'healed', 'calved'].includes(r.back) && callOk(r.call);
+  typeof r.gait === 'string' && count(r.points) && typeof r.lame === 'boolean' && [null, 'recheck', 'healed', 'again', 'calved'].includes(r.back) && callOk(r.call);
 // The day in progress: the next visit to an open farm, with one row per cow done so far.
 const visitOk = (v, d) => isObj(v) && farmIds.has(v.farm) && isOpen(farmById(v.farm), d.rep) &&
   v.n === (d.visits[v.farm] ?? 0) + 1 && Number.isInteger(v.k) && v.k >= 0 && v.k <= farmById(v.farm).cows &&

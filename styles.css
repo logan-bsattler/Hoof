@@ -484,7 +484,7 @@ table.day tr.lame td { color: var(--warn); }
 table.day tr.lame td.pts { color: var(--muted); }
 table.day .again { color: var(--brass); font-weight: 700; }
 p.back { border-left: 3px solid var(--brass); padding-left: 10px; color: var(--text); }
-p.back.recheck { border-left-color: var(--warn); }
+p.back.recheck, p.back.again { border-left-color: var(--warn); }
 p.back.healed { border-left-color: var(--sound); }
 
 /* ---- field guide (WP11.2) ---- */

@@ -888,6 +888,7 @@ Tier 2 of Nate's "Top ideas" (`docs/NOTES-NATE-LIVES.md`), items 4, 6 and 7, plu
 - **Not taken:** a bigger pedal bone in the art or the probe text. Only the recurrence is modelled.
 - **Check:** route tests: over many visits, a healed ulcer cow comes back as an ulcer about half the time and on the same claw; a healed white-line cow never does; a save with 'again' loads and an unknown outcome is still refused.
 - **Cost:** small.
+- **Built 2026-10-14.** `returningCows` picks healed ulcer cows first, then the rest. `returnCase` brings a healed ulcer back as `outcome: 'again'` when `ulcerAgain(farm, visit, k)` draws under 0.5 (the visit's own seed, stream 600 + k): same seed, so the same foot, claw and site, at `lesionSize: 0`; Case B comes back with her hand-placed ulcer as it was. A calving cow still comes back fresh. The visit card names her ("thinks #642's old ulcer is back"), her intro gives the spur line, and the save accepts 'again'. Browser-checked: Top Lane visit 3 card and intro. 166 tests green. sw v53.
 
 ### 15.3 Abscess stage: sealed or burst (medium)
 - **What it is:** Nate, ×2: a sealed abscess squirts pus when opened and she walks out better straight away. One that has already burst has a dry track and little pus; she's been finding her own relief.
