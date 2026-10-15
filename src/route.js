@@ -37,14 +37,14 @@ export const HERD_BONUS = 5;
 // (WP14.2, D47): the first three farms teach plain "firm means leave it" first.
 export const FARMS = [
   {
-    id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0,
+    id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0, seasons: false,
     intro: 'Ruth keeps a dozen old Holsteins on deep straw. She’ll show you round: a quiet herd to learn on.',
     mix: { routine: 0.67, ulcer: 0.33 }, growth: [0.85, 1.1], mud: [0.7, 1.0], temper: [0.1, 0.35], front: 0,
     // The first cow is the hand-built sole ulcer, with the guided trim on offer.
     first: CASE_B, firstMods: CASE_B_MODS,
   },
   {
-    id: 'hollins', footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30,
+    id: 'hollins', footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 30, seasons: false,
     intro: 'Dev grazes his herd out until the frosts. Their feet wear well on grass, but the lane to the parlour is all stones, and the odd nail in the gateway.',
     mix: { routine: 0.5, whiteline: 0.3, puncture: 0.2 }, growth: [0.75, 1.0], mud: [0.8, 1.15], temper: [0.2, 0.5], front: 0,
   },
@@ -115,11 +115,31 @@ export const FOOTBATH = {
   good: { dd: 0.25, text: 'Good footbath' },
 };
 
-// The farm's mix with its footbath applied to DD.
-export function farmMix(farm) {
+// The farm's mix with its footbath applied to DD, and the season's lean (WP15.1) on top.
+export function farmMix(farm, season = null) {
   const k = FOOTBATH[farm.footbath]?.dd ?? 1;
-  return farm.mix.dd ? { ...farm.mix, dd: farm.mix.dd * k } : farm.mix;
+  const mix = farm.mix.dd ? { ...farm.mix, dd: farm.mix.dd * k } : farm.mix;
+  const s = seasonal(farm, season);
+  return s ? Object.fromEntries(Object.entries(mix).map(([id, w]) => [id, w * (s.mix[id] ?? 1)])) : mix;
 }
+
+// ------------------------------------------------------------------ seasons (WP15.1)
+// The road keeps a calendar: every finished day moves it on, SEASON_DAYS days a season, from
+// spring. Summer heat keeps cows on their feet (abscess season, DD at its worst); winter they lie
+// in and their feet go quiet; wet spring and autumn bring mud and foot rot (Nate, six lives).
+// The first two farms are the teaching ramp and deal the same in any season (D54).
+export const SEASON_DAYS = 3;
+export const SEASONS = [
+  { id: 'spring', name: 'Spring', mix: { footrot: 1.5 }, mud: 0.1, line: 'Spring: the yards are wet, the grass is coming, and the gateways are mud again.' },
+  { id: 'summer', name: 'Summer', mix: { whiteline: 1.75, dd: 1.5, routine: 0.75 }, mud: 0, line: 'High summer: the herd has stood in the shade all week to keep cool. Abscess season.' },
+  { id: 'autumn', name: 'Autumn', mix: { footrot: 1.5 }, mud: 0.1, line: 'Autumn rain: the lanes are poached to mud, and the cows come in wet-footed.' },
+  { id: 'winter', name: 'Winter', mix: { whiteline: 0.5, footrot: 0.5, routine: 1.5 }, mud: 0, line: 'Deep winter: the cows are lying in, and most of their feet have gone quiet.' },
+];
+export const daysDone = (route) => Object.values(route.visits).reduce((a, n) => a + n, 0);
+export const seasonFor = (days) => SEASONS[Math.floor(Math.max(0, days) / SEASON_DAYS) % SEASONS.length];
+export const seasonById = (id) => SEASONS.find((s) => s.id === id) ?? SEASONS[0];
+// The season as it bears on this farm's deal: none at a farm that keeps its deck all year.
+const seasonal = (farm, season) => (season && farm.seasons !== false ? season : null);
 
 export const farmById = (id) => FARMS.find((f) => f.id === id);
 export const isOpen = (farm, rep) => rep >= farm.rep;
@@ -134,17 +154,18 @@ export function cowSeed(farm, visit, k) {
 }
 
 // The farm's condition and variations for one cow, from its own RNG stream.
-export function farmMods(farm, seed) {
+export function farmMods(farm, seed, season = null) {
   const rand = mulberry32(seed ^ 0x2f1a);
   const between = ([a, b]) => a + rand() * (b - a);
-  const mix = farmMix(farm);
+  const mix = farmMix(farm, season);
+  const wet = seasonal(farm, season)?.mud ?? 0;
   const ids = Object.keys(mix);
   let r = rand() * ids.reduce((a, id) => a + mix[id], 0);
   const condition = ids.find((id) => (r -= mix[id]) < 0) ?? ids[0];
   const mods = {
     foot: rand() < farm.front ? 'front' : 'hind',
     growth: between(farm.growth),
-    mud: between(farm.mud),
+    mud: between(farm.mud) + wet,
     temper: between(farm.temper),
   };
   if (farm.decoys) mods.decoyCount = Math.floor(between([farm.decoys[0], farm.decoys[1] + 1]));
@@ -157,8 +178,8 @@ export function farmMods(farm, seed) {
 // A visit's conditions as a deck: the mix shared out over the herd by largest remainder (ties
 // to the condition listed first), so Willow Bank is always 1 ulcer and 2 routine and Hollins
 // always brings its white line. Independent draws gave streaks that broke the early ramp.
-export function herdDeck(farm) {
-  const mix = farmMix(farm);
+export function herdDeck(farm, season = null) {
+  const mix = farmMix(farm, season);
   const ids = Object.keys(mix);
   const total = ids.reduce((a, id) => a + mix[id], 0);
   const share = ids.map((id) => (mix[id] / total) * farm.cows);
@@ -170,8 +191,8 @@ export function herdDeck(farm) {
 
 // The deck for one visit, shuffled from the visit's own seed. On a first visit with a hand-built
 // cow, she takes her own condition's card.
-function visitDeck(farm, visit) {
-  const deck = herdDeck(farm);
+function visitDeck(farm, visit, season) {
+  const deck = herdDeck(farm, season);
   if (visit === 1 && farm.first) {
     const i = deck.indexOf(farm.first.condition);
     if (i >= 0) deck.splice(i, 1);
@@ -222,8 +243,8 @@ const threwBlock = (h) => !!(h.stripped && h.blocked);
 
 // One cow back again, from her last record. She keeps her tag, foot and temperament (shifted by
 // how last time went: cows remember the crush, WP12.1); the horn and muck are this visit's.
-export function returnCase(farm, h, visit, k) {
-  const now = farmMods(farm, cowSeed(farm, visit, 100 + k)).mods;
+export function returnCase(farm, h, visit, k, season = null) {
+  const now = farmMods(farm, cowSeed(farm, visit, 100 + k), season).mods;
   const { excess: _e, calving: _c, oldBlock: _o, ...base } = h.seed === farm.first?.seed && h.visit === 1 ? farm.firstMods : farmMods(farm, h.seed).mods;
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
   const mood = remembers(h);
@@ -292,12 +313,12 @@ function backText(cd, b, was, last) {
 // The cows of one visit, in order: anyone coming back first, then fresh cows dealt from the
 // visit's deck (fewer fresh cows on a return visit take the top of it). Ear tags are unique
 // within the visit, and a fresh cow never wears a tag already trimmed at this farm.
-export function visitCases(farm, visit = 1, history = [], tier = null) {
+export function visitCases(farm, visit = 1, history = [], tier = null, season = null) {
   const back = returningCows(farm, visit, history);
-  const cases = back.map((h, k) => returnCase(farm, h, visit, k));
+  const cases = back.map((h, k) => returnCase(farm, h, visit, k, season));
   const tags = new Set(history.filter((h) => h.farm === farm.id).map((h) => h.tag));
   for (const cd of cases) tags.add(cd.subtitle.split(' · ')[0]);
-  const deck = visitDeck(farm, visit);
+  const deck = visitDeck(farm, visit, season);
   // At most one known kicker a visit (WP12.2): a new cow, and none if one is already coming back.
   const kr = mulberry32(cowSeed(farm, visit, 888));
   const kickAt = farm.kicker && kr() < farm.kicker && !cases.some((cd) => cd.kicker) ? cases.length + Math.floor(kr() * (farm.cows - cases.length)) : -1;
@@ -307,7 +328,7 @@ export function visitCases(farm, visit = 1, history = [], tier = null) {
     if (k === 0 && visit === 1 && farm.first) cd = farm.first;
     else {
       const seed = cowSeed(farm, visit, k);
-      const { condition, mods } = farmMods(farm, seed);
+      const { condition, mods } = farmMods(farm, seed, season);
       cd = makeCase(deck[d] ?? condition, seed, { ...tierMods(tier, mods), ...(cases.length === kickAt ? { kicker: true } : {}) });
     }
     if (tags.has(cd.subtitle.split(' · ')[0])) continue;
@@ -355,12 +376,13 @@ export function startVisit(route, farmId) {
 }
 
 // The cows of the visit in progress, dealt as they were when it started: from the history before
-// that day (its own cows left out) and the tier, which can't change until the day ends. So a
-// visit resumed after a reload gets the same herd.
+// that day (its own cows left out), the tier and the season, none of which can change until the
+// day ends (the days finished only move on at endVisit). So a visit resumed after a reload gets
+// the same herd.
 export function visitHerd(route) {
   const { farm, n } = route.visit;
   const before = route.history.filter((h) => !(h.farm === farm && h.visit === n));
-  return visitCases(farmById(farm), n, before, tierFor(route.rep));
+  return visitCases(farmById(farm), n, before, tierFor(route.rep), seasonFor(daysDone(route)));
 }
 
 // Record the current cow's result and move to the next. Points land at the end of the day.
@@ -394,12 +416,15 @@ export function endVisit(route) {
   const herdSound = v.rows.length === farm.cows && v.rows.every((r) => !r.lame);
   const earned = v.rows.reduce((a, r) => a + r.points, 0) + (herdSound ? HERD_BONUS : 0);
   const before = route.rep;
+  const was = seasonFor(daysDone(route));
   route.rep += earned;
   route.visits[v.farm] = v.n;
+  // The day done moves the calendar on; `turned` is the new season when this day ended the old one.
+  const season = seasonFor(daysDone(route));
   route.best[v.farm] = Math.max(route.best[v.farm] ?? 0, earned);
   route.visit = null;
   const opened = FARMS.filter((f) => f.rep > before && f.rep <= route.rep);
   // Rechecks that walked off sound this time.
   const mended = v.rows.filter((r) => r.back === 'recheck' && !r.lame).map((r) => r.tag);
-  return { farm, rows: v.rows, herdSound, mended, bonus: herdSound ? HERD_BONUS : 0, earned, before, rep: route.rep, opened };
+  return { farm, rows: v.rows, herdSound, mended, bonus: herdSound ? HERD_BONUS : 0, earned, before, rep: route.rep, opened, season, turned: season !== was ? season : null };
 }

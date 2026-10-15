@@ -20,7 +20,8 @@ import { Guide } from './guide.js';
 import { drawToolIcon } from './toolart.js';
 import { stance, drawStance, TOE_OUT_LINE } from './stance.js';
 import { loadRound, saveRound, clearRound, hasProgress } from './save.js';
-import { FARMS, FOOTBATH, HOUSING, onSand, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor } from './route.js';
+import { FARMS, FOOTBATH, HOUSING, onSand, farmById, isOpen, newRoute, nextLocked, startVisit, visitHerd, recordCow, endVisit, farmCows, backLine, visitCases, TIERS, GUIDES_TEXT, tierFor, SEASON_DAYS, daysDone, seasonFor, seasonById } from './route.js';
+import { paintLandscape } from './seasonart.js';
 
 // The round starts at the first farm on the road, whose first cow is the hand-built Case B.
 // Dev aid: ?cond=<condition id>[&seed=n] is free play on that condition instead ("Trim another"
@@ -45,6 +46,10 @@ if (devCase.has('rep')) route.rep = Math.max(0, +devCase.get('rep') || 0);
 let herd = [];         // the cows of the visit in progress, in order
 const canvas = document.getElementById('game');
 const renderer = new Renderer(canvas);
+// The season now (WP15.1), from the days finished. ?season=summer overrides the pictures (not the
+// deal), for checking the art.
+const seasonNow = () => (devCase.has('season') ? seasonById(devCase.get('season')) : seasonFor(daysDone(route)));
+renderer.setSeason(seasonNow().id);
 const particles = new Particles();
 
 const game = {
@@ -782,7 +787,7 @@ async function requestRelease() {
     renderer.block(hoof);
     renderer.dressing(hoof);
   };
-  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrapped, side: hoof.side, foot: caseDef.foot, hoof, drawFoot });
+  game.walkoff = new Walkoff(game.result, Sound, { wrapped: hoof.wrapped, side: hoof.side, foot: caseDef.foot, hoof, drawFoot, season: renderer.season });
   game.state = 'walkoff';
 }
 
@@ -870,6 +875,7 @@ async function showDay() {
   game.state = 'results';
   const d = endVisit(route);
   saveRound(route);
+  renderer.setSeason(seasonNow().id);
   Sound.step();
   const rows = d.rows.map((r) => `<tr class="${r.lame ? 'lame' : ''}">
       <td>${r.tag.replace('Holstein ', '')}${r.back ? ` <span class="again" title="${r.back === 'recheck' ? 'Recheck' : 'Seen before'}">↺</span>` : ''}</td><td>${r.title}</td><td>${r.grade}</td>
@@ -885,7 +891,8 @@ async function showDay() {
      ${d.bonus ? `<p class="rep-line">Whole herd walked off sound: +${d.bonus}</p>` : ''}
      ${d.mended.length ? `<p class="rep-line">Back on her feet: ${d.mended.map((t) => `<b>${t.replace('Holstein ', '')}</b>`).join(', ')}</p>` : ''}
      ${flagged ? `<p class="plan">${flagged === 1 ? 'One cow' : `${flagged} cows`} went off lame. ${d.farm.farmer[0].toUpperCase()}${d.farm.farmer.slice(1)} will want a second look next visit.</p>` : ''}
-     ${opened}`,
+     ${opened}
+     ${d.turned ? `<p class="season-line">The weather’s turning: ${d.turned.name.toLowerCase()} is here.</p>` : ''}`,
     [{ id: 'road', label: 'Back on the road', primary: true }],
   );
   showRoute();
@@ -897,7 +904,9 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const n = (route.visits[farm.id] ?? 0) + 1;
   const farmer = `${farm.farmer[0].toUpperCase()}${farm.farmer.slice(1)}`;
   // Who's coming back: the lame ones from last time, and a few you trimmed well.
-  const herdNow = visitCases(farm, n, route.history);
+  const season = seasonNow();
+  renderer.setSeason(season.id);
+  const herdNow = visitCases(farm, n, route.history, tierFor(route.rep), season);
   const back = herdNow.filter((cd) => cd.back);
   // Cows close to calving (J1): the farmer says so, and that's the only cue.
   const due = herdNow.filter((cd) => cd.calving);
@@ -911,10 +920,11 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const healed = back.filter((cd) => cd.back.outcome === 'healed').length;
   const calved = back.filter((cd) => cd.back.outcome === 'calved');
   const pick = await ui.modal(
-    `<div class="eyebrow">${HOUSING[farm.housing]} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
+    `<div class="eyebrow">${HOUSING[farm.housing]} · ${season.name} · ${n === 1 ? 'First visit' : `Visit ${n}`}</div>
      <h1>${farm.name}</h1>
      <p class="sub">${farmer} · ${farm.cows} cows waiting · ${FOOTBATH[farm.footbath].text.toLowerCase()}${back.length ? ` · ${back.length} you’ve trimmed before` : ''}</p>
      <p>${farm.intro}</p>
+     ${farm.seasons !== false ? `<p class="season-line">${season.line}</p>` : ''}
      ${lame.length ? `<p class="back recheck">${farmer} wants a second look at ${tags(lame)}: lame after last time.</p>` : ''}
      ${toes.length ? `<p class="back recheck">${tags(toes)} ${toes.length === 1 ? 'is' : 'are'} due back for the toe recheck: a black toe is never done in one visit.</p>` : ''}
      ${due.map((cd) => `<p class="back">${farmer} mentions ${tags([cd])}’s due to calve in ${cd.calving} days.</p>`).join('')}
@@ -944,6 +954,9 @@ function showRoute() {
   const open = FARMS.filter((f) => isOpen(f, route.rep));
   const suggest = [...open].reverse().find((f) => !route.visits[f.id]) ?? open[open.length - 1];
   const tier = tierFor(route.rep);
+  const season = seasonNow();
+  paintRouteSky();
+  document.getElementById('routeSeason').textContent = `${season.name} · day ${(daysDone(route) % SEASON_DAYS) + 1} of ${SEASON_DAYS}`;
   document.getElementById('routeRep').innerHTML = `Reputation <b>${route.rep}</b>` +
     (next ? ` · ${next.name} opens at ${next.rep}` : ' · every farm on the road is open') +
     `<br><span class="tier">${tier.name} · ${GUIDES_TEXT[tier.guides].toLowerCase()} · ±${tier.tolerance.toFixed(2)} mm band</span>`;
@@ -975,6 +988,20 @@ function showRoute() {
   list.querySelector('.suggest')?.scrollIntoView({ block: 'center' });
   list.querySelector('.suggest button')?.focus({ preventScroll: true });
 }
+
+// The countryside behind the road map, in the season's colours (WP15.1).
+function paintRouteSky() {
+  const el = document.getElementById('route');
+  const sky = document.getElementById('routeSky');
+  const id = seasonNow().id;
+  const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  const key = `${id}:${w}x${h}@${dpr}`;
+  if (sky.dataset.key === key) return;
+  sky.dataset.key = key;
+  el.dataset.season = id;
+  paintLandscape(sky, id, w, h, dpr);
+}
+window.addEventListener('resize', () => { if (!document.getElementById('route').hidden) paintRouteSky(); });
 
 // After the title: free play on a dev case, the day left off, a visit to ?farm, or the first farm.
 function begin() {
@@ -1170,7 +1197,7 @@ function showTitle() {
     const s = Math.max(cw / sw, ch / sh); // cover
     barn.width = Math.round(cw * dpr);
     barn.height = Math.round(ch * dpr);
-    const img = paintScenery(s * dpr);
+    const img = paintScenery(s * dpr, seasonNow().id);
     barn.getContext('2d').drawImage(img, (barn.width - img.width) / 2, (barn.height - img.height) / 2);
   };
   paint();

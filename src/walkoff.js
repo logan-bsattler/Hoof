@@ -3,6 +3,7 @@
 // (arched back, short stride and a hurried step off the affected hind), scored on the AHDB
 // 0-3 mobility scale.
 
+import { light } from './seasonart.js';
 import { CFG } from './config.js';
 import { roundRect } from './toolart.js';
 import { CLAW, clawPolygon, lesionSpot } from './hoof.js';
@@ -37,7 +38,8 @@ const LEGS = [
 
 export class Walkoff {
   // `drawFoot(ctx)` paints the trimmed foot for the weight test; `hoof` supplies its contact map.
-  constructor(result, sound, { wrapped = false, side = 'LH', foot = 'hind', hoof = null, drawFoot = null } = {}) {
+  constructor(result, sound, { wrapped = false, side = 'LH', foot = 'hind', hoof = null, drawFoot = null, season = 'spring' } = {}) {
+    this.season = season;
     this.result = result;
     this.wrapped = wrapped;
     this.limpLeg = LEGS.findIndex((L) => L.id === side[0] + (foot === 'front' ? 'F' : 'H')); // index into LEGS
@@ -142,8 +144,8 @@ export class Walkoff {
     c.fillRect(-20, -20, W + 40, H + 40);
     c.fillStyle = '#4a3a2a';
     c.fillRect(-20, GROUND, W + 40, H - GROUND + 20);
-    c.fillStyle = 'rgba(255,230,180,0.08)';
-    for (let x = -40; x < W + 40; x += 60) c.fillRect(x, 180, 30, 260); // windows of light
+    c.fillStyle = light(this.season, 0.24);
+    for (let x = -40; x < W + 40; x += 60) c.fillRect(x, 180, 30, 260); // windows of light, the season's colour
     // Trimming chute on the left.
     c.fillStyle = '#5a4632';
     c.fillRect(8, 300, 10, GROUND - 300);

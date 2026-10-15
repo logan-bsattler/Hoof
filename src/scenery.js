@@ -3,6 +3,7 @@
 // low resolution and scaled up, which gives a cheap shallow depth of field.
 // Procedural and original: no reference imagery is used.
 
+import { light } from './seasonart.js';
 import { CFG } from './config.js';
 import { mulberry32 } from './noise.js';
 
@@ -18,7 +19,7 @@ function canvas(w, h) {
 
 // Paint the static backdrop at scale k (device px per logical px). The result covers logical
 // x −B…W+B, so draw it at (−B, 0, W + 2B, H).
-export function paintScenery(k) {
+export function paintScenery(k, season = 'spring') {
   const out = canvas((W + 2 * B) * k, H * k);
   const c = out.getContext('2d');
   c.setTransform(k, 0, 0, k, B * k, 0);
@@ -28,7 +29,7 @@ export function paintScenery(k) {
   const far = canvas((W + 2 * B) * fk, H * fk);
   const f = far.getContext('2d');
   f.setTransform(fk, 0, 0, fk, B * fk, 0);
-  paintFar(f);
+  paintFar(f, season);
   c.imageSmoothingEnabled = true;
   c.imageSmoothingQuality = 'high';
   c.drawImage(far, -B, 0, W + 2 * B, H);
@@ -39,7 +40,7 @@ export function paintScenery(k) {
   return out;
 }
 
-function paintFar(c) {
+function paintFar(c, season) {
   const rand = mulberry32(512);
   const bg = c.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, '#16120f');
@@ -48,10 +49,10 @@ function paintFar(c) {
   c.fillStyle = bg;
   c.fillRect(-B, 0, W + 2 * B, H);
 
-  // Daylight from the barn door, upper right.
+  // Daylight from the barn door, upper right, in the season's colour (WP15.1).
   const sun = c.createRadialGradient(360, 260, 10, 360, 260, 300);
-  sun.addColorStop(0, 'rgba(232,214,180,0.35)');
-  sun.addColorStop(1, 'rgba(232,214,180,0)');
+  sun.addColorStop(0, light(season));
+  sun.addColorStop(1, light(season, 0));
   c.fillStyle = sun;
   c.fillRect(-B, 0, W + 2 * B, H);
 

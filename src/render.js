@@ -38,6 +38,7 @@ export class Renderer {
     this.dpr = 1;
     this.art = null;
     this.scenery = null;
+    this.season = 'spring';
     this.shadows = null;
     // Tool-in-hand state driven by the game loop.
     this.fx = { ang: 0.7, spin: 0, grindOn: false, biteT: 0, squeezeT: 0 };
@@ -67,8 +68,15 @@ export class Renderer {
     this.cssScale = cam.scale;
     if (!scaleChanged && this.scenery) return; // only the framing moved
     // Hoof buffers are sized once: 2× logical, 3× on dense screens.
-    this.scenery = paintScenery(k);
+    this.scenery = paintScenery(k, this.season);
     this.shadows = {};
+  }
+
+  // The season's daylight through the barn door (WP15.1): repaints the backdrop on a change.
+  setSeason(id) {
+    if (id === this.season) return;
+    this.season = id;
+    if (this.scenery && this.k) this.scenery = paintScenery(this.k, id);
   }
 
   // Contact shadow sprites for one foot layout, made on first use at this scale.

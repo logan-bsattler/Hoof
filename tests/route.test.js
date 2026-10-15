@@ -10,6 +10,7 @@ import {
   FARMS, HOUSING, POINTS, HERD_BONUS, farmMods, herdDeck, visitCases, cowSeed, cowPoints,
   newRoute, startVisit, recordCow, endVisit, openFarms, nextLocked,
   farmCows, healedBack, backLine, TIERS, tierFor, tierMods, farmById,
+  SEASONS, SEASON_DAYS, daysDone, seasonFor, seasonById, farmMix, visitHerd,
 } from '../src/route.js';
 import { Hoof, CLAW } from '../src/hoof.js';
 
@@ -557,4 +558,52 @@ test('a dug decoy comes back as an old pit, recheck or healed (WP14.2)', () => {
   // A malformed pit in a save is dropped, never a throw.
   route.history[0].pits = [{ claw: 7, x: 'a' }, null];
   assert.ok(!visitCases(farm, 2, route.history).find((c) => tag(c) === tag(herd[0])).findings.some((f) => f.kind === 'pit'));
+});
+
+// ------------------------------------------------------------------ WP15.1 seasons
+test('the calendar: three days a season from spring, round the year, and every day done counts', () => {
+  assert.equal(SEASON_DAYS, 3);
+  assert.deepEqual([0, 2, 3, 6, 9, 12].map((d) => seasonFor(d).id), ['spring', 'spring', 'summer', 'autumn', 'winter', 'spring']);
+  assert.equal(seasonById('nope').id, 'spring');
+  const route = newRoute();
+  assert.equal(daysDone(route), 0);
+  let d;
+  for (let k = 0; k < 3; k++) {
+    startVisit(route, 'willowbank').forEach((cd) => recordCow(route, cd, result('Clean')));
+    d = endVisit(route);
+    assert.equal(d.turned?.id ?? null, k === 2 ? 'summer' : null, `day ${k + 1}`);
+  }
+  assert.equal(daysDone(route), 3);
+  assert.equal(d.season.id, 'summer');
+});
+
+test('a season leans the mix, but never at Willow Bank or Hollins (D54)', () => {
+  const summer = seasonById('summer'), winter = seasonById('winter');
+  for (const f of FARMS.slice(0, 2)) for (const s of SEASONS) {
+    assert.deepEqual(herdDeck(f, s), herdDeck(f), `${f.name} ${s.id}`);
+    for (let v = 1; v <= 4; v++) assert.deepEqual(visitCases(f, v, [], null, s).map(tag), visitCases(f, v).map(tag));
+  }
+  const top = farmById('toplane');
+  assert.ok(farmMix(top, summer).whiteline > farmMix(top, winter).whiteline);
+  assert.ok(farmMix(farmById('marshend'), summer).dd > farmMix(farmById('marshend')).dd);
+  // Over many visits, a summer Top Lane deals half again as many white lines as a winter one.
+  const count = (s) => { let n = 0; for (let v = 1; v <= 40; v++) n += visitCases(top, v, [], null, s).filter((cd) => cd.condition === 'whiteline').length; return n; };
+  const hot = count(summer), cold = count(winter);
+  assert.ok(hot >= cold * 1.5, `white lines: summer ${hot}, winter ${cold}`);
+  // Wet seasons bring more mud.
+  const mud = (s) => farmMods(top, 4242, s).mods.mud;
+  assert.ok(Math.abs(mud(seasonById('autumn')) - mud(summer) - 0.1) < 1e-9);
+});
+
+test('the season is fixed for a day: a reload mid-day deals the same herd', () => {
+  const route = newRoute();
+  route.rep = 999;
+  for (let k = 0; k < 2; k++) { startVisit(route, 'toplane').forEach((cd) => recordCow(route, cd, result('Clean'))); endVisit(route); }
+  const herd = startVisit(route, 'marshend');
+  recordCow(route, herd[0], result('Clean'));
+  // The calendar hasn't moved for the day in progress.
+  assert.equal(daysDone(route), 2);
+  const again = visitHerd(JSON.parse(JSON.stringify(route)));
+  assert.deepEqual(again.map(tag), herd.map(tag));
+  assert.deepEqual(again.map((cd) => cd.condition), herd.map((cd) => cd.condition));
 });
