@@ -1042,3 +1042,42 @@ From the 2026-10-15 review (#3). **Recommendation: break up the run of identical
 - In the preview at 1280×900, 375×812 and 375×667: no guides or mm figures before cleaning; guided progress visible on phones; the canvas stays the same size between beats; tool buttons at least 44 px wide; canvas text at least about 11 CSS px.
 - Ben's phone playtest: he can stop the grinder at about 7 mm on purpose, and the danger can be heard and felt before any blood.
 - README and DESIGN.md match the new behavior.
+
+## Phone notes 2026-10-15 (after the stain islands APK)
+
+### Level gauge says LEVEL before step 2 is done (to build)
+- Ben's phone, step 2: the gauge read **LEVEL** (inner 8.2 mm, outer 7.6 mm) but the step didn't advance.
+- The step is right: `levelled()` (src/steps.js:16, used at :67) also needs the claw at target (`wbMean <= T + tolOf(cd)`, 7.75 mm), and 8.2 isn't.
+- The gauge is wrong: `level` in src/render.js:405 and :455 checks only `|diff| <= 0.6`, so the big green word says "done" while the claw is still high.
+- Fix: show LEVEL only when the claws match *and* the claw being worked is at target. Otherwise say which is off, e.g. "level · inner 0.5 mm high". Both gauge layouts (render.js ~405 and ~455). Add a test that the label and `steps` agree.
+- Not caused by WP10.3. Leaving the islands out of `wbMean` makes the reading honest; with them counted, the islands would have pulled the mean down and ticked the step over early.
+
+### Stain islands look like holes (to build, art only)
+- On the phone the islands read as punched through the sole: flat, evenly dark brown, a crisp torn-paper edge and a heavy rim shadow.
+- Fix in hoofart.js (stain block at "3. Stained outer horn"): mottle the inside, lighten where `isle` is shallow, soften the edge and the dark lip. Leave the sim alone.
+
+### To check
+- A faint pink patch mid outer claw (about level with its third island). Pink means the sole is near the thin line: fine if Ben had been grinding an island there, a bug if not.
+- A dark brown dash just outside the outer claw's right edge, about halfway down. It doesn't look like part of the foot.
+
+### "Always over-trimmed, but the overall is still too high" (to investigate)
+- Ben, phone, Top Lane: Restraint 0, "Over-trimmed patches", yet the gauge still read high while grinding. It's a feeling across many cows, not just this one (the calving miss was separate).
+- Likely cause: the gauge shows the claw's *mean*, but over-trim is judged *per cell* (scoring.js:262: more than 5% of sole cells more than 1.25 mm under target gives the note). A disc that takes some patches deep while others stay high gives a mean that still says "too high" with patches already over. The gauge then pushes for more grinding everywhere.
+- The islands may add to it: an island's stain clears about 1 mm under where it started, but over-trim there counts at 1.25 mm, and the art's jitter can push the clear point past that. Chasing one stain = an over-trimmed patch.
+- Restraint 0 also took the dug wall mark ("a passing flaw … chasing it"), so it's not all over-trim.
+- Next: pull Ben's playlog export (road map → log) and replay a few cows. Measure the spread of sole thickness at the moment the gauge first says on target, and what share of the over-trimmed cells are islands. Fix options: show the high spots rather than only the mean (e.g. tint cells still above the band); widen the island over-trim margin to soak + 0.5 mm; make the step and gauge use a robust level (median) so a few high cells don't push the mean.
+
+### Toasts land where the tool is working (to build)
+- Ben, phone: message pop-ups cover the spot he's working on.
+- `#toast` (styles.css:145) is fixed at the bottom centre of the play area (`bottom: 16px`), which is where the toe and the lower sole sit on a phone, right under the thumb.
+- Fix: place the toast away from the active touch. When the pointer or the last tool stamp is in the lower half of the foot, show it at the top (under the level gauge); otherwise at the bottom. Simpler alternative: always dock it in the instruction strip at the top of the screen ("2 · Match the inner claw" panel), which is off the foot entirely. Check both on a phone and on desktop, and keep the warn/good styles.
+
+## Every foot is the same shape (gap, to scope)
+From Ben, 2026-10-16: "hooves are different shapes and sizes." The references agree; the game draws one foot.
+- **The game:** one claw outline (`INNER_PTS`, src/hoof.js:87), mirrored for the other claw and flipped for side. `GEOM` (hoof.js:70) zones are fixed pixels. Cows differ only in horn heights, growth, mud and lesions. The plan's line "Toe length fixed vs foot size? Moot" (Nate AMA table) records the gap but treats it as nothing to do.
+- **Size sets the toe length.** Cramer: 7.5 cm dorsal wall under 650–700 kg; 8.2 cm for bulls and Brown Swiss. Shearer step 1: "Observe the size of the cow … small, average or large", 7.5 cm for an average Holstein, add 3–6 mm for larger cows and bulls. AHDB field guide: 8 cm for young healthy Holsteins, "adjust for age, breed, environmental conditions and disease". Nate: his complaint about Dutch is a big foot getting the same toe as a small one.
+- **Shape comes from growth vs wear.** Shearer: overgrowth lengthens and raises the toe, lowers the heel, and drops the front wall from 45° to 35° or less, mostly on the hind outer and front inner claws. AHDB: "care taken if presented with curled toes".
+- **Shape conditions already noted but not built:** corkscrew claw (hind outer, a farm trait; Shearer also describes acquired corkscrew of the front inner claws at feed bunks), the odd claw enlarged by an old pedal-bone injury (Nate lives #12), bulls (Nate lives #13; thin soles).
+- **Build options, smallest first:** (1) per-cow scale: small / average / large frame, outline and `GEOM` scaled together, toe target in mm scaled to match, intro or read card says her size; breed per farm deck (Jersey small, Brown Swiss and bulls large). (2) Per-claw shape mods: claw width, toe length and curl, heel height, outer claw bigger than inner, drawn from the outline with seeded jitter. (3) Corkscrew as a condition and farm trait on top of (2).
+- **Cost:** everything keyed to fixed pixels has to move with the outline: `GEOM` zones and feathers, `toeRamp`/`overgrowY`, decoy and lesion placement bands in conditions.js, tutorial targets, guide sets, the art lab, crops in the field guide, the bot's paths. Bigger than it looks; scope D-decisions with Ben first.
+- **Release art per breed (Ben, 2026-10-16).** The walk-off cow is one Holstein: one `bodyPath` (src/walkoff.js:287) with seeded black-and-white patches (`patchTexture`, :385). Once breed exists, the release should show it: Holstein black-and-white (or red-and-white), Jersey a small fawn cow with a dark face and dished profile, Brown Swiss a big solid grey-brown cow with a pale muzzle ring, a beef cow short and stocky (Nate: the reason they're hard in the chute), and a bull with a thick neck and no udder. Needs a body shape per breed (size, depth, leg length, head and neck), a coat painter per breed in place of the one patch texture, and the same coat on the intro and day summary if a cow appears there. The walk-off gait and lameness code should stay shared and read the scale from the breed.
