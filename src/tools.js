@@ -56,7 +56,7 @@ function newEvents() {
     removed: 0, mud: 0, dead: 0,
     loose: { [LOOSE.ULCER]: 0, [LOOSE.HEEL]: 0, [LOOSE.TRACT]: 0, [LOOSE.NECRO]: 0, [LOOSE.DOUBLE]: 0 },
     blood: false, bloodCells: 0, thin: false, lesionCut: false, grinderLesion: false,
-    dirtyCut: false, nipLive: false, nipSole: false, tooDeep: false, blockedSkip: false, claws: new Set(),
+    dirtyCut: false, nipLive: false, nipSole: false, toeLive: false, toeShort: 0, tooDeep: false, blockedSkip: false, claws: new Set(),
     sprayed: 0, sprayLesion: 0,
     // White-line abscess: drain fires once, when the pared track reaches the pocket of pus.
     // offTrack: the knife dug at the pocket's sole without following the track there.
@@ -375,31 +375,61 @@ export function applyBite(hoof, x, y) {
   const c0 = Math.max(0, Math.floor((x - cfg.radius - x0) / cell));
   const c1 = Math.min(cols - 1, Math.floor((x + cfg.radius - x0) / cell));
   const r0 = Math.max(0, Math.floor((y - y0) / cell));
+  const T = CFG.toe;
+  const core = cfg.radius * cfg.liveCore;
   const chunk = { [CLAW.OUTER]: [], [CLAW.INNER]: [] };
   const reach = { [CLAW.OUTER]: 0, [CLAW.INNER]: 0 };
   for (let cy = r0; cy < rows; cy++) {
     for (let cx = c0; cx <= c1; cx++) {
       const i = cy * cols + cx;
-      if (!(hoof.zone[i] & Z.DEAD) || hoof.thick[i] <= 0.05) continue;
       const c = hoof.claw[i];
+      if (!c) continue;
+      // Jaws closing near the tip take living toe too (D68). The whole jaw takes overgrowth;
+      // only its middle cuts into her own toe, so its edges ride round the curve of her line.
+      const live = hoof.nippableToe(i) && y - hoof.seamY[cx] - hoof.toeShift > -T.tipZone;
+      if (!live && (!(hoof.zone[i] & Z.DEAD) || hoof.thick[i] <= 0.05)) continue;
+      if (!hoof.over[i] && Math.abs(hoof.cellX(i) - x) > core) continue;
       chunk[c].push(i);
       reach[c] = Math.max(reach[c], hoof.cellY(i) - y);
     }
   }
   let bit = false;
+  ev.toeShort = 0;
   for (const c of [CLAW.OUTER, CLAW.INNER]) {
     if (!chunk[c].length) continue;
     if (reach[c] > (hoof.kit?.nippers ? cfg.jawLong : cfg.jawDepth)) { ev.tooDeep = true; continue; }
     bit = true;
-    for (const i of chunk[c]) if (!blocked(hoof, i, ev)) cut(hoof, i, hoof.thick[i], ev, 1);
+    for (const i of chunk[c]) {
+      if (blocked(hoof, i, ev)) continue;
+      // How far (px) into her own toe this cell sat: 0 for horn past her line.
+      const into = hoof.over[i] ? 0 : Math.max(0, hoof.toeShift - hoof.toeD[i]);
+      if (into > 0) ev.toeShort = Math.max(ev.toeShort, into / T.pxPerMm);
+      if (!(hoof.zone[i] & Z.LIVE)) {
+        cut(hoof, i, hoof.thick[i], ev, 1);
+        hoof.toeCut[i] = Math.max(hoof.toeCut[i], into);
+        continue;
+      }
+      ev.toeLive = true;
+      // Like the dead toe, nipping it isn't the claw's trim begun (ev.claws: which claw went first).
+      ev.removed += hoof.thick[i];
+      hoof.nipOff(i, into);
+      // Cut far enough into her toe and the jaws reach the corium: the new face bleeds.
+      const face = i - cols;
+      if (into / T.pxPerMm > T.blood && face >= 0 && (hoof.zone[face] & Z.LIVE)) {
+        hoof.blood[face] = 1;
+        ev.blood = true;
+        ev.bloodCells++;
+      }
+    }
   }
   if (ev.tooDeep && !bit) return aimedAtSepsis(hoof, x, y, ev);
   // Jaws centred on living horn: that's nipping the sole, not grazing the trim line from the toe.
   const at = hoof.cellAt(x, y);
-  const onSole = at >= 0 && hoof.claw[at] && !(hoof.zone[at] & Z.DEAD);
+  const onSole = at >= 0 && hoof.claw[at] && !(hoof.zone[at] & Z.DEAD) && !hoof.nippableToe(at);
 
   hoof.stamp(x, y, cfg.radius, (i, f) => {
     if (hoof.zone[i] & Z.DEAD) return;
+    if (hoof.nippableToe(i)) return;
     if (blocked(hoof, i, ev)) return;
     // Only the middle of the jaws bites living horn; the edges just graze it.
     if (f < 1 - cfg.liveCore ** 2) return;

@@ -41,13 +41,13 @@ export const STEPS = [
   // Thin soles (WP13.1): the long toes come off and nothing else. No grinder, no dish.
   {
     id: 'toeOnly', label: 'Nip the toes back, leave the sole', tool: 'nippers',
-    tip: 'Nip both overgrown toes back to the dashed line. Her sole is already under 7 mm: no grinder on it and no dish.',
+    tip: 'Nip both overgrown toes back to her toe length. Her sole is already under 7 mm: no grinder on it and no dish.',
     done: (m) => m.claws[CLAW.INNER].deadRemain < 0.12 && m.claws[CLAW.OUTER].deadRemain < 0.12,
   },
   // Deep sepsis (WP13.3): the swollen claw is the vet's. Trim the sound one: toe off, sole level.
   {
     id: 'trimSound', label: (cd) => `Trim the sound (${CLAW_NAME[soundClaw(cd)]}) claw only`, tool: 'nippers',
-    tip: (cd) => `Leave the swollen ${CLAW_NAME[cd.lesion.claw]} claw alone. Nip the ${CLAW_NAME[soundClaw(cd)]} toe back to the dashed line, then grind its sole down until the gauge reads ~7 mm.`,
+    tip: (cd) => `Leave the swollen ${CLAW_NAME[cd.lesion.claw]} claw alone. Nip the ${CLAW_NAME[soundClaw(cd)]} toe back to her toe length, then grind its sole down until the gauge reads ~7 mm.`,
     done: (m, s, hoof) => levelled(m.claws[soundClaw(hoof.caseDef)], hoof.caseDef),
   },
   {
@@ -57,7 +57,7 @@ export const STEPS = [
   },
   {
     id: 'step1', label: (cd) => `1 · Trim the first (${CLAW_NAME[firstClaw(cd)]}) claw`, tool: 'nippers',
-    tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to the dashed line, then grind the sole down until the gauge reads ~7 mm.`,
+    tip: (cd) => `${cap(CLAW_NAME[firstClaw(cd)])} claw first${cd?.foot === 'front' ? ' on a front foot' : ''}. Nip the overgrown toe back to her toe length, then grind the sole down until the gauge reads ~7 mm.`,
     done: (m, s, hoof) => levelled(m.claws[firstClaw(hoof?.caseDef)], hoof?.caseDef),
   },
   {

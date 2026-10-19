@@ -1,12 +1,13 @@
 // Dev-only art lab: replays scripted tool work on fresh hoofs and draws each stage large,
 // so texture and cut edges can be judged side by side. Not loaded by the game.
 
-import { Hoof, CLAW, Z, clawPolygon } from '../src/hoof.js';
+import { Hoof, CLAW, Z, clawPolygon, toeShiftPx } from '../src/hoof.js';
 import { CASE_B, makeCase } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
 import { makePlayer } from '../tests/player.js';
 import { drawBlock, drawPad, drawWrap } from '../src/toolart.js';
-import { applyStroke } from '../src/tools.js';
+import { applyStroke, applyBite } from '../src/tools.js';
+import { CFG } from '../src/config.js';
 
 const CROP = { x: 24, y: 165, w: 352, h: 480 };
 // ?focus=lesion crops a close-up around the ulcer; ?focus=toe the nipped toe tips.
@@ -27,6 +28,8 @@ const OLD = Q.get('oldblock');
 const MODS = OLD ? { oldBlock: { claw: CLAW.OUTER, kind: OLD === 'wood' ? 'wood' : 'rubber' } } : {};
 // &burst=1 on a white line deals the abscess that has broken out on its own (WP15.3).
 if (Q.has('burst')) MODS.stage = 'burst';
+// &breed=jerseyx &frame=small|large deal that cow's toe length (D68, D73).
+for (const k of ['breed', 'frame']) if (Q.has(k)) MODS[k] = Q.get(k);
 if (Q.has('kinds')) { MODS.decoyKinds = Q.get('kinds').split(','); MODS.decoyCount = MODS.decoyKinds.length; }
 const dealt = (mods) => makeCase(Q.get('cond'), Number(Q.get('seed')) || 1, mods);
 const pitsOf = (cd) => cd.findings.filter((f) => f.kind !== cd.lesion?.type).slice(0, 2).map(({ claw, x, y }) => ({ claw, x, y }));
@@ -72,8 +75,34 @@ const openAll = (s) => {
 // Pad/wrap stage per claw, drawn over the art as the game's render.dressing does.
 const dress = (s, stages) => Object.assign(s, { dressing: stages });
 
+// &toe=1 stages the nippers at her length (D69-D72): nipped true, then bitten 3 and 9 mm short.
+// Her line on claw c's tip column: the drawn seam plus her frame's shift.
+function tipOf(h, c) {
+  let best = -1;
+  for (let col = 0; col < h.g.cols; col++) {
+    if (Number.isNaN(h.seamY[col])) continue;
+    const i = h.cellAt(h.g.x0 + (col + 0.5) * h.g.cell, h.seamY[col]);
+    if (i < 0 || h.claw[i] !== c) continue;
+    if (best < 0 || h.seamY[col] > h.seamY[best]) best = col;
+  }
+  return { x: h.g.x0 + (best + 0.5) * h.g.cell, y: h.seamY[best] + toeShiftPx(CD) };
+}
+const biteShort = (s, mm) => {
+  for (const c of [CLAW.OUTER, CLAW.INNER]) {
+    const { x, y } = tipOf(s.hoof, c);
+    for (let d = 3; d <= mm; d += 3) applyBite(s.hoof, x, y - d * CFG.toe.pxPerMm);
+  }
+  s.art.sync(s.hoof);
+  return s;
+};
+
 const L = CD.lesion;
-const STAGES = OLD ? [
+const STAGES = Q.has('toe') ? [
+  ['Brushed', () => session().brushAll()],
+  ['Nipped to her length', () => session().brushAll().nip()],
+  ['Bitten 3 mm short', () => biteShort(session().brushAll().nip(), 3)],
+  ['Bitten 9 mm short', () => biteShort(session().brushAll().nip(), 9)],
+] : OLD ? [
   ['Old block on', () => session()],
   ['One tap', () => { const s = session(); s.hoof.oldBlock.taps = 1; return s; }],
   ['Two taps', () => { const s = session(); s.hoof.oldBlock.taps = 2; return s; }],

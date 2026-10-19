@@ -548,7 +548,21 @@ export class HoofArt {
     const { nMudThr, nStain, nIsle, nCav, nGrain, nStreak, nLump, nTone, nFleck, mudSpec, wetSpec, straw, hash, markT, markA, arcX, arcY, growth, mudX, mudY } = this;
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell, gx0 = g.x0;
     const d = this.img.data;
-    const { thick, init, mud, rough, tint, lift } = hoof;
+    const { thick, init, mud, rough, tint, lift, zone, toeCut } = hoof;
+    // Her toe line (D68) in pixel rows: the living outline moved toeShift px toward the tip.
+    // The sim nips her living tip off cell by cell; the art cuts it along her line instead,
+    // anywhere within a cell of a nipped tip cell, so the edge follows the toe's curve.
+    const lineRows = -hoof.toeShift * S;
+    const nearTip = this.nearTip ??= new Uint8Array(hoof.n);
+    nearTip.fill(0);
+    for (let i = 0; i < hoof.n; i++) {
+      if (!(zone[i] & Z.OFF) || toeCut[i]) continue;
+      const x = i % cols;
+      for (let dy = -cols; dy <= cols; dy += cols) for (let dx = -1; dx <= 1; dx++) {
+        const j = i + dy + dx;
+        if (j >= 0 && j < hoof.n && x + dx >= 0 && x + dx < cols && hoof.claw[j] === hoof.claw[i]) nearTip[j] = 1;
+      }
+    }
     const looseF = this.looseF, bloodF = this.bloodF, ulcerF = this.ulcerF, tractF = this.tractF, isleF = this.isleF, mudK = this.mudK, mudThin = this.mudThin;
     const L = hoof.caseDef.lesion, LH = hoof.caseDef.looseHorn;
     const cleftF = this.cleftF, ddF = this.ddF, DDL = L?.type === 'dd' ? L : null;
@@ -695,6 +709,8 @@ export class HoofArt {
         let R, G, B, spec = 0, wetness = 0, crust = 0;
         // Decoy marks, gathered in the horn pass and laid over the manure film (step 5).
         let fadeK = 0, pigK = 0, haemK = 0, pitK = 0, pitRing = 0, onSole = false;
+        // The fresh face where living toe was nipped off (D68), and how pink it went.
+        let toeFace = 0, toePink = 0;
         // Surface slope (height per logical px): the claw's dome plus cut relief and tool marks.
         let gx = sx0[p], gy = sy0[p];
         let sheen = 1;
@@ -730,6 +746,34 @@ export class HoofArt {
             R += (150 + 20 * ngr - R) * face; G += (136 + 18 * ngr - G) * face; B += (108 + 14 * ngr - B) * face;
           }
         } else {
+          // Living toe nipped off (D68): gone, its edge torn midway like the dead toe's. The
+          // fresh face goes pink the further into her toe the jaws went.
+          // A living tip past her line (no toeCut) comes off along her line, drawn from the smooth
+          // outline so it follows the toe's curve; a bite into her toe follows the jaws' cells.
+          let biteK = 0;
+          if (w0 && zone[i0] & Z.OFF && toeCut[i0]) biteK += w0;
+          if (w1 && zone[i1] & Z.OFF && toeCut[i1]) biteK += w1;
+          if (w2 && zone[i2] & Z.OFF && toeCut[i2]) biteK += w2;
+          if (w3 && zone[i3] & Z.OFF && toeCut[i3]) biteK += w3;
+          const overK = (w0 && nearTip[i0]) || (w1 && nearTip[i1]) || (w2 && nearTip[i2]) || (w3 && nearTip[i3]) ? 1 : 0;
+          if (biteK > 0 || overK > 0) {
+            const tear = 0.5 + (ncv - 0.5) * 0.7 + (ngr - 0.5) * 0.18;
+            // Pixel rows from here on to her line, roughened a little: 0 is past it. Her line is
+            // where the living outline would end had it sat lineRows rows nearer the heel.
+            let toLine = Infinity;
+            if (overK > 0) {
+              const jag = Math.round(((ncv - 0.5) * 1.6 + (ngr - 0.5) * 0.6) * S);
+              for (let k = 0; k <= 3 * S; k++) {
+                const q = py + Math.round(lineRows) + k + jag;
+                if (q < 0 || q >= this.h || cls[q * w + px] !== c) { toLine = k; break; }
+              }
+            }
+            if (biteK > tear || toLine <= 0) { d[o + 3] = 0; continue; }
+            toeFace = Math.max(biteK > 0 ? smoothstep(tear - 0.4, tear - 0.03, biteK) : 0,
+              toLine < Infinity ? 1 - smoothstep(0.5 * S, 2.5 * S, toLine) : 0);
+            const cutPx = Math.max(w0 ? toeCut[i0] : 0, w1 ? toeCut[i1] : 0, w2 ? toeCut[i2] : 0, w3 ? toeCut[i3] : 0);
+            toePink = smoothstep(CFG.toe.pink - 1.5, CFG.toe.pink + 0.5, cutPx / CFG.toe.pxPerMm);
+          }
           const ti = (init[i0] * w0 + init[i1] * w1 + init[i2] * w2 + init[i3] * w3), r = (rough[i0] * w0 + rough[i1] * w1 + rough[i2] * w2 + rough[i3] * w3);
           const removed = ti - t;
           {
@@ -1252,6 +1296,12 @@ export class HoofArt {
             wetness = Math.max(wetness, k);
             haemK *= 1 - k;
           }
+        }
+
+        if (toeFace > 0) {
+          const fr = 214 + (232 - 214) * toePink, fg = 196 + (150 - 196) * toePink, fb = 150;
+          R += (fr - R) * toeFace; G += (fg - G) * toeFace; B += (fb - B) * toeFace;
+          wetness = Math.max(wetness, toePink * toeFace * 0.5);
         }
 
         // 5. Manure and straw on top. A film lingers even after the clumps go.

@@ -38,6 +38,20 @@ export const CFG = {
     ramp: 1.5,        // cuts slow over this many mm above a zone's target, down to the tool's `resist`
   },
 
+  // Toe length by the cow's size (D68–D72). The drawn seam between the overgrown toe and the
+  // living one is an average Holstein's 7.5 cm toe; a cow's right toe sits `mm - 75` mm past it
+  // (Cramer, Shearer step 1; Jersey dorsal walls run 69–73 mm untrimmed, ADSA 2018 T197).
+  // pxPerMm: view px per mm along the toe. tipZone: how far (px) back from the seam the nippers
+  // can take living toe; any further up the jaws are on the sole. tipCols: the columns (px either
+  // side of her toe's point) whose length counts as her toe length. A toe cut `note` mm short is
+  // a Balance note, `hit` mm a Restraint hit, and past `pink` the cut face shows pink; a cut
+  // `blood` mm into her toe reaches the corium.
+  toe: {
+    pxPerMm: 3, tipZone: 30, tipCols: 12,
+    frames: { small: { mm: 70 }, average: { mm: 75 }, large: { mm: 80 } },
+    note: 1.5, hit: 3.5, pink: 3.5, blood: 5, restraint: 20,
+  },
+
   // Tool behaviour. Rates are mm removed per px of movement (stroke tools)
   // or per second (grinder). `resist` is the removal multiplier at a cell's zone target,
   // eased in over `sole.ramp` mm above it: the "you're nearly there" assist.

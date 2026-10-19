@@ -34,6 +34,7 @@ export class Renderer {
     this.ctx = canvas.getContext('2d');
     this.tol = CFG.sole.tolerance; // the case's on-target band (main.js sets it per cow)
     this.caseDef = null; // the cow on the table, for the gauge's LEVEL read (main.js sets it)
+    this.toeGuide = true; // draw her trim line: Apprentice and free play only (D71, main.js sets it)
     this.k = 1;
     this.cssScale = 1; // CSS px per logical px
     this.cam = fitCamera(W, H);
@@ -279,9 +280,10 @@ export class Renderer {
       const s = clawSide(claw, side), box = clawBox(claw, side);
       const ax = onClaw(claw, side); // an x on the right-hand claw, moved onto this claw
 
-      // Trim line at the front of the living toe.
-      const tl = toeLine(claw, side);
-      c.globalAlpha = A.trim;
+      // Trim line at her toe length (D68). From Journeyman on there's none (D71): her frame is
+      // in the intro and the rule in the field guide.
+      const tl = toeLine(claw, side, hoof.toeShift);
+      c.globalAlpha = this.toeGuide ? A.trim : 0;
       c.setLineDash([5, 4]);
       c.strokeStyle = 'rgba(232,190,100,0.95)';
       c.lineWidth = 1.5;

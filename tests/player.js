@@ -77,13 +77,14 @@ export function makePlayer(hoof, opts = {}) {
       for (let y = 180; y < 640; y += 14) p.drag('brush', [[30, y], [370, y + 6], [30, y + 12]], 900);
       return p;
     },
-    // Nip each column from the tip back, stopping before the jaws' core would reach live horn.
-    // With a claw given, only that claw's columns (deep sepsis: the sound claw only).
+    // Nip each column from the tip back, stopping before the jaws' core would reach horn her size
+    // keeps (D68): the living sole, a big cow's dead toe short of her line. A small cow's living
+    // tip goes. With a claw given, only that claw's columns (deep sepsis: the sound claw only).
     nip(claw = null) {
       const core = CFG.tools.nippers.radius * CFG.tools.nippers.liveCore;
       const touchesLive = (x, y) => {
         let live = false;
-        hoof.stamp(x, y, core, (i) => { if (!(hoof.zone[i] & Z.DEAD)) live = true; });
+        hoof.stamp(x, y, core, (i) => { if (!hoof.over[i] && !(hoof.zone[i] & Z.OFF)) live = true; });
         return live;
       };
       const xs = [158, 242, 128, 272, 100, 300, 190, 210, 80, 320, 70, 330, 112, 288, 143, 257, 174, 226];

@@ -19,7 +19,14 @@ export const Z = {
   DD: 512,     // digital dermatitis: the raw lesion on the cleft skin
   ROT: 1024,   // foot rot: the split, infected skin along the whole cleft, both claws
   SEPSIS: 2048, // deep sepsis: the old, open hole at the ulcer site. No blade goes in it
+  OFF: 4096,   // living toe nipped off (D68): gone from the foot, kept as DEAD with no horn
 };
+
+// How far (px) past the drawn seam a cow's right toe line sits: + longer (a big cow), - shorter.
+export function toeShiftPx(caseDef) {
+  const f = CFG.toe.frames[caseDef?.frame] ?? CFG.toe.frames.average;
+  return Math.round((f.mm - CFG.toe.frames.average.mm) * CFG.toe.pxPerMm);
+}
 
 export const CLAW = { NONE: 0, OUTER: 1, INNER: 2 };
 export const CLAW_NAME = { 1: 'outer', 2: 'inner' };
@@ -115,10 +122,11 @@ export function clawPolygon(claw, overgrown = false, side = 'LH') {
   return pts.map(([x, y]) => [mx(x), y]);
 }
 
-// The front edge of the living toe: the "trim to here" line.
-export function toeLine(claw, side = 'LH') {
+// The front edge of the living toe: the "trim to here" line. `shift` px moves it for her size
+// (toeShiftPx): further out for a big cow, back into the toe for a small one.
+export function toeLine(claw, side = 'LH', shift = 0) {
   const mx = onClaw(claw, side);
-  return INNER_PTS.filter(([, y]) => y > 510).map(([x, y]) => [mx(x), y]).sort((a, b) => a[0] - b[0]);
+  return INNER_PTS.filter(([, y]) => y > 510).map(([x, y]) => [mx(x), y + shift]).sort((a, b) => a[0] - b[0]);
 }
 
 // Bounding box of a claw's living outline.
@@ -260,6 +268,15 @@ export class Hoof {
     this.lift = new Float32Array(n);
     this.noise = new Float32Array(n);
     this.tract = new Uint8Array(n); // TRACT.* for a white-line abscess
+    // Toe length (D68): toeD is how far (px) a toe cell sits past the drawn seam in its column
+    // (NaN off the toe), seamY the seam per column. over marks the horn her size wants off: the
+    // dead toe past her line, and on a small cow the living tip past it too. toeCut is how far
+    // (px) into her own toe each nipped cell was.
+    this.toeShift = toeShiftPx(caseDef);
+    this.toeD = new Float32Array(n).fill(NaN);
+    this.seamY = new Float32Array(this.g.cols).fill(NaN);
+    this.over = new Uint8Array(n);
+    this.toeCut = new Float32Array(n);
     // Stain islands (WP10.3): how far (mm) the sole starts under the plain sole round it, and how
     // deep (mm, below where it started) the manure stain soaked in. 0 off the islands.
     this.low = new Float32Array(n);
@@ -411,6 +428,7 @@ export class Hoof {
       }
     }
 
+    this.buildToe();
     for (const L of lesionsOf(cd)) this.buildLesion(L);
 
     // A curl of loose, undermined heel horn for step 5.
@@ -436,6 +454,69 @@ export class Hoof {
 
     this.buildIslands();
     this.init.set(this.thick);
+  }
+
+  // Her toe line (D68–D70). The seam drawn between dead and living toe is an average cow's toe;
+  // hers sits toeShift px past it. A big cow's dead horn short of her line is her toe, to keep;
+  // a small cow's living tip past her line is overgrowth, to nip. An average cow is as before.
+  // A claw trimmed already (WP17.1/17.2) was trimmed to her line, unless its toe was left long.
+  buildToe() {
+    const { cols } = this.g, s = this.toeShift, cd = this.caseDef;
+    for (let i = 0; i < this.n; i++) {
+      if (!(this.zone[i] & Z.LIVE)) continue;
+      const col = i % cols, y = this.cellY(i);
+      if (!(this.seamY[col] >= y)) this.seamY[col] = y;
+    }
+    for (let i = 0; i < this.n; i++) {
+      const c = this.claw[i], y = this.cellY(i);
+      if (!c || y <= GEOM.overgrowY) continue;
+      const seam = this.seamY[i % cols];
+      const d = Number.isNaN(seam) ? Infinity : y - seam;
+      this.toeD[i] = d;
+      // Dead horn beside the living claw (d <= 0) is overgrowth on any cow.
+      if (this.zone[i] & Z.DEAD) this.over[i] = d > 0 && d <= s ? 0 : 1;
+      else this.over[i] = d > s ? 1 : 0;
+      const done = !!cd.trimmed?.includes(c) && cd.apprentice?.longtoe !== c;
+      if (!done) continue;
+      if ((this.zone[i] & Z.DEAD) && !this.over[i]) this.thick[i] = CFG.sole.target + 2.5;
+      else if ((this.zone[i] & Z.LIVE) && this.over[i]) { this.zone[i] = Z.DEAD | Z.OFF; this.thick[i] = 0; }
+    }
+  }
+
+  // A living toe cell the nippers can take off (D68): near the tip (within tipZone of her line,
+  // whatever her size), past the sole, and plain horn.
+  nippableToe(i) {
+    const z = this.zone[i];
+    return !!(z & Z.LIVE) && !(z & (Z.ULCER | Z.SEPSIS | Z.CLEFT | Z.HEEL)) && !this.looseInit[i]
+      && this.toeD[i] - this.toeShift > -CFG.toe.tipZone;
+  }
+
+  // Nip living toe cell i off: gone from the foot. `depth` px is how far into her own toe it was.
+  nipOff(i, depth) {
+    this.zone[i] = Z.DEAD | Z.OFF;
+    this.thick[i] = 0;
+    this.mud[i] = 0;
+    this.toeCut[i] = Math.max(this.toeCut[i], depth);
+  }
+
+  // How far (mm) short of her line claw c's toe was cut, at its point: the columns either side of
+  // where her toe reaches furthest. Corners rounded off by the jaws don't count.
+  toeShortMm(c) {
+    const { cols } = this.g;
+    let tip = -1, tipY = -Infinity;
+    for (let col = 0; col < cols; col++) {
+      const x = this.g.x0 + (col + 0.5) * this.g.cell;
+      if (Number.isNaN(this.seamY[col]) || clawSide(c, this.side) !== Math.sign(x - MID_X)) continue;
+      if (this.seamY[col] > tipY) { tipY = this.seamY[col]; tip = col; }
+    }
+    if (tip < 0) return 0;
+    const w = Math.round(CFG.toe.tipCols / this.g.cell);
+    let worst = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.claw[i] !== c || Math.abs((i % cols) - tip) > w) continue;
+      worst = Math.max(worst, this.toeCut[i]);
+    }
+    return worst / CFG.toe.pxPerMm;
   }
 
   // Stain islands (WP10.3): a few low spots per claw, placed per cow, where the manure stain
@@ -619,10 +700,11 @@ export class Hoof {
     if (i < 0) return { kind: 'none', text: 'Tap the hoof with the testers.' };
     const z = this.zone[i];
     if (this.mud[i] > 0.35) return { kind: 'dirty', text: "Too dirty to read. Clean it first." };
+    if (z & Z.OFF) return { kind: 'none', text: 'Nipped off: nothing there.' };
     if (z & Z.DEAD) {
       // Dragging the toe (D26) wears its tip square: a read-card line, not a sore spot.
       if (this.caseDef.toeDrag) return { kind: 'scuff', finding: scuffFinding(this.caseDef, this.claw[i]), text: SCUFF_TEXT };
-      return { kind: 'dead', text: 'Dead, overgrown toe horn: safe to nip off.' };
+      return { kind: 'dead', text: 'Dead toe horn, no feeling in it. Nip it back to her toe length.' };
     }
     const L = this.caseDef.lesion;
     if (z & (Z.DD | Z.ROT)) {
@@ -700,7 +782,7 @@ export class Hoof {
 
   metrics() {
     const { target: T, dishTarget: D, thin } = CFG.sole;
-    const acc = () => ({ wbSum: 0, wbN: 0, wbTaken: 0, dishSum: 0, dishN: 0, deadN: 0, deadLeft: 0 });
+    const acc = () => ({ wbSum: 0, wbN: 0, wbTaken: 0, dishSum: 0, dishN: 0, deadN: 0, deadLeft: 0, liveLeft: 0 });
     const claws = { [CLAW.OUTER]: acc(), [CLAW.INNER]: acc() };
     const m = {
       claws, mudSum: 0, liveN: 0, roughSum: 0, roughN: 0,
@@ -716,11 +798,13 @@ export class Hoof {
       const k = claws[c];
       const t = this.thick[i];
 
-      if (z & Z.DEAD) {
+      // The overgrown toe, by her size (D68): dead horn past her line, and a small cow's living
+      // tip. A big cow's dead horn short of her line is her toe: not counted as left on.
+      if (this.over[i]) {
         k.deadN++;
-        if (t > 0.05) k.deadLeft++;
-        continue;
+        if (!(z & Z.OFF) && t > 0.05) { k.deadLeft++; if (z & Z.LIVE) k.liveLeft++; }
       }
+      if (z & Z.DEAD) continue;
 
       m.liveN++;
       m.mudSum += this.mud[i];
@@ -795,6 +879,9 @@ export class Hoof {
       k.wbTakenMean = k.wbN ? k.wbTaken / k.wbN : 0;
       k.dishMean = k.dishN ? k.dishSum / k.dishN : 0;
       k.deadRemain = k.deadN ? k.deadLeft / k.deadN : 0;
+      // A small cow's living tip left on, as a share of all she had to lose (D72: long for her).
+      k.liveRemain = k.deadN ? k.liveLeft / k.deadN : 0;
+      k.toeShort = this.toeShortMm(c);
     }
     m.mudMean = m.liveN ? m.mudSum / m.liveN : 0;
     m.roughMean = m.roughN ? m.roughSum / m.roughN : 0;

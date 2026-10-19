@@ -11,7 +11,7 @@ import { FARMS, KIT } from './route.js';
 const TOOL_NOTES = {
   brush: ['First, every time. You can’t read a foot you can’t see.', 'A blade through muck is a cut you didn’t mean.'],
   probe: ['On anything that looks wrong once she’s clean: dark, red, lifted or raw.', 'Squeeze, then commit your read before you start opening things.'],
-  nippers: ['The overgrown toe only, from the tip back toward the dashed line.', 'Too blunt for the sole, and a big bite can reach the trim line.'],
+  nippers: ['The overgrown toe only, from the tip back to her toe length: shorter on a small cow, longer on a big one.', 'Too blunt for the sole, and a big bite can reach the trim line.'],
   grinder: ['Levelling each claw’s sole to about 7 mm, in smooth passes.', 'Not near a lesion or on a false sole: it tears. Linger in one spot and she bleeds.'],
   knife: ['Pull for the dish along the inner edge. Flick (a short, quick stroke) to open a cap and lift loose horn.', 'Flick the rim of an opened lesion, never the raw middle: a long carve there strips the ring she stands on. A tap prises off an old block.'],
   rasp: ['After the grinder, to true the sole before a block covers it.', 'Smoothing only: it won’t take a claw down.'],
@@ -43,7 +43,7 @@ export const GUIDE_CONDITIONS = {
 // The trim the guided run teaches, in plain words.
 export const TRIM_PAGE = [
   ['Clean and read', 'Brush the muck off, then test anything that looks wrong and commit your read.'],
-  ['1 · The first claw', 'The inner claw on a hind foot, the outer on a front. Nip the long toe back, then grind the sole to about 7 mm.'],
+  ['1 · The first claw', 'The inner claw on a hind foot, the outer on a front. Nip the long toe back to her toe length, then grind the sole to about 7 mm. A Holstein’s toe is about 7.5 cm; a small cow or a heifer’s nearer 7, a big cow’s nearer 8.'],
   ['2 · Match the other', 'Bring the other claw down to the same height. Level is the goal.'],
   ['3 · Dish both', 'Carve a shallow dish along the inner edge of each claw, out of the toe triangle. Then rasp.'],
   ['4 · Rest the sore claw', 'Open what needs opening, and block the sound claw so the sore one is off the floor.'],

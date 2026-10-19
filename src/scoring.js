@@ -164,14 +164,20 @@ export function scoreCase(m, session, hoof, caseDef) {
   const slack = Math.max(0, tolOf(caseDef) - CFG.sole.tolerance);
   const off = (k) => thin ? ramp(k.wbTakenMean, 0.3 + slack, 1.5 + slack) : ramp(Math.abs(k.wbMean - T), 0.4 + slack, 3 + slack);
   const height = dds ? off(soundK) : (off(inner) + off(outer)) / 2;
-  const toe = 100 * (1 - (dds ? soundK.deadRemain : (inner.deadRemain + outer.deadRemain) / 2));
+  const judged = dds ? [soundK] : [inner, outer];
+  // Toe length by her size (D68–D72): horn left past her line, or her own toe cut short.
+  const short = Math.max(...judged.map((k) => k.toeShort ?? 0));
+  const longFor = judged.reduce((a, k) => a + (k.liveRemain ?? 0), 0) / judged.length;
+  const toe = Math.min(100 * (1 - judged.reduce((a, k) => a + k.deadRemain, 0) / judged.length), ramp(short, CFG.toe.note, CFG.toe.blood));
   const heel = ramp(m.heelRemovedMean, 0.3, 2);
   const balance = !trim ? 100 : dds ? 0.5 * height + 0.35 * toe + 0.15 * heel : 0.4 * level + 0.3 * height + 0.2 * toe + 0.1 * heel;
   if (dds && height < 70) notes.push(`The sound ${CLAW_NAME[sound]} claw is off target at ${soundK.wbMean.toFixed(1)} mm; aim for ~${T}. It carries her now.`);
   if (trim) {
   if (level < 70 && !dds) notes.push(`Claws aren’t level: ${Math.abs(m.levelDiff).toFixed(1)} mm apart. She’ll rock on the taller one.`);
   if (height < 70 && !thin && !dds) notes.push(`Sole height is off target (inner ${inner.wbMean.toFixed(1)} mm, outer ${outer.wbMean.toFixed(1)} mm; aim for ~${T}).`);
-  if (toe < 85) notes.push('Overgrown toe left on. Nip back to the dashed line.');
+  if (short > CFG.toe.note) notes.push(`Toe cut ${short.toFixed(1)} mm short of her length: she'll rock back on her heels.`);
+  else if (longFor > 0.2) notes.push('Toe left long for her size. A small cow wants a shorter toe: nip the living tip back too.');
+  else if (toe < 85) notes.push('Overgrown toe left on. Nip it back to her toe length.');
   if (heel < 80) notes.push('You took horn off the heel. Step 1 rule: don’t touch the heel.');
   }
 
@@ -294,7 +300,9 @@ export function scoreCase(m, session, hoof, caseDef) {
   const deep = dds ? Math.min(30, 15 * (holes + swollenCuts)) : 0;
   if (dds && holes) notes.push('That’s the vet’s job now: the infection’s deep in the joint. No blade in the hole.');
   if (dds && swollenCuts) notes.push(`Leave the swollen ${CLAW_NAME[L.claw]} claw: trim the sound one. Every stroke on it hurt her.`);
-  const restraint = clamp(100 - needless - deep - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - ringCost - (session.cleftCuts ? 20 : 0));
+  const toeCost = trim && short > CFG.toe.hit ? CFG.toe.restraint : 0;
+  if (toeCost) notes.push('You nipped into her living toe. Bite from the tip back and stop at her length.');
+  const restraint = clamp(100 - toeCost - needless - deep - overFrac * 300 - triFrac * 200 - Math.min(30, m.thinCells * 0.5) - clawOver - nickCost - dug * 25 - (hunted ? 25 : 0) - ringCost - (session.cleftCuts ? 20 : 0));
   for (const note of new Set(dugMarks.map((f) => DUG_NOTE[f.kind] ?? FIRM_NOTE))) notes.push(note);
   if (hunted) notes.push(L.type === 'foreign' ? 'You opened a crater round the puncture. A narrow funnel straight down on the mark is all it needs.' : 'You dug into the sole beside the track. Follow the dark line from the wall: it leads to the pus.');
   if (stripped) notes.push('You stripped the horn round the ulcer. Free the loose horn, but leave a ring of sound sole: if her block comes off, that ring is all she stands on.');

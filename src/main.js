@@ -3,7 +3,7 @@
 
 import { CFG, touchAngle, tolOf } from './config.js';
 import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
-import { CASE_A, apprenticeLeft, dealCase, makeCase, temperament, readOptions, cowName } from './case.js';
+import { CASE_A, apprenticeLeft, dealCase, makeCase, temperament, readOptions, cowName, tagAndLimb } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyFlick, applyGrind, applyBite, applySpray, applyWrap, applyPry } from './tools.js';
 import { startStroke, strokeMove, strokeTick, strokeEnd } from './stroke.js';
 import { stepsFor, evaluateSteps, trimFinished, stepTip, suggestedTool } from './steps.js';
@@ -40,6 +40,8 @@ function devMods() {
     // WP17: &partial=heifer|lately, &apprentice=unlevel,heel (or &apprentice= for a good job).
     partial: devCase.get('partial') ?? undefined,
     apprentice: devCase.has('apprentice') ? devCase.get('apprentice').split(',').filter(Boolean) : undefined,
+    // D68/D73: &breed=jerseyx|brownswiss|holstein, &frame=small|average|large.
+    breed: devCase.get('breed') ?? undefined, frame: devCase.get('frame') ?? undefined,
   };
   return Object.fromEntries(Object.entries(mods).filter(([, v]) => v !== undefined));
 }
@@ -218,6 +220,7 @@ function newCase() {
   renderer.caseDef = caseDef;
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
   if (game.guideMode) setGuides(game.guideMode === 'on');
+  renderer.toeGuide = !game.guideMode || game.guideMode === 'on';
   game.found = [];      // marks the testers have read this case, in order
   game.temper = temperament(caseDef.temper, { guards: game.hoof.kit?.guards, kicker: caseDef.kicker });
   game.fidgetT = game.temper.fidgetEvery * (0.6 + Math.random() * 0.8);
@@ -790,7 +793,8 @@ function handle(ev, x, y) {
   }
   if (ev.tooDeep) warnOnce('nipDeep', 'Too much horn for one bite. Start at the tip and work back toward the hoof.', 'info');
   if (ev.nipSole) warnOnce('nip', 'Nippers are for the overgrown toe. Too blunt for the living sole.');
-  else if (ev.nipLive) warnOnce('nipLine', 'That bite reached the trim line. Ease back a touch: the grinder does the rest.', 'info', 8);
+  else if (ev.toeShort > CFG.toe.hit) warnOnce('toeShort', 'That’s into her toe. Cut it that short and she rocks back onto her heels.');
+  else if (ev.toeShort > CFG.toe.note) warnOnce('toeNote', 'A touch short of her toe length there. Work back from the tip in smaller bites.', 'info', 8);
   if (ev.grinderLesion) {
     s.grinderLesion = true;
     warnOnce('grindLesion', caseDef.lesion?.type === 'doublesole' ? 'Not the grinder on the false sole! It tears into the thin new sole. Lift the old layer off with the knife.'
@@ -1013,7 +1017,7 @@ async function showDay() {
   renderer.setSeason(seasonNow().id);
   Sound.step();
   const rows = d.rows.map((r) => `<tr class="${r.lame ? 'lame' : ''}">
-      <td>${r.tag.replace('Holstein ', '')}${r.back ? ` <span class="again" title="${r.back === 'recheck' ? 'Recheck' : 'Seen before'}">↺</span>` : ''}</td><td>${r.title}</td><td>${r.grade}</td>
+      <td>${tagAndLimb(r.tag)[0]}${r.back ? ` <span class="again" title="${r.back === 'recheck' ? 'Recheck' : 'Seen before'}">↺</span>` : ''}</td><td>${r.title}</td><td>${r.grade}</td>
       <td>${r.gait}</td><td class="pts">${r.lame ? '—' : `+${r.points}`}</td></tr>`).join('');
   const flagged = d.rows.filter((r) => r.lame).length;
   const opened = d.opened.map((f) => `<p class="rep-line">New on the road: <b>${f.name}</b> (${HOUSING[f.housing].toLowerCase()})</p>`).join('') +
@@ -1025,7 +1029,7 @@ async function showDay() {
      <p class="sub">Reputation ${d.before} → <b>${d.rep}</b>${next ? ` · ${next.name} opens at ${next.rep}` : ''}</p>
      <table class="day"><thead><tr><th>Cow</th><th>Case</th><th>Grade</th><th>Walked</th><th></th></tr></thead><tbody>${rows}</tbody></table>
      ${d.bonus ? `<p class="rep-line">Whole herd walked off sound: +${d.bonus}</p>` : ''}
-     ${d.mended.length ? `<p class="rep-line">Back on her feet: ${d.mended.map((t) => `<b>${t.replace('Holstein ', '')}</b>`).join(', ')}</p>` : ''}
+     ${d.mended.length ? `<p class="rep-line">Back on her feet: ${d.mended.map((t) => `<b>${tagAndLimb(t)[0]}</b>`).join(', ')}</p>` : ''}
      ${flagged ? `<p class="plan">${flagged === 1 ? 'One cow' : `${flagged} cows`} went off lame. ${d.farm.farmer[0].toUpperCase()}${d.farm.farmer.slice(1)} will want a second look next visit.</p>` : ''}
      ${opened}
      ${d.turned ? `<p class="season-line">The weather’s turning: ${d.turned.name.toLowerCase()} is here.</p>` : ''}`,
@@ -1050,7 +1054,7 @@ async function showVisit(farm, { fromMap = true } = {}) {
   const kicker = herdNow.find((cd) => cd.kicker);
   // Her first cow's foot is built while the card is read.
   expect(herdNow[0]);
-  const tags = (list) => list.map((cd) => `<b>${cd.subtitle.split(' · ')[0].replace('Holstein ', '')}</b>`).join(', ');
+  const tags = (list) => list.map((cd) => `<b>${tagAndLimb(cd.subtitle)[0]}</b>`).join(', ');
   const rechecks = back.filter((cd) => cd.back.outcome === 'recheck');
   // A black toe is due back whatever happened (WP8.4); the rest came back lame.
   const toes = rechecks.filter((cd) => CONDITIONS[cd.back.was]?.recheck);

@@ -24,9 +24,31 @@ export function temperament(t = 0.5, { guards = false, kicker = false } = {}) {
   };
 }
 
+// Breeds (D73) and the frame each usually brings (D68): her toe length goes with her size.
+export const BREEDS = {
+  holstein: { name: 'Holstein', frame: 'average' },
+  jerseyx: { name: 'Jersey cross', frame: 'small' },
+  brownswiss: { name: 'Brown Swiss', frame: 'large' },
+};
+// Her tag and limb from the subtitle, with the breed dropped: ['#214', 'left hind'].
+export const tagAndLimb = (subtitle) => subtitle.slice(subtitle.indexOf('#')).split(' · ');
+
+// What the intro says about her size, so the player knows her toe length without a line (D71).
+function frameLine(breed, frame) {
+  const B = BREEDS[breed] ?? BREEDS.holstein;
+  if (frame === B.frame && frame === 'average') return null;
+  const who = frame === B.frame ? `a ${B.name}` : `a ${frame === 'large' ? 'big' : 'small'}-framed ${B.name}`;
+  if (frame === 'small') return `She’s small, ${who}: a shorter toe than a big Holstein’s, nearer 7 cm.`;
+  if (frame === 'large') return `She’s a big cow, ${who}: her toe runs longer, nearer 8 cm.`;
+  return `She’s ${who}, middling for size: a 7.5 cm toe, as usual.`;
+}
+
 // One line for the intro about anything out of the ordinary with this cow.
-function traitsLine({ temper, mud, growth, foot, kicker }) {
+function traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young }) {
   const bits = [];
+  // A heifer's short toe is in her own intro line (PARTIAL).
+  const fl = young ? null : frameLine(breed, frame);
+  if (fl) bits.push(fl);
   if (foot === 'front') bits.push('A front foot: the inner claw is the long one here, so the outer claw goes first.');
   if (kicker) bits.push('The farmer warned you: she kicks. Short strokes, and keep clear of her heel.');
   else if (temper >= 0.7) bits.push('She’s a flighty one: expect her to shift about.');
@@ -38,7 +60,7 @@ function traitsLine({ temper, mud, growth, foot, kicker }) {
 }
 
 // Everything a case needs, written out from where things are on the foot.
-function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker, swollen }) {
+function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker, swollen, breed = 'holstein', frame = 'average', young = false }) {
   const C = CONDITIONS[condition];
   const cow = 100 + (((seed - 100) % 900) + 900) % 900; // ear tag #100–#999; seed 214 is #214
   const leg = side === 'RH' ? 'right' : 'left';
@@ -54,7 +76,9 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     foot,
     title: C.title,
     noun: C.noun ?? 'lesion', // what the copy calls the lesion: 'ulcer', 'abscess'
-    subtitle: `Holstein #${cow} · ${limb}`,
+    subtitle: `${(BREEDS[breed] ?? BREEDS.holstein).name} #${cow} · ${limb}`,
+    // Her breed and frame (D68, D73): the frame sets her toe length (hoof.js toeShiftPx).
+    breed, frame,
 
     // The step ids this job needs, in order (see steps.js).
     steps: C.steps,
@@ -76,7 +100,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     // (1 covered; above 1 caked harder, below 1 patchy).
     temper,
     mud,
-    traits: traitsLine({ temper, mud, growth, foot, kicker }),
+    traits: traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young }),
     // A known kicker (WP12.2): the farmer names her on the visit card.
     ...(kicker ? { kicker: true } : {}),
 
@@ -134,6 +158,8 @@ function withPits({ decoys, lesion, lesions, looseHorn }, pits) {
 //   stage      'burst': a white-line abscess that has broken out on its own (WP15.3)
 //   partial    'heifer' | 'lately': a routine cow with less to do (WP17.2, see partialWork)
 //   apprentice [fault ids]: trimmed already by the farm's apprentice, with these faults (WP17.1)
+//   breed      a BREEDS id (D73), and frame 'small'|'average'|'large' (D68) if not the breed's own;
+//              a heifer is small whatever her breed
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).
 // With no mods she comes out exactly as before the variations existed.
 export function makeCase(condition, seed, mods = {}) {
@@ -157,7 +183,7 @@ export function makeCase(condition, seed, mods = {}) {
   const excess = C.thinSole
     ? { [big]: -0.5 - (hi - 3.5) / 2 + (lo - 1.8) / 6, [small]: -0.5 - (hi - 3.5) / 2 }
     : { [big]: hi * growth, [small]: lo * growth };
-  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, stage, partial, apprentice, ...over } = mods;
+  const { side: _s, foot: _f, growth: _g, decoyCount: _n, decoyKinds: _k, lesionSize: _z, lesionAt: _a, calving, oldBlock, pits, stage, partial, apprentice, breed = 'holstein', frame: frameMod, ...over } = mods;
   // Less to do (WP17.2): a heifer's young feet carry little horn, and a cow trimmed lately has
   // one claw still right from last time. She's livelier too, if a heifer: it's her first crush.
   const short = !calving && condition === 'routine' && PARTIAL[partial] ? partial : null;
@@ -177,11 +203,12 @@ export function makeCase(condition, seed, mods = {}) {
   if (stage === 'burst' && condition === 'whiteline') placed.lesion = { ...placed.lesion, stage };
   if (pits?.length) placed.decoys = withPits(placed, pits);
   if (over.kicker) over.temper = Math.max(over.temper ?? 0.5, CFG.temper.kickFrom);
-  const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over });
+  const frame = short === 'heifer' ? 'small' : frameMod ?? (BREEDS[breed] ?? BREEDS.holstein).frame;
+  const cd = buildCase(condition, { seed, side, foot, excess, ...placed, temper: 0.5, mud: 1, growth, ...over, breed, frame, young: short === 'heifer' });
   if (oldBlock) return { ...cd, oldBlock, steps: ['unblock', ...cd.steps] };
   if (short) return partialWork(cd, short, big);
   if (work) {
-    const [tag] = cd.subtitle.replace('Holstein ', '').split(' · ');
+    const [tag] = tagAndLimb(cd.subtitle);
     return { ...cd, apprentice: work, trimmed: [CLAW.OUTER, CLAW.INNER],
       intro: `The farm’s apprentice trimmed ${tag} this morning and wants you to look her over. Check the work: put right what isn’t, and leave what is.` };
   }
@@ -192,11 +219,11 @@ export function makeCase(condition, seed, mods = {}) {
 // are the usual ones; they read done where the foot is already right, so there's less to do,
 // and taking more off a claw that's already right is over-trimming it.
 export const PARTIAL = {
-  heifer: { line: (tag, limb) => `A first-calf heifer, ${tag}, in for her first trim on the ${limb}. Young feet, not much horn: check her over and tidy what needs it. She’s never been in a crush before.` },
+  heifer: { line: (tag, limb) => `A first-calf heifer, ${tag}, in for her first trim on the ${limb}. Young feet, not much horn and a short toe, nearer 7 cm: check her over and tidy what needs it. She’s never been in a crush before.` },
   lately: { line: (tag, limb, claw) => `${tag} had her ${limb} trimmed a few weeks back, but only the ${claw} claw: the farmer ran out of time. Finish the job, and leave what’s already right.` },
 };
 function partialWork(cd, kind, big) {
-  const [tag, limb] = cd.subtitle.replace('Holstein ', '').split(' · ');
+  const [tag, limb] = tagAndLimb(cd.subtitle);
   return {
     ...cd, partial: kind, ...(kind === 'lately' ? { trimmed: [big] } : {}),
     intro: PARTIAL[kind].line(tag, limb, big === CLAW.OUTER ? 'outer' : 'inner'),
@@ -238,7 +265,7 @@ export function apprenticeLeft(cd) {
 // in her intro. The right call is to leave her till dry-off.
 function closeToCalving(cd) {
   const days = 4 + (((cd.seed % 9) + 9) % 9);
-  const [tag, limb] = cd.subtitle.replace('Holstein ', '').split(' · ');
+  const [tag, limb] = tagAndLimb(cd.subtitle);
   return {
     ...cd, calving: days, call: 'leave',
     intro: `Routine herd trim. ${tag} is due on the ${limb} and walks sound. The farmer mentions she’s due to calve in ${days} days.`,

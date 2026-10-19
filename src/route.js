@@ -37,6 +37,7 @@ export const HERD_BONUS = 5;
 // (WP14.2, D47): the first three farms teach plain "firm means leave it" first.
 // `partial` is the chance a routine cow is a short one, a heifer or trimmed lately (WP17.2).
 // `apprentice`: from the Journeyman tier on, one cow a visit was trimmed by the farm's apprentice (WP17.1).
+// `breeds`: [chance, mods] for cows that aren't the usual Holstein (D73): her breed, or a frame (D68).
 export const FARMS = [
   {
     id: 'willowbank', footbath: 'good', name: 'Willow Bank', farmer: 'Ruth Haddon', housing: 'straw', cows: 3, rep: 0, seasons: false,
@@ -48,7 +49,8 @@ export const FARMS = [
   },
   {
     id: 'hollins', partial: 0.25, footbath: 'good', name: 'Hollins Farm', farmer: 'Dev Hollins', housing: 'pasture', cows: 4, rep: 25, seasons: false,
-    intro: 'Dev grazes his herd out until the frosts. Their feet wear well on grass, but the lane to the parlour is all stones, and the odd nail in the gateway.',
+    breeds: [[0.25, { breed: 'jerseyx' }]],
+    intro: 'Dev grazes his herd out until the frosts, a few Jersey crosses among them. Their feet wear well on grass, but the lane to the parlour is all stones, and the odd nail in the gateway.',
     mix: { routine: 0.5, whiteline: 0.3, puncture: 0.2 }, growth: [0.75, 1.0], mud: [0.8, 1.15], temper: [0.2, 0.5], front: 0,
   },
   {
@@ -70,7 +72,8 @@ export const FARMS = [
   },
   {
     id: 'greystone', partial: 0.25, apprentice: true, burst: 1 / 3, name: 'Greystone Dairy', farmer: 'Priya Natt', housing: 'sand', footbath: 'poor', cows: 5, rep: 285,
-    intro: 'A big, busy unit on sand-bedded stalls. Priya’s heifers have never been in a crush before, and they let you know it.',
+    breeds: [[0.5, { frame: 'large' }]],
+    intro: 'A big, busy unit on sand-bedded stalls, and big Holsteins in it. Priya’s heifers have never been in a crush before, and they let you know it.',
     mix: { ulcer: 0.2, dd: 0.2, puncture: 0.2, nonfoot: 0.2, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.55, 0.95], front: 0.2, calving: 0.5, kicker: 0.33,
     decoyKinds: DECOY_KINDS_ALL,
   },
@@ -82,7 +85,8 @@ export const FARMS = [
   },
   {
     id: 'ridgeway', partial: 0.25, apprentice: true, burst: 1 / 3, footbath: 'poor', name: 'Ridgeway', farmer: 'Sam Okafor', housing: 'freestall', cows: 6, rep: 480,
-    intro: 'Sam bought this herd in last month, lame cows and all. Some were trimmed too hard before they came: look at the toes.',
+    breeds: [[0.2, { breed: 'brownswiss' }]],
+    intro: 'Sam bought this herd in last month, lame cows and all, a Brown Swiss or two among them. Some were trimmed too hard before they came: look at the toes.',
     mix: { toenecrosis: 0.2, ulcer: 0.2, dd: 0.15, twoclaw: 0.1, thinsole: 0.15, routine: 0.2 }, growth: [1.0, 1.3], mud: [0.9, 1.3], temper: [0.4, 0.9], front: 0.2, calving: 0.5, kicker: 0.33,
     decoys: [1, 3], decoyKinds: DECOY_KINDS_ALL,
   },
@@ -203,6 +207,12 @@ export function farmMods(farm, seed, season = null) {
   // A short routine cow (WP17.2): a heifer, or one trimmed lately. Drawn last again; makeCase
   // uses it on routine feet only, and never on a cow close to calving.
   if (farm.partial && !mods.calving && rand() < farm.partial) mods.partial = rand() < 0.5 ? 'heifer' : 'lately';
+  // Her breed or frame (D73), drawn last of all: a Holstein of average size unless it says.
+  if (farm.breeds) {
+    let b = rand();
+    const pick = farm.breeds.find(([p]) => (b -= p) < 0);
+    if (pick) Object.assign(mods, pick[1]);
+  }
   return { condition, mods };
 }
 
@@ -284,6 +294,9 @@ export function returnCase(farm, h, visit, k, season = null) {
   const hand = h.visit === 1 ? (farm.first ?? []).findIndex((cd) => cd.seed === h.seed) : -1;
   const { excess: _e, calving: _c, oldBlock: _o, ...base } = hand >= 0 ? farm.firstMods[hand] : farmMods(farm, h.seed).mods;
   const cow = { side: h.side, foot: h.foot, growth: now.growth, mud: now.mud };
+  // Same cow, same breed and frame (D73).
+  if (base.breed) cow.breed = base.breed;
+  if (base.frame) cow.frame = base.frame;
   const mood = remembers(h);
   if (base.temper !== undefined) cow.temper = Math.min(1, Math.max(0, base.temper + (CFG.temper.remember[mood] ?? 0)));
   const threw = threwBlock(h);

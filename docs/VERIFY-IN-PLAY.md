@@ -22,7 +22,21 @@ round over** on the road map.
 
 ---
 
-## 0. Phone notes fixes (2026-10-19)
+## 0. Foot size: toe length by her frame (D68–D73, 2026-10-19)
+
+Free play takes `&breed=jerseyx|brownswiss|holstein` and `&frame=small|average|large`. The art lab
+stages the nippers with `dev/artlab.html?cond=routine&seed=214&frame=small&toe=1&focus=toe`.
+
+- [ ] **The intro names her size.** `?cond=routine&breed=jerseyx`: the card reads "She's small, a Jersey cross: … nearer 7 cm." A Brown Swiss says "nearer 8 cm". A plain Holstein says nothing.
+- [ ] **Her line sits at her size.** In free play (and at Apprentice) the trim line on a Jersey sits a little short of the drawn dead/live seam, and on a Brown Swiss a little past it. From Journeyman on, there's no line at all (`?rep=75&farm=hollins`).
+- [ ] **Nipping a Jersey's living tip, on the phone.** The tip past her line comes off along a smooth curve with a pale cut face. Can you tell where to stop without the line?
+- [ ] **The pink face.** Bite well past her line: the notch's face goes pink at about 3.5 mm and bleeds past 5 mm. Is it clear enough as a warning before the blood?
+- [ ] **A big cow's toe is hers.** On a Brown Swiss, the dead horn short of her line is left on and costs nothing. Does that feel right, or does it look like you missed a bit?
+- [ ] **Breeds on the road.** Hollins, Greystone and Ridgeway now bring Jerseys and Brown Swiss. Heifers are always small.
+
+---
+
+## 0b. Phone notes fixes (2026-10-19)
 
 - [ ] **Gauge word.** Step 2 with the claws matched but still high: the gauge says e.g. `level · inner 1.1 mm high` in amber, and LEVEL (green) comes up exactly when step 2 ticks.
 - [ ] **Toasts off your thumb.** Working the toe or lower sole, messages come up under the gauge instead of at the bottom. Working the heel, they stay at the bottom. They shouldn't jump while showing.
