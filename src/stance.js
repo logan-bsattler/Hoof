@@ -4,6 +4,7 @@
 // says nothing; only the turned foot does. Front feet and sound or two-claw cows stand square.
 
 import { CLAW } from './hoof.js';
+import { coatOf } from './coat.js';
 
 // Lesion kinds that make the claw sore enough to turn her foot out.
 export const TOE_OUT_KINDS = new Set(['ulcer', 'whiteline', 'foreign', 'toenecrosis', 'dds']);
@@ -27,6 +28,7 @@ const FORE = 0.7; // how much ground depth shows: the eye is above her hocks, lo
 export function drawStance(canvas, cd) {
   const kind = stance(cd);
   if (!kind) return;
+  const coat = coatOf(cd); // her breed's colours (D74)
   const dpr = Math.min(3, globalThis.devicePixelRatio || 1);
   canvas.width = STANCE_W * dpr;
   canvas.height = STANCE_H * dpr;
@@ -40,28 +42,30 @@ export function drawStance(canvas, cd) {
   c.fillStyle = fl;
   c.fillRect(0, 0, STANCE_W, STANCE_H);
   // The rump and the backs of the thighs, cut off by the top of the frame.
-  c.fillStyle = '#f3eee4';
+  c.fillStyle = coat.base;
   c.beginPath();
   c.moveTo(8, 0); c.lineTo(152, 0);
   c.bezierCurveTo(150, 22, 132, 36, 114, 40);
   c.lineTo(46, 40);
   c.bezierCurveTo(28, 36, 10, 22, 8, 0);
   c.fill();
-  // A black Holstein patch over one hip, and the udder's shadow between the thighs.
-  c.fillStyle = '#26201c';
-  c.beginPath(); c.ellipse(38, 6, 26, 15, 0.2, 0, Math.PI * 2); c.fill();
+  // A Holstein's patch over one hip, and the udder's shadow between the thighs.
+  if (coat.patch) {
+    c.fillStyle = `rgb(${coat.patch.join(',')})`;
+    for (const [px, py, rx, ry] of coat.rump) { c.beginPath(); c.ellipse(px, py, rx, ry, 0.2, 0, Math.PI * 2); c.fill(); }
+  }
   c.fillStyle = 'rgba(60,40,30,0.35)';
   c.beginPath(); c.ellipse(80, 38, 22, 6, 0, 0, Math.PI * 2); c.fill();
   for (const leg of ['LH', 'RH']) {
     const s = leg === 'LH' ? -1 : 1; // which way is outward on screen
     const out = kind === 'out' && cd.side === leg;
-    drawLeg(c, 80 + s * 30, s, out);
+    drawLeg(c, 80 + s * 30, s, out, coat);
   }
 }
 
 // One hind leg from behind: thigh, hock, cannon, fetlock, and both claws on the floor. `s` is
 // -1 for the leg on the viewer's left. A turned-out leg has its hock a touch in and its toe out.
-function drawLeg(c, x, s, out) {
+function drawLeg(c, x, s, out, coat) {
   const hockX = x - (out ? s * 4 : 0), hockY = 54;
   const heelX = x + (out ? s * 2 : 0), fetY = GROUND - 24;
   const a = out ? s * TURN : 0;
@@ -87,15 +91,22 @@ function drawLeg(c, x, s, out) {
   }
   // The leg: thigh, hock, cannon, fetlock and a short pastern down to the heels.
   c.lineCap = 'round';
-  c.strokeStyle = '#f3eee4';
+  const low = coat.legLow ?? coat.leg;
+  c.strokeStyle = coat.leg;
   c.lineWidth = 20;
   c.beginPath(); c.moveTo(x + s * 4, 30); c.lineTo(hockX, hockY); c.stroke();
+  const g = c.createLinearGradient(0, hockY, 0, fetY);
+  g.addColorStop(0, coat.leg);
+  g.addColorStop(0.5, low);
+  c.strokeStyle = g;
   c.lineWidth = 10;
   c.beginPath(); c.moveTo(hockX, hockY); c.lineTo(heelX, fetY); c.stroke();
+  c.strokeStyle = low;
   c.lineWidth = 9;
   c.beginPath(); c.moveTo(heelX, fetY); c.lineTo(heelX, GROUND - 8); c.stroke();
-  c.fillStyle = '#f3eee4';
+  c.fillStyle = coat.leg;
   c.beginPath(); c.arc(hockX, hockY, 8, 0, Math.PI * 2); c.fill();
+  c.fillStyle = low;
   c.beginPath(); c.arc(heelX, fetY, 6.5, 0, Math.PI * 2); c.fill();
   // The point of the hock and a shade line down the inside of the cannon.
   c.strokeStyle = 'rgba(60,45,30,0.3)';

@@ -1104,4 +1104,6 @@ From Ben, 2026-10-16: "hooves are different shapes and sizes." The references ag
 | D76 | Build order | **Size data + intro + toe line → too-short nipping + scoring → field guide → breed art → farm decks.** Each step is playable before the next. |
 
 
+**D74 built (2026-10-19):** src/coat.js holds a coat per breed and a draw scale per frame (small 0.86, large 1.1). The walk-off cow (walkoff.js `coatTexture`, `head`) and the walk-in sketch (stance.js) both read it. A Holstein is red and white one time in eight, from her seed. Beef and bull bodies wait for those cows.
+
 **Ben's answers (2026-10-19):** defaults on all of D68–D76. Ready to build in the D76 order, starting with size data, the intro line and the toe line. Check the small-cow 7.0 cm figure against a reference first.

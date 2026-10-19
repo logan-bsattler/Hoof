@@ -8,6 +8,7 @@ import { CFG } from './config.js';
 import { roundRect } from './toolart.js';
 import { CLAW, clawPolygon, lesionSpot } from './hoof.js';
 import { mulberry32, valueNoise, fbm, smoothstep } from './noise.js';
+import { coatOf, frameScale } from './coat.js';
 
 const { w: W, h: H } = CFG.view;
 const GROUND = 560;
@@ -38,7 +39,8 @@ const LEGS = [
 
 export class Walkoff {
   // `drawFoot(ctx)` paints the trimmed foot for the weight test; `hoof` supplies its contact map.
-  constructor(result, sound, { wrapped = false, side = 'LH', foot = 'hind', hoof = null, drawFoot = null, season = 'spring' } = {}) {
+  // `caseDef` (her breed, frame and seed) sets her coat and size (D74).
+  constructor(result, sound, { wrapped = false, side = 'LH', foot = 'hind', hoof = null, drawFoot = null, season = 'spring', caseDef = hoof?.caseDef } = {}) {
     this.season = season;
     this.result = result;
     this.wrapped = wrapped;
@@ -58,7 +60,9 @@ export class Walkoff {
     this.phase = 0;
     this.lastU = LEGS.map(() => 0);
     this.speed = this.gait === 'lame' ? 70 : this.gait === 'tender' ? 92 : 112;
-    this.patches = patchTexture(7 + (hoof?.caseDef?.seed ?? 0));
+    this.coat = coatOf(caseDef);
+    this.scale = frameScale(caseDef);
+    this.patches = coatTexture(7 + (caseDef?.seed ?? 0), this.coat);
   }
 
   skip() { this.t = Math.max(this.t, this.dur); }
@@ -152,11 +156,12 @@ export class Walkoff {
     c.fillRect(70, 300, 10, GROUND - 300);
     c.fillRect(8, 300, 72, 10);
 
-    // Drawn a size up, standing on the alley floor.
+    // Drawn a size up, standing on the alley floor: a Jersey smaller, a Brown Swiss bigger.
     const cx = -110 + w * this.speed;
+    const k = 1.25 * this.scale;
     c.save();
     c.translate(cx, GROUND);
-    c.scale(1.25, 1.25);
+    c.scale(k, k);
     c.translate(-cx, -GROUND);
     this.drawCow(c, cx);
     c.restore();
@@ -213,9 +218,9 @@ export class Walkoff {
     // Legs hang from under the body: the barrel and thighs cover their tops.
     LEGS.forEach((L, i) => L.far && this.leg(c, L, i, x, y));
     LEGS.forEach((L, i) => !L.far && this.leg(c, L, i, x, y));
-    tail(c, x, y, this.phase);
-    body(c, x, y, arch, this.patches);
-    head(c, x, y, nod);
+    tail(c, x, y, this.phase, this.coat);
+    body(c, x, y, arch, this.patches, this.coat);
+    head(c, x, y, nod, this.coat);
   }
 
   // One jointed leg, solved from hip to fetlock. Hind legs bend back at the hock, fore legs
@@ -235,16 +240,22 @@ export class Walkoff {
     const ax = hx + fx, ay = GROUND - 10 - lift; // fetlock
     const [L1, L2] = L.hind ? [58, 44] : [50, 46];
     const [jx, jy] = ik(hx, hy, ax, ay, L1, L2, L.hind ? 1 : -1);
-    const skin = L.far ? '#d4cdc0' : '#f3eee4';
+    const skin = L.far ? this.coat.legFar : this.coat.leg;
+    const low = this.coat.legLow ?? skin; // a Jersey's or a Brown Swiss's darker lower leg
     c.lineCap = 'round';
     c.strokeStyle = skin;
     c.lineWidth = L.hind ? 17 : 14;
     c.beginPath(); c.moveTo(hx, hy - 12); c.lineTo(jx, jy); c.stroke();
+    const g = c.createLinearGradient(jx, jy, ax, ay);
+    g.addColorStop(0, skin);
+    g.addColorStop(0.45, low);
+    c.strokeStyle = g;
     c.lineWidth = 9;
     c.beginPath(); c.moveTo(jx, jy); c.lineTo(ax, ay); c.stroke();
     // Joint and fetlock knobs, a little shading on the far side.
     c.fillStyle = skin;
     c.beginPath(); c.arc(jx, jy, L.hind ? 7 : 6, 0, TAU); c.fill();
+    c.fillStyle = low;
     c.beginPath(); c.arc(ax, ay, 5.5, 0, TAU); c.fill();
     c.strokeStyle = 'rgba(60,45,30,0.25)';
     c.lineWidth = 1.2;
@@ -300,7 +311,7 @@ function bodyPath(c, x, y, arch) {
   c.closePath();
 }
 
-function body(c, x, y, arch, patches) {
+function body(c, x, y, arch, patches, coat) {
   // Udder, under the belly between the hind legs.
   c.fillStyle = '#e8aaa0';
   c.beginPath(); c.ellipse(x - 46, y + 44, 17, 11, 0, 0, TAU); c.fill();
@@ -309,7 +320,7 @@ function body(c, x, y, arch, patches) {
 
   c.save();
   bodyPath(c, x, y, arch);
-  c.fillStyle = '#f4efe6';
+  c.fillStyle = coat.base;
   c.fill();
   c.clip();
   c.drawImage(patches, x - 110, y - 70);
@@ -321,10 +332,12 @@ function body(c, x, y, arch, patches) {
   c.fillStyle = g;
   c.fillRect(x - 120, y - 70, 240, 130);
   const r = c.createRadialGradient(x - 70, y - 18, 4, x - 70, y - 10, 46);
+  // Faded out at its rim: a hard edge reads as a seam down a solid coat.
   r.addColorStop(0, 'rgba(255,255,255,0.12)');
-  r.addColorStop(1, 'rgba(0,0,0,0.12)');
+  r.addColorStop(0.6, 'rgba(0,0,0,0.1)');
+  r.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = r;
-  c.fillRect(x - 120, y - 70, 100, 130);
+  c.fillRect(x - 120, y - 70, 240, 130);
   c.restore();
 
   c.strokeStyle = 'rgba(40,28,18,0.35)';
@@ -336,44 +349,75 @@ function body(c, x, y, arch, patches) {
   c.beginPath(); c.ellipse(x - 70, y - 42, 7, 3, 0, 0, TAU); c.fill();
 }
 
-function tail(c, x, y, phase) {
+function tail(c, x, y, phase, coat) {
   const sw = Math.sin(phase * 0.7) * 5;
-  c.strokeStyle = '#ece5d8';
+  c.strokeStyle = coat.tail;
   c.lineWidth = 4;
   c.lineCap = 'round';
   c.beginPath();
   c.moveTo(x - 94, y - 34);
   c.bezierCurveTo(x - 108, y - 20, x - 104 + sw * 0.4, y + 20, x - 102 + sw, y + 58);
   c.stroke();
-  c.fillStyle = '#2a211c';
+  c.fillStyle = coat.switch;
   c.beginPath(); c.ellipse(x - 102 + sw, y + 64, 5, 10, 0, 0, TAU); c.fill();
 }
 
-function head(c, x, y, nod) {
+function head(c, x, y, nod, coat) {
   c.save();
   c.translate(x + 112, y - 28 + nod);
   c.rotate(0.55);
-  // Black head with a white blaze, pink muzzle, ear and eye.
-  c.fillStyle = '#1f1a17';
+  // The head, dished between the eyes on a Jersey, and a Holstein's white blaze.
+  c.fillStyle = coat.head;
   c.beginPath();
   c.moveTo(-14, -16);
-  c.bezierCurveTo(4, -22, 30, -14, 40, -2);
+  if (coat.dished) c.bezierCurveTo(6, -15, 26, -9, 40, -2);
+  else c.bezierCurveTo(4, -22, 30, -14, 40, -2);
   c.bezierCurveTo(44, 8, 36, 16, 24, 16);
   c.bezierCurveTo(10, 18, -12, 12, -16, 2);
   c.closePath();
   c.fill();
-  c.fillStyle = '#f4efe6';
-  c.beginPath();
-  c.moveTo(-6, -12); c.bezierCurveTo(8, -12, 22, -6, 30, 2); c.bezierCurveTo(18, 4, 4, 0, -6, -12);
-  c.fill();
-  c.fillStyle = '#e7a9a0';
-  c.beginPath(); c.ellipse(36, 6, 9, 10, 0.3, 0, TAU); c.fill();
-  c.fillStyle = '#9a5a55';
+  if (coat.blaze) {
+    c.fillStyle = coat.blaze;
+    c.beginPath();
+    c.moveTo(-6, -12); c.bezierCurveTo(8, -12, 22, -6, 30, 2); c.bezierCurveTo(18, 4, 4, 0, -6, -12);
+    c.fill();
+  }
+  // Muzzle: pink on a Holstein, dark inside a pale ring on a Jersey or a Brown Swiss.
+  if (coat.ring) {
+    c.fillStyle = coat.ring;
+    c.beginPath(); c.ellipse(35, 6, 9.5, 10.5, 0.3, 0, TAU); c.fill();
+    c.fillStyle = coat.muzzle;
+    c.beginPath(); c.ellipse(37.5, 6.5, 7.5, 8.5, 0.3, 0, TAU); c.fill();
+  } else {
+    c.fillStyle = coat.muzzle;
+    c.beginPath(); c.ellipse(36, 6, 9, 10, 0.3, 0, TAU); c.fill();
+  }
+  c.fillStyle = coat.nostril;
   c.beginPath(); c.arc(40, 6, 1.6, 0, TAU); c.fill();
-  c.fillStyle = '#1f1a17';
-  c.beginPath(); c.ellipse(-16, -14, 11, 5, -0.7, 0, TAU); c.fill();
-  c.fillStyle = '#c98f86';
-  c.beginPath(); c.ellipse(-16, -14, 6, 2.4, -0.7, 0, TAU); c.fill();
+  // Ear: a Brown Swiss's big and fringed with pale hair.
+  const [ew, eh] = coat.bigEars ? [15, 7.5] : [11, 5];
+  c.fillStyle = coat.ear;
+  c.beginPath(); c.ellipse(-16, -14, ew, eh, -0.7, 0, TAU); c.fill();
+  c.fillStyle = coat.earIn;
+  c.beginPath(); c.ellipse(-16, -14, ew * 0.55, eh * 0.48, -0.7, 0, TAU); c.fill();
+  if (coat.bigEars) {
+    c.strokeStyle = coat.earIn;
+    c.lineWidth = 1;
+    // Tufts round the tip, in the ear's own frame (turned -0.7 like its ellipse).
+    const [ca, sa] = [Math.cos(-0.7), Math.sin(-0.7)];
+    for (let i = -2; i <= 2; i++) {
+      const t = Math.PI + i * 0.35;
+      const [u0, v0, u1, v1] = [ew * 0.8 * Math.cos(t), eh * 0.8 * Math.sin(t), (ew + 3) * Math.cos(t), (eh + 3) * Math.sin(t)];
+      c.beginPath();
+      c.moveTo(-16 + u0 * ca - v0 * sa, -14 + u0 * sa + v0 * ca);
+      c.lineTo(-16 + u1 * ca - v1 * sa, -14 + u1 * sa + v1 * ca);
+      c.stroke();
+    }
+  }
+  if (coat.eyeRing) {
+    c.fillStyle = coat.eyeRing;
+    c.beginPath(); c.arc(2, -6, 4.6, 0, TAU); c.fill();
+  }
   c.fillStyle = '#0c0a09';
   c.beginPath(); c.arc(2, -6, 2.6, 0, TAU); c.fill();
   c.fillStyle = 'rgba(255,255,255,0.7)';
@@ -381,20 +425,33 @@ function head(c, x, y, nod) {
   c.restore();
 }
 
-// Holstein patches: thresholded fractal noise, soft-edged, painted once per cow.
-function patchTexture(seed) {
+// Her coat over the body's base colour, painted once per cow. A Holstein's patches are
+// thresholded fractal noise, soft-edged. A solid coat is mottled and darker over her
+// hindquarters and shoulders, and a Brown Swiss is pale along the line of her back. The canvas
+// sits with its top left at (x - 110, y - 70), so her back runs along row 22.
+function coatTexture(seed, coat) {
   const w = 220, h = 130;
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
   const g = cv.getContext('2d');
   const img = g.createImageData(w, h);
   const noise = valueNoise(mulberry32(seed));
+  const { patch, shade: S, stripe: T } = coat;
   for (let py = 0; py < h; py++) {
     for (let px = 0; px < w; px++) {
-      const n = fbm(noise, px / 42, py / 34, 3);
-      const a = smoothstep(0.5, 0.54, n);
       const o = (py * w + px) * 4;
-      img.data[o] = 31; img.data[o + 1] = 26; img.data[o + 2] = 23;
+      if (patch) {
+        const a = smoothstep(0.5, 0.54, fbm(noise, px / 42, py / 34, 3));
+        img.data[o] = patch[0]; img.data[o + 1] = patch[1]; img.data[o + 2] = patch[2];
+        img.data[o + 3] = Math.round(a * 255);
+        continue;
+      }
+      // Shade (a1) under the pale back line (a2), composited into one pixel.
+      const ends = Math.max(smoothstep(75, 5, px), smoothstep(160, 222, px));
+      const a1 = Math.min(1, 0.6 * ends + 0.22 * fbm(noise, px / 30, py / 24, 3));
+      const a2 = T ? 0.5 * smoothstep(9, 2, Math.abs(py - 27)) * smoothstep(20, 60, px) * smoothstep(200, 150, px) : 0;
+      const a = a2 + a1 * (1 - a2);
+      for (let ch = 0; ch < 3; ch++) img.data[o + ch] = a ? ((a2 ? T[ch] * a2 : 0) + S[ch] * a1 * (1 - a2)) / a : 0;
       img.data[o + 3] = Math.round(a * 255);
     }
   }

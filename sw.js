@@ -1,12 +1,12 @@
 // Service worker: precaches the app shell so TRUE HOOF installs and plays offline.
 // Network-first, so a reachable server always wins and dev edits show up on reload;
 // the cache is the fallback when offline or slow. Bump VERSION when the asset list changes.
-const VERSION = 'true-hoof-v62';
+const VERSION = 'true-hoof-v63';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png', 'icons/favicon-32.png',
-  'src/audio.js', 'src/case.js', 'src/conditions.js', 'src/config.js', 'src/hoof.js', 'src/hoofart.js',
+  'src/audio.js', 'src/case.js', 'src/coat.js', 'src/conditions.js', 'src/config.js', 'src/hoof.js', 'src/hoofart.js',
   'src/guide.js', 'src/main.js', 'src/noise.js', 'src/particles.js', 'src/playlog.js', 'src/render.js', 'src/route.js', 'src/save.js', 'src/scenery.js', 'src/seasonart.js', 'src/stroke.js', 'src/view.js',
   'src/scoring.js', 'src/stance.js', 'src/steps.js', 'src/toolart.js', 'src/tools.js', 'src/tutorial.js',
   'src/ui.js', 'src/walkoff.js',

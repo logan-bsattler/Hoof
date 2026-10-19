@@ -33,6 +33,8 @@ stages the nippers with `dev/artlab.html?cond=routine&seed=214&frame=small&toe=1
 - [ ] **The pink face.** Bite well past her line: the notch's face goes pink at about 3.5 mm and bleeds past 5 mm. Is it clear enough as a warning before the blood?
 - [ ] **A big cow's toe is hers.** On a Brown Swiss, the dead horn short of her line is left on and costs nothing. Does that feel right, or does it look like you missed a bit?
 - [ ] **Breeds on the road.** Hollins, Greystone and Ridgeway now bring Jerseys and Brown Swiss. Heifers are always small.
+- [ ] **She walks off as her breed (D74).** A Jersey cross goes out small and fawn with a dark face, a pale ring round a black nose and dark lower legs. A Brown Swiss goes out big and grey-brown with fringed ears and a pale muzzle ring. A big-framed Holstein (Greystone) is a size up. About one Holstein in eight is red and white (`?cond=routine&seed=116`). Do they read as different cows at walk-off speed, on the phone?
+- [ ] **The walk-in sketch has her colours.** On a hind foot the rear-view sketch on the intro card is fawn on a Jersey and grey-brown on a Brown Swiss; only a Holstein has the hip patch.
 
 ---
 
