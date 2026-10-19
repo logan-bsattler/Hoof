@@ -1045,7 +1045,7 @@ From the 2026-10-15 review (#3). **Recommendation: break up the run of identical
 
 ## Phone notes 2026-10-15 (after the stain islands APK)
 
-### Level gauge says LEVEL before step 2 is done (to build)
+### Level gauge says LEVEL before step 2 is done (built 2026-10-19)
 - Ben's phone, step 2: the gauge read **LEVEL** (inner 8.2 mm, outer 7.6 mm) but the step didn't advance.
 - The step is right: `levelled()` (src/steps.js:16, used at :67) also needs the claw at target (`wbMean <= T + tolOf(cd)`, 7.75 mm), and 8.2 isn't.
 - The gauge is wrong: `level` in src/render.js:405 and :455 checks only `|diff| <= 0.6`, so the big green word says "done" while the claw is still high.
@@ -1053,7 +1053,7 @@ From the 2026-10-15 review (#3). **Recommendation: break up the run of identical
 - Not caused by WP10.3. Leaving the islands out of `wbMean` makes the reading honest; with them counted, the islands would have pulled the mean down and ticked the step over early.
 - **Built 2026-10-19.** `levelRead(m, caseDef)` in steps.js is the gauge's word for both layouts: LEVEL only when step 2 would tick (matched within 0.6 mm, each trimmed claw at target, toe off); otherwise `N mm off`, `level · inner 1.1 mm high` or `level · outer toe long`. A deep sepsis foot checks only the sound claw. `renderer.caseDef` set per cow in main.js. tests/level.test.js sweeps the second claw's height and toe and checks the label agrees with step 2.
 
-### Stain islands look like holes (to build, art only)
+### Stain islands look like holes (built 2026-10-19, art only)
 - On the phone the islands read as punched through the sole: flat, evenly dark brown, a crisp torn-paper edge and a heavy rim shadow.
 - Fix in hoofart.js (stain block at "3. Stained outer horn"): mottle the inside, lighten where `isle` is shallow, soften the edge and the dark lip. Leave the sim alone.
 - **Built 2026-10-19.** The dark fill was the stain, not the relief (the dip alone reads soft). Once the plain sole round an island is ground (`isleAround()`: the plain sole's cut carried in over the island, per compose), its stain lies patchy and part-cover, thins to the rim, mottles, lightens where nearly through, and the lip and packed-manure darkening ease off. An island in unground sole stays as stained as the rest. Sim untouched. Checked in the art lab, stages 1 and 2. sw v61.
@@ -1069,7 +1069,7 @@ From the 2026-10-15 review (#3). **Recommendation: break up the run of identical
 - Restraint 0 also took the dug wall mark ("a passing flaw … chasing it"), so it's not all over-trim.
 - Next: pull Ben's playlog export (road map → log) and replay a few cows. Measure the spread of sole thickness at the moment the gauge first says on target, and what share of the over-trimmed cells are islands. Fix options: show the high spots rather than only the mean (e.g. tint cells still above the band); widen the island over-trim margin to soak + 0.5 mm; make the step and gauge use a robust level (median) so a few high cells don't push the mean.
 
-### Toasts land where the tool is working (to build)
+### Toasts land where the tool is working (built 2026-10-19)
 - Ben, phone: message pop-ups cover the spot he's working on.
 - `#toast` (styles.css:145) is fixed at the bottom centre of the play area (`bottom: 16px`), which is where the toe and the lower sole sit on a phone, right under the thumb.
 - Fix: place the toast away from the active touch. When the pointer or the last tool stamp is in the lower half of the foot, show it at the top (under the level gauge); otherwise at the bottom. Simpler alternative: always dock it in the instruction strip at the top of the screen ("2 · Match the inner claw" panel), which is off the foot entirely. Check both on a phone and on desktop, and keep the warn/good styles.
@@ -1084,3 +1084,24 @@ From Ben, 2026-10-16: "hooves are different shapes and sizes." The references ag
 - **Build options, smallest first:** (1) per-cow scale: small / average / large frame, outline and `GEOM` scaled together, toe target in mm scaled to match, intro or read card says her size; breed per farm deck (Jersey small, Brown Swiss and bulls large). (2) Per-claw shape mods: claw width, toe length and curl, heel height, outer claw bigger than inner, drawn from the outline with seeded jitter. (3) Corkscrew as a condition and farm trait on top of (2).
 - **Cost:** everything keyed to fixed pixels has to move with the outline: `GEOM` zones and feathers, `toeRamp`/`overgrowY`, decoy and lesion placement bands in conditions.js, tutorial targets, guide sets, the art lab, crops in the field guide, the bot's paths. Bigger than it looks; scope D-decisions with Ben first.
 - **Release art per breed (Ben, 2026-10-16).** The walk-off cow is one Holstein: one `bodyPath` (src/walkoff.js:287) with seeded black-and-white patches (`patchTexture`, :385). Once breed exists, the release should show it: Holstein black-and-white (or red-and-white), Jersey a small fawn cow with a dark face and dished profile, Brown Swiss a big solid grey-brown cow with a pale muzzle ring, a beef cow short and stocky (Nate: the reason they're hard in the chute), and a bull with a thick neck and no udder. Needs a body shape per breed (size, depth, leg length, head and neck), a coat painter per breed in place of the one patch texture, and the same coat on the intro and day summary if a cow appears there. The walk-off gait and lameness code should stay shared and read the scale from the breed.
+
+### Decisions for Ben (foot shape, 2026-10-19)
+
+**The finding that drives these.** Toe length can't be got wrong today. The nippers only bite `Z.DEAD` cells (tools.js `applyBite`), and the dead/live line is the same fixed outline on every cow. So the dashed toe line is a tidy-up, not a judgment. If size only changes the picture, it's cosmetic. It becomes a skill (Shearer's step 1, "observe the size of the cow", and Nate's complaint about one toe length for every foot) only if the right toe length moves with the cow *and* you can miss it.
+
+**The cheap path vs the expensive one.** Drawing a big foot bigger on screen means scaling the outline and every pixel-keyed thing with it (`GEOM`, ~50 uses across hoof, conditions, render, art, tutorial and the tests, plus the guide crops and the bot). Moving only where the toe line sits on the same outline is local to the toe: the dead zone's top edge, `toeLine()`, the dashed guide and the nipper check. The recommendation is to start cheap and only pay for the redraw if the cheap version plays well.
+
+| # | Decision | Default (recommended) |
+|---|---|---|
+| D68 | What does a cow's size change in play? (a) the picture only, (b) where the right toe line sits, (c) (b) and the nippers can cut too short | **(c).** Without it size is cosmetic. Too short is the real risk the references warn about. |
+| D69 | Does a big foot look bigger on screen? | **No, not in the first pass.** The camera keeps framing the foot. Her size comes from the intro, the walk-in picture and the walk-off (D74). Redraw at real scale later only if it's missed. |
+| D70 | Size classes and toe targets | **Three:** small (Jersey, heifers) ≈ 7.0 cm, average (Holstein) 7.5 cm, large (Brown Swiss, big old cows) 8.0 cm. Cramer's 8.2 cm and Shearer's +3–6 mm are for bulls and the largest cows. The small figure is an estimate; check it against a reference before building. |
+| D71 | How does the player know the target once guides are off? | **At Apprentice, the dashed line sits at her size. From Journeyman on there's no line:** the intro names her frame ("a big Brown Swiss"), and the field guide has the rule (7.5 cm average, longer for big cows). Optional: a mm ruler along the toe when the nippers are picked up. |
+| D72 | Cost of a toe cut too short | **Scaled by how far.** About 2 mm short is a Balance note ("toe short: she'll rock back on her heels"). Further is a Soundness hit. Into the toe's live tip: pink, then blood, as on the sole. A toe left long (a big cow's line used on a small cow) is a smaller Balance note. |
+| D73 | Which breeds, on which farms | **Willow Bank:** Holsteins only (learn the average first). **Hollins:** some Jersey crosses (grazing herd). **Greystone:** big Holsteins. **Ridgeway:** a Brown Swiss or two. Beef cows and bulls later: bulls bring thin soles and their own handling (Nate lives #13). |
+| D74 | Breed art on the walk-off (and walk-in) | **With size:** Holstein (black or red and white), Jersey (small, fawn, dark face) and Brown Swiss (big, grey-brown, pale muzzle). One body shape scaled per breed plus a coat painter each. Beef and bull bodies when those cows arrive. |
+| D75 | Per-claw shape (width, curl, heel height) and corkscrew | **Later, as their own WP.** They need the outline to vary, which is the expensive path. Revisit after D68–D74 are played. |
+| D76 | Build order | **Size data + intro + toe line → too-short nipping + scoring → field guide → breed art → farm decks.** Each step is playable before the next. |
+
+
+**Ben's answers (2026-10-19):** defaults on all of D68–D76. Ready to build in the D76 order, starting with size data, the intro line and the toe line. Check the small-cow 7.0 cm figure against a reference first.
