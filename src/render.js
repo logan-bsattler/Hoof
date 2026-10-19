@@ -7,6 +7,7 @@ import { toolRadius } from './tools.js';
 import { HoofArt } from './hoofart.js';
 import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
 import { fitCamera } from './view.js';
+import { levelRead } from './steps.js';
 import {
   drawKnife, drawGrinder, drawBrush, drawNippers, drawRasp, drawTesters, drawSpray,
   drawWrapRoll, drawBlock, drawPad, drawWrap, roundRect,
@@ -32,6 +33,7 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.tol = CFG.sole.tolerance; // the case's on-target band (main.js sets it per cow)
+    this.caseDef = null; // the cow on the table, for the gauge's LEVEL read (main.js sets it)
     this.k = 1;
     this.cssScale = 1; // CSS px per logical px
     this.cam = fitCamera(W, H);
@@ -402,7 +404,7 @@ export class Renderer {
     const name = (k) => (k === CLAW.OUTER ? 'OUTER' : 'INNER');
     const left = m.claws[lc].wbMean, right = m.claws[rc].wbMean;
     const diff = clean ? right - left : 0;
-    const level = clean && Math.abs(diff) <= 0.6;
+    const read = levelRead(m, this.caseDef), level = clean && read.level;
     c.save();
     // Near-opaque, so the strap and the chute read as passing under the HUD.
     c.fillStyle = 'rgba(20,14,10,0.92)';
@@ -431,7 +433,7 @@ export class Renderer {
     c.fillText(mm(right), W - 22, 28 + fb);
     c.textAlign = 'center';
     c.fillStyle = !clean ? 'rgba(241,231,208,0.6)' : level ? '#7bbf6a' : '#d8a64a';
-    c.fillText(!clean ? 'clean to read' : level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, 200, 28);
+    c.fillText(!clean ? 'clean to read' : read.text, 200, 28);
     const fs = this.font(10);
     c.fillStyle = 'rgba(241,231,208,0.7)';
     c.fillText(`target sole ≈ ${T} mm`, 200, 30 + fs);
@@ -452,7 +454,7 @@ export class Renderer {
     const name = (k) => (k === CLAW.OUTER ? 'OUTER' : 'INNER');
     const left = m.claws[lc].wbMean, right = m.claws[rc].wbMean;
     const diff = clean ? right - left : 0;
-    const level = clean && Math.abs(diff) <= 0.6;
+    const read = levelRead(m, this.caseDef), level = clean && read.level;
     const fs = CFG.view.minText;
     c.save();
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -473,7 +475,7 @@ export class Renderer {
     c.textAlign = 'center';
     c.font = `bold ${fs}px system-ui, sans-serif`;
     c.fillStyle = !clean ? 'rgba(241,231,208,0.6)' : level ? '#7bbf6a' : '#d8a64a';
-    c.fillText(!clean ? 'clean to read' : level ? 'LEVEL' : `${Math.abs(diff).toFixed(1)} mm off`, cw / 2, 15);
+    c.fillText(!clean ? 'clean to read' : read.text, cw / 2, 15);
     c.font = `${fs}px system-ui, sans-serif`;
     c.fillStyle = 'rgba(241,231,208,0.7)';
     c.fillText(`target ${T} mm`, cw / 2, 42);

@@ -22,6 +22,15 @@ round over** on the road map.
 
 ---
 
+## 0. Phone notes fixes (2026-10-19)
+
+- [ ] **Gauge word.** Step 2 with the claws matched but still high: the gauge says e.g. `level · inner 1.1 mm high` in amber, and LEVEL (green) comes up exactly when step 2 ticks.
+- [ ] **Toasts off your thumb.** Working the toe or lower sole, messages come up under the gauge instead of at the bottom. Working the heel, they stay at the bottom. They shouldn't jump while showing.
+- [ ] **Islands look like dips, not holes.** After grinding round an island it reads as patchy, mottled dirt in a shallow dip. On unground sole it's as stained as the rest. Still easy enough to spot as "stain left: leave it"?
+- [ ] Still to check from 10-15: a faint pink patch mid outer claw, and a dark dash just outside the outer claw's right edge.
+
+---
+
 ## 1. This round (review fixes 2026-10-15)
 
 ### Stain islands are low spots (WP10.3 follow-up)

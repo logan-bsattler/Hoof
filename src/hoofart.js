@@ -514,6 +514,34 @@ export class HoofArt {
     return this.rg;
   }
 
+  // Per cell, how deep the grinder has cut the plain sole round each stain island (mm). The
+  // island itself is a dip the disc skims, so its own cut can't say whether the sole round it
+  // is ground yet: carry the plain sole's cut in over the island, a few cells a round.
+  isleAround() {
+    const hoof = this.hoof, n = hoof.n, cols = CFG.grid.cols, low = hoof.low;
+    const a = this.aroundF ??= new Float32Array(n), ok = this.aroundOk ??= new Uint8Array(n);
+    const nx = this.aroundNx ??= new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      ok[i] = hoof.claw[i] && low[i] <= 0.01 ? 1 : 0;
+      a[i] = ok[i] ? Math.max(0, hoof.init[i] - hoof.thick[i]) : 0;
+    }
+    for (let round = 0; round < 10; round++) {
+      nx.set(ok);
+      for (let i = 0; i < n; i++) {
+        if (ok[i] || !hoof.claw[i]) continue;
+        const x = i % cols;
+        let sum = 0, k = 0;
+        if (x > 0 && ok[i - 1]) { sum += a[i - 1]; k++; }
+        if (x < cols - 1 && ok[i + 1]) { sum += a[i + 1]; k++; }
+        if (i >= cols && ok[i - cols]) { sum += a[i - cols]; k++; }
+        if (i + cols < n && ok[i + cols]) { sum += a[i + cols]; k++; }
+        if (k) { a[i] = sum / k; nx[i] = 1; }
+      }
+      ok.set(nx);
+    }
+    return a;
+  }
+
   compose(x0, y0, x1, y1) {
     const hoof = this.hoof;
     const { S, w, X0, Y0, cls, edge, sx0, sy0, cellCls, fallback } = this;
@@ -574,6 +602,7 @@ export class HoofArt {
     };
 
     const RG = this.reliefGrid();
+    const aroundF = this.isleAround();
     const PER = Math.max(2.4, 0.9 * S);  // striation spacing, render px
     const GPER = 2.6 * S;                // grinder arcs are broader
     // The spline's column weights depend only on the pixel column: worked out once.
@@ -860,9 +889,18 @@ export class HoofArt {
             const sd = isl > 0.01 ? Math.min(0.2 + 0.4 * ns + isle, Math.max(0.2 + 0.4 * ns, ti - CFG.sole.thin - 0.6)) : 0.2 + 0.4 * ns + isle;
             // Jitter the cut depth at pixel scale so the stain breaks off in a crisp, ragged edge.
             const rj = removed + (ngr - 0.5) * 0.14 + (ncv - 0.5) * 0.3;
-            const st = smoothstep(sd + 0.07, sd - 0.03, rj);
+            // An island the grinder skimmed past is a shallow dip, not a hole (phone notes
+            // 2026-10-15). A solid dark fill with a cut edge read as punched through, and the dip's
+            // own relief already shows, so its stain lies patchy and part-cover, thins towards the
+            // rim and keeps only a faint lip. Until the sole round it is ground (gw 0) the island is
+            // as stained as the rest.
+            const iw = smoothstep(0.01, 0.3, isl);
+            const patch = 0.35 + 0.5 * smoothstep(0.3, 0.75, nLump[p] / 255 + (ncv - 0.5) * 0.5);
+            const gw = iw > 0 ? iw * smoothstep(0.3, 0.9, aroundF[i0] * w0 + aroundF[i1] * w1 + aroundF[i2] * w2 + aroundF[i3] * w3) : 0;
+            let st = smoothstep(sd + 0.07 + 0.25 * gw, sd - 0.03 - 0.2 * gw, rj);
+            if (gw > 0) st *= 1 - gw * (1 - patch * smoothstep(0.02, 0.9, isl + (ncv - 0.5) * 0.3));
             // The stained crust has thickness: a dark lip where it breaks off.
-            const lip = st * (1 - st) * 4;
+            const lip = st * (1 - st) * 4 * (1 - 0.75 * gw);
             if (lip > 0) { const k = 1 - 0.3 * lip; R *= k; G *= k; B *= k; }
             if (st > 0) {
               // Manure-stained horn: a warm brown, darker where the stain soaked deeper, with dark,
@@ -872,8 +910,18 @@ export class HoofArt {
               // An island the grinder skimmed past is darker still: packed, wet manure in the hollow.
               const res = Math.max(smoothstep(0.58, 0.8, ni + (nLump[p] / 255 - 0.5) * 0.35),
                 smoothstep(0.4, 1.4, isle - removed) * smoothstep(0.3, 1.4, removed) * (0.75 + 0.25 * (nLump[p] / 255)));
-              sr += (40 - sr) * res * 0.8; sg += (29 - sg) * res * 0.8; sb += (17 - sb) * res * 0.8;
-              crust = Math.max(crust, res * st * 0.8);
+              const rk = 0.8 * (1 - 0.6 * gw);
+              sr += (40 - sr) * res * rk; sg += (29 - sg) * res * rk; sb += (17 - sb) * res * rk;
+              crust = Math.max(crust, res * st * rk);
+              if (gw > 0) {
+                // Mottle the island and lighten it where the stain is nearly ground through, so
+                // it reads as a dirty dip in the horn rather than one flat dark-brown hole.
+                const left = Math.max(0, sd - removed);
+                const pale = gw * 0.55 * (1 - smoothstep(0.1, 0.9, left));
+                sr += (150 - sr) * pale; sg += (118 - sg) * pale; sb += (78 - sb) * pale;
+                const mot = 1 + gw * (0.5 * (nLump[p] / 255 - 0.5) + 0.35 * (ncv - 0.5));
+                sr *= mot; sg *= mot; sb *= mot;
+              }
               // The dark, cracked patch that gives the ulcer away on a cleaned foot.
               if (dL < Lr * 1.9) {
                 const k = smoothstep(Lr * 1.9, Lr * 0.4, dL) * 0.55;

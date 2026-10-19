@@ -58,6 +58,11 @@ export class UI {
     });
     this.toastTimer = null;
     this.toastWait = null;
+    // Where the finger (or mouse) last was over the play area: a toast keeps clear of it.
+    this.pointerY = null;
+    const track = (e) => { this.pointerY = e.clientY; };
+    $('canvasWrap').addEventListener('pointerdown', track, { passive: true });
+    $('canvasWrap').addEventListener('pointermove', track, { passive: true });
     this.toastCur = null;   // { msg, kind, ms, pri, at }
     this.toastQueue = [];
   }
@@ -204,11 +209,16 @@ export class UI {
   showToast(t, at, ms = t.ms) {
     const el = $('toast');
     el.textContent = t.msg;
-    el.className = `show ${t.kind}`;
+    // Bottom centre sits on the toe, right under the thumb on a phone (phone notes 2026-10-15).
+    // Working the lower half of the foot, the toast goes up under the gauge instead. Placed
+    // when it comes up and not moved after, so it doesn't jump about under a moving tool.
+    const r = $('game').getBoundingClientRect();
+    const top = this.pointerY != null && this.pointerY > r.top + r.height / 2;
+    el.className = `show ${t.kind}${top ? ' top' : ''}`;
     this.toastCur = { ...t, at };
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => {
-      el.className = '';
+      el.classList.remove('show'); // keeps its place while it fades
       this.toastCur = null;
       // Let the fade finish before the next one comes up.
       this.toastWait = setTimeout(() => this.pumpToast(), 220);

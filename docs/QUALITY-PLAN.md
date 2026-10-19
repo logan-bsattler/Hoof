@@ -1051,10 +1051,12 @@ From the 2026-10-15 review (#3). **Recommendation: break up the run of identical
 - The gauge is wrong: `level` in src/render.js:405 and :455 checks only `|diff| <= 0.6`, so the big green word says "done" while the claw is still high.
 - Fix: show LEVEL only when the claws match *and* the claw being worked is at target. Otherwise say which is off, e.g. "level · inner 0.5 mm high". Both gauge layouts (render.js ~405 and ~455). Add a test that the label and `steps` agree.
 - Not caused by WP10.3. Leaving the islands out of `wbMean` makes the reading honest; with them counted, the islands would have pulled the mean down and ticked the step over early.
+- **Built 2026-10-19.** `levelRead(m, caseDef)` in steps.js is the gauge's word for both layouts: LEVEL only when step 2 would tick (matched within 0.6 mm, each trimmed claw at target, toe off); otherwise `N mm off`, `level · inner 1.1 mm high` or `level · outer toe long`. A deep sepsis foot checks only the sound claw. `renderer.caseDef` set per cow in main.js. tests/level.test.js sweeps the second claw's height and toe and checks the label agrees with step 2.
 
 ### Stain islands look like holes (to build, art only)
 - On the phone the islands read as punched through the sole: flat, evenly dark brown, a crisp torn-paper edge and a heavy rim shadow.
 - Fix in hoofart.js (stain block at "3. Stained outer horn"): mottle the inside, lighten where `isle` is shallow, soften the edge and the dark lip. Leave the sim alone.
+- **Built 2026-10-19.** The dark fill was the stain, not the relief (the dip alone reads soft). Once the plain sole round an island is ground (`isleAround()`: the plain sole's cut carried in over the island, per compose), its stain lies patchy and part-cover, thins to the rim, mottles, lightens where nearly through, and the lip and packed-manure darkening ease off. An island in unground sole stays as stained as the rest. Sim untouched. Checked in the art lab, stages 1 and 2. sw v61.
 
 ### To check
 - A faint pink patch mid outer claw (about level with its third island). Pink means the sole is near the thin line: fine if Ben had been grinding an island there, a bug if not.
@@ -1071,6 +1073,7 @@ From the 2026-10-15 review (#3). **Recommendation: break up the run of identical
 - Ben, phone: message pop-ups cover the spot he's working on.
 - `#toast` (styles.css:145) is fixed at the bottom centre of the play area (`bottom: 16px`), which is where the toe and the lower sole sit on a phone, right under the thumb.
 - Fix: place the toast away from the active touch. When the pointer or the last tool stamp is in the lower half of the foot, show it at the top (under the level gauge); otherwise at the bottom. Simpler alternative: always dock it in the instruction strip at the top of the screen ("2 · Match the inner claw" panel), which is off the foot entirely. Check both on a phone and on desktop, and keep the warn/good styles.
+- **Built 2026-10-19.** ui.js tracks the last pointer over `#canvasWrap`; a toast placed while that's in the lower half of the canvas gets `.top`, docked at `--toast-top` (set in main.js resize: just under the gauge, phone strip or desktop meter). Placed when it comes up, not moved after; keeps its place while it fades. Checked at 375×812 (testers tap low → top) and desktop.
 
 ## Every foot is the same shape (gap, to scope)
 From Ben, 2026-10-16: "hooves are different shapes and sizes." The references agree; the game draws one foot.

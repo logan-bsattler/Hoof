@@ -215,6 +215,7 @@ function newCase() {
   showWear();
   // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
   renderer.tol = tolOf(caseDef);
+  renderer.caseDef = caseDef;
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
   if (game.guideMode) setGuides(game.guideMode === 'on');
   game.found = [];      // marks the testers have read this case, in order
@@ -1195,7 +1196,11 @@ function resize() {
   requestAnimationFrame(() => {
     resizeQueued = false;
     const wrap = document.getElementById('canvasWrap');
-    renderer.resize(fitCamera(wrap.clientWidth, wrap.clientHeight, viewMode()), Math.min(2.5, window.devicePixelRatio || 1));
+    const cam = fitCamera(wrap.clientWidth, wrap.clientHeight, viewMode());
+    renderer.resize(cam, Math.min(2.5, window.devicePixelRatio || 1));
+    // A toast that has to move off the working spot docks just under the level gauge.
+    const hud = cam.hudH || 112 * cam.scale;
+    wrap.style.setProperty('--toast-top', `${Math.round(renderer.canvas.offsetTop + hud + 8)}px`);
   });
 }
 // The top bar names her by tag and foot; the condition's name only once the read is committed,

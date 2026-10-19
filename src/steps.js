@@ -193,3 +193,18 @@ export function suggestedTool(current, m, caseDef) {
   const k = m.claws[s.id === 'trimSound' ? soundClaw(caseDef) : s.id === 'step1' ? firstClaw(caseDef) : secondClaw(caseDef)];
   return k.deadRemain >= 0.12 ? 'nippers' : 'grinder';
 }
+
+// The balance beam's word (phone notes 2026-10-15). LEVEL only when step 2 would tick: the claws
+// match, and each claw being trimmed is down to target with its toe off. Otherwise say what's off.
+// A deep sepsis foot only trims the sound claw, so only that one has to reach the target.
+export function levelRead(m, caseDef) {
+  const off = Math.abs(m.levelDiff);
+  if (off > 0.6) return { level: false, text: `${off.toFixed(1)} mm off` };
+  const ks = caseDef?.steps?.includes('trimSound') ? [soundClaw(caseDef)] : [CLAW.INNER, CLAW.OUTER];
+  const high = ks.filter((k) => m.claws[k].wbMean > T + tolOf(caseDef))
+    .sort((a, b) => m.claws[b].wbMean - m.claws[a].wbMean)[0];
+  if (high) return { level: false, text: `level · ${CLAW_NAME[high]} ${(m.claws[high].wbMean - T).toFixed(1)} mm high` };
+  const toe = ks.find((k) => m.claws[k].deadRemain >= 0.12);
+  if (toe) return { level: false, text: `level · ${CLAW_NAME[toe]} toe long` };
+  return { level: true, text: 'LEVEL' };
+}

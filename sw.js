@@ -1,7 +1,7 @@
 // Service worker: precaches the app shell so TRUE HOOF installs and plays offline.
 // Network-first, so a reachable server always wins and dev edits show up on reload;
 // the cache is the fallback when offline or slow. Bump VERSION when the asset list changes.
-const VERSION = 'true-hoof-v60';
+const VERSION = 'true-hoof-v61';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',

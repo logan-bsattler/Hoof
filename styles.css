@@ -159,6 +159,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   transition: opacity 0.2s, transform 0.2s;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.top { top: var(--toast-top, 16px); bottom: auto; transform: translate(-50%, -12px); }
+#toast.top.show { transform: translate(-50%, 0); }
 #toast.warn { border-color: var(--warn); color: #ffd2cc; }
 #toast.good { border-color: var(--sound); }
 
