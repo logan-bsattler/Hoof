@@ -78,7 +78,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     title: C.title,
     noun: C.noun ?? 'lesion', // what the copy calls the lesion: 'ulcer', 'abscess'
     subtitle: `${(BREEDS[breed] ?? BREEDS.holstein).name} #${cow} · ${limb}`,
-    // Her breed and frame (D68, D73): the frame sets her toe length (hoof.js toeShiftPx).
+    // Her breed and frame (D68, D73): the frame sets her size on screen (hoof.js frameScale, D84).
     breed, frame,
     // D82: a bunk-fed cow's front inner claw curls in harder (shape.js). Front feet only.
     ...(bunkCurl && foot === 'front' ? { bunkCurl: true } : {}),

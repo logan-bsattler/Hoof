@@ -1,7 +1,7 @@
 // Dev-only art lab: replays scripted tool work on fresh hoofs and draws each stage large,
 // so texture and cut edges can be judged side by side. Not loaded by the game.
 
-import { Hoof, CLAW, Z, clawPolygon, toeShiftPx } from '../src/hoof.js';
+import { Hoof, CLAW, Z, clawPolygon } from '../src/hoof.js';
 import { CASE_B, makeCase } from '../src/case.js';
 import { HoofArt } from '../src/hoofart.js';
 import { makePlayer } from '../tests/player.js';
@@ -85,7 +85,7 @@ function tipOf(h, c) {
     if (i < 0 || h.claw[i] !== c) continue;
     if (best < 0 || h.seamY[col] > h.seamY[best]) best = col;
   }
-  return { x: h.g.x0 + (best + 0.5) * h.g.cell, y: h.seamY[best] + toeShiftPx(CD) };
+  return { x: h.g.x0 + (best + 0.5) * h.g.cell, y: h.seamY[best] };
 }
 const biteShort = (s, mm) => {
   for (const c of [CLAW.OUTER, CLAW.INNER]) {

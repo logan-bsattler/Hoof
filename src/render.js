@@ -8,7 +8,7 @@ import { HoofArt } from './hoofart.js';
 import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
 import { fitCamera } from './view.js';
 import { levelRead } from './steps.js';
-import { warpHalves, toView } from './shape.js';
+import { warpHalves, toView, labelY } from './shape.js';
 import {
   drawKnife, drawGrinder, drawBrush, drawNippers, drawRasp, drawTesters, drawSpray,
   drawWrapRoll, drawBlock, drawPad, drawWrap, roundRect,
@@ -17,6 +17,7 @@ import {
 const { w: W, h: H } = CFG.view;
 const BLEED = CFG.view.phone.bleed;
 const CLAWS = [CLAW.OUTER, CLAW.INNER];
+const RULER_ZERO = 360; // template y the nippers' ruler measures her toe from (D84)
 
 // Which guides each step shows. Cleaning and the read show none (don't spoil the reveal),
 // and neither do the finish and the treatment.
@@ -309,9 +310,10 @@ export class Renderer {
       const s = clawSide(claw, side), box = clawBox(claw, side);
       const ax = onClaw(claw, side); // an x on the right-hand claw, moved onto this claw
 
-      // Trim line at her toe length (D68). From Journeyman on there's none (D71): her frame is
-      // in the intro and the rule in the field guide.
-      const tl = toeLine(claw, side, hoof.toeShift);
+      // Trim line at her toe length (D68, drawn at her size by the warp, D84). From Journeyman
+      // on there's none (D71): her frame is in the intro, the rule in the field guide, and the
+      // nippers carry a ruler.
+      const tl = toeLine(claw, side);
       c.globalAlpha = this.toeGuide ? A.trim : 0;
       c.setLineDash([5, 4]);
       c.strokeStyle = 'rgba(232,190,100,0.95)';
@@ -367,6 +369,41 @@ export class Renderer {
     c.restore();
   }
 
+  // The nippers' ruler (D84), on every tier while they're in hand: a steel rule laid along each
+  // claw's axial wall from the top of the toe (template y 360), marked in her real mm (50–85), so her
+  // toe length from the intro can be read off at the tip. Drawn through her warp, so on any
+  // frame the mark for her length lands on her line.
+  ruler(hoof) { this.warped(hoof.caseDef, () => this.rulerMarks(hoof)); }
+
+  rulerMarks(hoof) {
+    const c = this.ctx, mx = GEOM.midX;
+    const per = CFG.toe.pxPerMm / hoof.mmScale, y0 = RULER_ZERO, at = (mm) => y0 + mm * per;
+    const fs = this.font(9, true);
+    c.save();
+    c.textAlign = 'center';
+    for (const claw of CLAWS) {
+      const s = clawSide(claw, hoof.side), x = (d) => mx + s * d;
+      // The blade: a thin line from her zero, the marked strip from 50 mm on.
+      c.globalAlpha = 0.9;
+      c.strokeStyle = 'rgba(214,220,224,0.85)';
+      c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x(2), y0); c.lineTo(x(2), at(50)); c.stroke();
+      c.beginPath(); c.moveTo(x(0), y0); c.lineTo(x(7), y0); c.stroke();
+      c.fillStyle = 'rgba(196,204,210,0.55)';
+      c.fillRect(Math.min(x(0), x(7)), at(50), 7, at(85) - at(50));
+      c.strokeStyle = 'rgba(20,16,12,0.9)';
+      // Like a steel rule: a tick a mm, longer at 5, numbered at 10 (a phone's text floor
+      // leaves no room to number the 5s).
+      for (let mm = 50; mm <= 85; mm++) {
+        const y = at(mm), tick = mm % 10 === 0 ? 0 : mm % 5 === 0 ? 1.5 : 4.5;
+        c.lineWidth = tick ? 0.8 : 1.3;
+        c.beginPath(); c.moveTo(x(7), y); c.lineTo(x(tick), y); c.stroke();
+      }
+      for (let mm = 60; mm <= 80; mm += 10) label(c, String(mm), x(17), at(mm) + fs * 0.35, 'rgba(236,240,242,0.95)', fs);
+    }
+    c.restore();
+  }
+
   // ghostKind: which block the aim ghost shows (the one in hand, not yet glued).
   block(hoof, ghostClaw = 0, ghostKind = 'rubber') { this.warped(hoof.caseDef, () => this.blocks(hoof, ghostClaw, ghostKind)); }
 
@@ -418,15 +455,15 @@ export class Renderer {
     if (claw) this.placed[what + claw] = this.time;
   }
 
-  // Under each claw, on a fixed line: a long toe (WP18) moves the label across, not down.
+  // Under each claw, on one line for her size (D84): a long toe (WP18) moves the label across.
   labels(hoof) {
     const c = this.ctx;
     c.save();
-    const fs = this.font(12, true);
+    const fs = this.font(12, true), y = labelY(hoof.caseDef);
     c.textAlign = 'center';
     for (const claw of CLAWS) {
       const box = clawBox(claw, hoof.side);
-      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, toView(hoof.caseDef, box.cx, box.cy).x, 652, 'rgba(241,231,208,0.9)', fs);
+      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, toView(hoof.caseDef, box.cx, box.cy).x, y, 'rgba(241,231,208,0.9)', fs);
     }
     c.restore();
   }

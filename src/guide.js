@@ -11,7 +11,7 @@ import { FARMS, KIT } from './route.js';
 const TOOL_NOTES = {
   brush: ['First, every time. You can’t read a foot you can’t see.', 'A blade through muck is a cut you didn’t mean.'],
   probe: ['On anything that looks wrong once she’s clean: dark, red, lifted or raw.', 'Squeeze, then commit your read before you start opening things.'],
-  nippers: ['The overgrown toe only, from the tip back to her toe length: shorter on a small cow, longer on a big one.', 'Too blunt for the sole, and a big bite can reach the trim line.'],
+  nippers: ['The overgrown toe only, from the tip back to her toe length: shorter on a small cow, longer on a big one.', 'Too blunt for the sole, and a big bite can reach the trim line. They carry a rule along the toe, in mm from the top of the toe: read her length off it at the tip.'],
   grinder: ['Levelling each claw’s sole to about 7 mm, in smooth passes.', 'Not near a lesion or on a false sole: it tears. Linger in one spot and she bleeds.'],
   knife: ['Pull for the dish along the inner edge. Flick (a short, quick stroke) to open a cap and lift loose horn.', 'Flick the rim of an opened lesion, never the raw middle: a long carve there strips the ring she stands on. A tap prises off an old block.'],
   rasp: ['After the grinder, to true the sole before a block covers it.', 'Smoothing only: it won’t take a claw down.'],

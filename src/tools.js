@@ -386,7 +386,7 @@ export function applyBite(hoof, x, y) {
       if (!c) continue;
       // Jaws closing near the tip take living toe too (D68). The whole jaw takes overgrowth;
       // only its middle cuts into her own toe, so its edges ride round the curve of her line.
-      const live = hoof.nippableToe(i) && y - hoof.seamY[cx] - hoof.toeShift > -T.tipZone;
+      const live = hoof.nippableToe(i) && y - hoof.seamY[cx] > -T.tipZone;
       if (!live && (!(hoof.zone[i] & Z.DEAD) || hoof.thick[i] <= 0.05)) continue;
       if (!hoof.over[i] && Math.abs(hoof.cellX(i) - x) > core) continue;
       chunk[c].push(i);
@@ -401,9 +401,10 @@ export function applyBite(hoof, x, y) {
     bit = true;
     for (const i of chunk[c]) {
       if (blocked(hoof, i, ev)) continue;
-      // How far (px) into her own toe this cell sat: 0 for horn past her line.
-      const into = hoof.over[i] ? 0 : Math.max(0, hoof.toeShift - hoof.toeD[i]);
-      if (into > 0) ev.toeShort = Math.max(ev.toeShort, into / T.pxPerMm);
+      // How far (px) into her own toe this cell sat: 0 for horn past her line. Reported in her
+      // real mm (D84).
+      const into = hoof.over[i] ? 0 : Math.max(0, -hoof.toeD[i]);
+      if (into > 0) ev.toeShort = Math.max(ev.toeShort, (into / T.pxPerMm) * hoof.mmScale);
       if (!(hoof.zone[i] & Z.LIVE)) {
         cut(hoof, i, hoof.thick[i], ev, 1);
         hoof.toeCut[i] = Math.max(hoof.toeCut[i], into);

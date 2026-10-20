@@ -28,10 +28,10 @@ Free play takes `&breed=jerseyx|brownswiss|holstein` and `&frame=small|average|l
 stages the nippers with `dev/artlab.html?cond=routine&seed=214&frame=small&toe=1&focus=toe`.
 
 - [ ] **The intro names her size.** `?cond=routine&breed=jerseyx`: the card reads "She's small, a Jersey cross: … nearer 7 cm." A Brown Swiss says "nearer 8 cm". A plain Holstein says nothing.
-- [ ] **Her line sits at her size.** In free play (and at Apprentice) the trim line on a Jersey sits a little short of the drawn dead/live seam, and on a Brown Swiss a little past it. From Journeyman on, there's no line at all (`?rep=75&farm=hollins`).
-- [ ] **Nipping a Jersey's living tip, on the phone.** The tip past her line comes off along a smooth curve with a pale cut face. Can you tell where to stop without the line?
+- [ ] **Her foot is her size (D84).** A Jersey's foot is drawn smaller in the chute, a Brown Swiss's bigger (`&breed=jerseyx`, `&breed=brownswiss`). Can you see it without being told? Her trim line is the dead/live seam on every cow. From Journeyman on, there's no line at all (`?rep=75&farm=hollins`).
+- [ ] **The nippers' rule (D84).** Pick up the nippers: a steel rule lies along each claw's toe, numbered at 60/70/80 mm. On a Jersey her line is at 70, on a Holstein the long tick at 75, on a Brown Swiss 80. Readable on the phone? Does it get in the way of the bite?
+- [ ] **The phone frame (D85).** Everything is about 7% smaller than before on every cow. A Brown Swiss with `&shape=max` should still fit, with the OUTER/INNER labels under her toes. Is the foot still big enough to work on?
 - [ ] **The pink face.** Bite well past her line: the notch's face goes pink at about 3.5 mm and bleeds past 5 mm. Is it clear enough as a warning before the blood?
-- [ ] **A big cow's toe is hers.** On a Brown Swiss, the dead horn short of her line is left on and costs nothing. Does that feel right, or does it look like you missed a bit?
 - [ ] **Breeds on the road.** Hollins, Greystone and Ridgeway now bring Jerseys and Brown Swiss. Heifers are always small.
 - [ ] **She walks off as her breed (D74).** A Jersey cross goes out small and fawn with a dark face, a pale ring round a black nose and dark lower legs. A Brown Swiss goes out big and grey-brown with fringed ears and a pale muzzle ring. A big-framed Holstein (Greystone) is a size up. About one Holstein in eight is red and white (`?cond=routine&seed=116`). Do they read as different cows at walk-off speed, on the phone?
 - [ ] **The walk-in sketch has her colours.** On a hind foot the rear-view sketch on the intro card is fawn on a Jersey and grey-brown on a Brown Swiss; only a Holstein has the hip patch.

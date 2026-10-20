@@ -14,7 +14,8 @@ export const CFG = {
     // Phones (`maxW` CSS px wide or less) zoom onto the hoof (src/view.js): `content` is the
     // logical box that must stay in view (claws, labels, tutorial targets), `hudH` the CSS px
     // HUD strip above it, `bleed` how far the scenery is painted past each side of the scene.
-    phone: { maxW: 860, content: { x: 38, y: 172, w: 324, h: 492 }, hudH: 48, bleed: 80 },
+    // D85: framed for the biggest foot (a large cow, D84) on every cow, about 8% further out.
+    phone: { maxW: 860, content: { x: 25, y: 166, w: 350, h: 532 }, hudH: 48, bleed: 80 },
   },
 
   // Touch: the finger holds the tool's handle, so the working tip sits `grip` px up-left of

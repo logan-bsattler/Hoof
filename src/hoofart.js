@@ -549,10 +549,9 @@ export class HoofArt {
     const g = CFG.grid, cols = g.cols, rows = g.rows, cell = g.cell, gx0 = g.x0;
     const d = this.img.data;
     const { thick, init, mud, rough, tint, lift, zone, toeCut } = hoof;
-    // Her toe line (D68) in pixel rows: the living outline moved toeShift px toward the tip.
-    // The sim nips her living tip off cell by cell; the art cuts it along her line instead,
-    // anywhere within a cell of a nipped tip cell, so the edge follows the toe's curve.
-    const lineRows = -hoof.toeShift * S;
+    // Her toe line (D68) is the living outline (D84). The sim nips the tip off cell by cell; the
+    // art cuts it along her line instead, anywhere within a cell of a nipped tip cell, so the
+    // edge follows the toe's curve.
     const nearTip = this.nearTip ??= new Uint8Array(hoof.n);
     nearTip.fill(0);
     for (let i = 0; i < hoof.n; i++) {
@@ -748,7 +747,7 @@ export class HoofArt {
         } else {
           // Living toe nipped off (D68): gone, its edge torn midway like the dead toe's. The
           // fresh face goes pink the further into her toe the jaws went.
-          // A living tip past her line (no toeCut) comes off along her line, drawn from the smooth
+          // A tip cell nipped with no toeCut comes off along her line, drawn from the smooth
           // outline so it follows the toe's curve; a bite into her toe follows the jaws' cells.
           let biteK = 0;
           if (w0 && zone[i0] & Z.OFF && toeCut[i0]) biteK += w0;
@@ -758,13 +757,13 @@ export class HoofArt {
           const overK = (w0 && nearTip[i0]) || (w1 && nearTip[i1]) || (w2 && nearTip[i2]) || (w3 && nearTip[i3]) ? 1 : 0;
           if (biteK > 0 || overK > 0) {
             const tear = 0.5 + (ncv - 0.5) * 0.7 + (ngr - 0.5) * 0.18;
-            // Pixel rows from here on to her line, roughened a little: 0 is past it. Her line is
-            // where the living outline would end had it sat lineRows rows nearer the heel.
+            // Pixel rows from here on to her line (the living outline), roughened a little: 0 is
+            // past it.
             let toLine = Infinity;
             if (overK > 0) {
               const jag = Math.round(((ncv - 0.5) * 1.6 + (ngr - 0.5) * 0.6) * S);
               for (let k = 0; k <= 3 * S; k++) {
-                const q = py + Math.round(lineRows) + k + jag;
+                const q = py + k + jag;
                 if (q < 0 || q >= this.h || cls[q * w + px] !== c) { toLine = k; break; }
               }
             }
@@ -772,7 +771,7 @@ export class HoofArt {
             toeFace = Math.max(biteK > 0 ? smoothstep(tear - 0.4, tear - 0.03, biteK) : 0,
               toLine < Infinity ? 1 - smoothstep(0.5 * S, 2.5 * S, toLine) : 0);
             const cutPx = Math.max(w0 ? toeCut[i0] : 0, w1 ? toeCut[i1] : 0, w2 ? toeCut[i2] : 0, w3 ? toeCut[i3] : 0);
-            toePink = smoothstep(CFG.toe.pink - 1.5, CFG.toe.pink + 0.5, cutPx / CFG.toe.pxPerMm);
+            toePink = smoothstep(CFG.toe.pink - 1.5, CFG.toe.pink + 0.5, (cutPx / CFG.toe.pxPerMm) * hoof.mmScale);
           }
           const ti = (init[i0] * w0 + init[i1] * w1 + init[i2] * w2 + init[i3] * w3), r = (rough[i0] * w0 + rough[i1] * w1 + rough[i2] * w2 + rough[i3] * w3);
           const removed = ti - t;

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { CFG } from '../src/config.js';
 import { CLAW, clawPolygon, clawBox } from '../src/hoof.js';
 import { makeCase, dealCase } from '../src/case.js';
-import { clawShapes, toView, toTemplate, LIMIT } from '../src/shape.js';
+import { clawShapes, toView, toTemplate, LIMIT, labelY } from '../src/shape.js';
 import { tutorialBeats } from '../src/tutorial.js';
 
 const CB = CFG.view.phone.content;
@@ -67,6 +67,29 @@ test('the phone content box holds every shaped claw and tutorial target, on both
       const rects = t.kind === 'rects' ? t.list : t.kind === 'rect' ? [t] : [];
       for (const r of rects) for (const [x, y] of [[r.x, r.y], [r.x + r.w, r.y + r.h]]) assert.ok(inBox(toView(cd, x, y)), `seed ${seed} ${b.id} rect`);
       if (t.kind === 'ring') assert.ok(inBox(toView(cd, t.x, t.y + t.r)), `seed ${seed} ${b.id} ring`);
+    }
+  }
+});
+
+test('the biggest foot fits the phone box on every frame, labels under it (D84/D85)', () => {
+  for (const frame of ['small', 'average', 'large']) {
+    for (const foot of ['hind', 'front']) {
+      for (const side of ['LH', 'RH']) {
+        const base = makeCase('routine', 5, { frame, foot });
+        // The widest, longest, most curled pair D78 allows.
+        const cd = { ...base, side, shape: { 1: { w: LIMIT.w[1], toeMm: LIMIT.toeMm[1], lean: LIMIT.lean[1] }, 2: { w: LIMIT.w[1], toeMm: LIMIT.toeMm[1], lean: LIMIT.lean[1] } } };
+        let low = 0;
+        for (const claw of [CLAW.OUTER, CLAW.INNER]) {
+          for (const [x, y] of clawPolygon(claw, true, side)) {
+            const v = toView(cd, x, y);
+            assert.ok(inBox(v), `${frame} ${foot} ${side} claw ${claw} (${v.x.toFixed(1)}, ${v.y.toFixed(1)})`);
+            low = Math.max(low, v.y);
+          }
+        }
+        const ly = labelY(cd);
+        assert.ok(ly - 12 > low, `${frame}: labels at ${ly} under the toe at ${low.toFixed(1)}`);
+        assert.ok(inBox({ x: CB.x, y: ly + 5 }), `${frame}: labels in the box`);
+      }
     }
   }
 });

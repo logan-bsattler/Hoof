@@ -1367,6 +1367,7 @@ function draw() {
   renderer.dressing(hoof, game.tool === 'wrap' ? aim : 0);
   renderer.setGuides(game.guides && game.state === 'play' ? guideStep() : null);
   renderer.guides(hoof);
+  if (game.tool === 'nippers' && game.state === 'play') renderer.ruler(hoof);
   if (game.tutorial?.beat && game.state === 'play') renderer.coach(game.tutorial.beat.target, game.tutorial.progress, game.time);
   renderer.labels(hoof);
   particles.draw(ctx);

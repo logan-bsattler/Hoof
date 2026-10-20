@@ -20,11 +20,11 @@ test('full view letterboxes the whole scene, as before the camera existed', () =
   assert.deepEqual([cam.cssW, cam.cssH], [Math.floor(W * s), Math.floor(H * s)]);
 });
 
-test('phone view makes the hoof at least 25% bigger and keeps the content box under the HUD', () => {
+test('phone view makes the hoof at least 15% bigger (25% before D85 framed the biggest foot) and keeps the content box under the HUD', () => {
   for (const [ww, wh] of PHONES) {
     const full = fitCamera(ww, wh, 'full');
     const cam = fitCamera(ww, wh, 'hoof');
-    assert.ok(cam.scale >= full.scale * 1.25, `${ww}x${wh}: ${cam.scale} vs ${full.scale}`);
+    assert.ok(cam.scale >= full.scale * 1.15, `${ww}x${wh}: ${cam.scale} vs ${full.scale}`);
     assert.ok(cam.cssW <= ww && cam.cssH <= wh);
     const a = toScreen(cam, CB.x, CB.y), b = toScreen(cam, CB.x + CB.w, CB.y + CB.h);
     assert.ok(a.x >= -0.5 && b.x <= cam.cssW + 0.5, `${ww}x${wh}: content box fits across`);
@@ -60,7 +60,7 @@ test('the phone content box holds both claws, the labels and every tutorial targ
       }
     }
   }
-  assert.ok(inBox(CB.x, 652 - 12, CB.x, 652 + 4), 'claw labels (y 652)');
+  assert.ok(inBox(CB.x, 652 - 12, CB.x, 652 + 4), 'claw labels (y 652 on an average cow)');
   for (let seed = 0; seed < 40; seed++) {
     const cd = seed === 0 ? CASE_B : makeCase('ulcer', seed);
     for (const b of tutorialBeats(cd)) {

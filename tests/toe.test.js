@@ -1,9 +1,11 @@
-// Toe length by the cow's size (D68–D74): her line, the nippers on living toe, the score, breeds.
+// Toe length by the cow's size (D68–D74, D84): her foot drawn at her size, her line the seam on
+// every frame, the nippers on living toe in her real mm, the score, breeds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CFG } from '../src/config.js';
-import { Hoof, Z, CLAW, toeShiftPx } from '../src/hoof.js';
+import { Hoof, Z, CLAW, frameScale } from '../src/hoof.js';
+import { labelY } from '../src/shape.js';
 import { makeCase, BREEDS, tagAndLimb } from '../src/case.js';
 import { applyBite } from '../src/tools.js';
 import { newSession, scoreCase } from '../src/scoring.js';
@@ -23,11 +25,15 @@ function tipOf(h, c) {
   return { x: h.g.x0 + (best + 0.5) * h.g.cell, y: h.seamY[best] };
 }
 
-test('her frame moves her toe line: 70 / 75 / 80 mm, 3 px a mm, an average cow unchanged', () => {
-  assert.equal(toeShiftPx({ frame: 'small' }), -15);
-  assert.equal(toeShiftPx({ frame: 'average' }), 0);
-  assert.equal(toeShiftPx({ frame: 'large' }), 15);
-  assert.equal(toeShiftPx({}), 0);
+test('her frame sets her size: 70 / 75 / 80 mm toe, an average cow unchanged (D84)', () => {
+  assert.equal(frameScale({ frame: 'small' }), 70 / 75);
+  assert.equal(frameScale({ frame: 'average' }), 1);
+  assert.equal(frameScale({ frame: 'large' }), 80 / 75);
+  assert.equal(frameScale({}), 1);
+  assert.equal(new Hoof(makeCase('routine', 214, { frame: 'large' })).mmScale, 80 / 75);
+  // The claw labels move down under a big cow's toe, up under a small one's.
+  const at = (frame) => labelY(makeCase('routine', 214, { frame }));
+  assert.ok(at('small') < at('average') && at('average') < at('large'));
   const plain = makeCase('routine', 214);
   assert.equal(plain.breed, 'holstein');
   assert.equal(plain.frame, 'average');
@@ -50,7 +56,7 @@ test('breeds bring their frame, a heifer is small, and the intro names a cow off
   }
 });
 
-test('a careful hand nips every frame to her length: no toe cut short, a small cow’s living tip off', () => {
+test('a careful hand nips every frame to her length: no toe cut short, no living tip taken', () => {
   for (const breed of Object.keys(BREEDS)) {
     const h = cow({ breed });
     const evs = [];
@@ -61,8 +67,7 @@ test('a careful hand nips every frame to her length: no toe cut short, a small c
       assert.ok(m.claws[c].toeShort < CFG.toe.note, `${breed}: cut ${m.claws[c].toeShort.toFixed(1)} mm short`);
     }
     assert.equal(evs.some((e) => e.blood), false, breed);
-    if (breed === 'jerseyx') assert.ok(evs.some((e) => e.toeLive), 'the small cow lost living tip');
-    else assert.equal(evs.some((e) => e.toeLive), false, breed);
+    assert.equal(evs.some((e) => e.toeLive), false, breed);
   }
 });
 
@@ -91,31 +96,35 @@ test('the nippers reach as far into her toe on every frame: a small cow bleeds t
     const h = cow({ frame });
     makePlayer(h).nip();
     const { x, y } = tipOf(h, CLAW.OUTER);
-    const line = y + toeShiftPx({ frame });
     let ev;
-    for (let d = 3; d <= 9; d += 3) ev = applyBite(h, x, line - d * CFG.toe.pxPerMm);
+    for (let d = 3; d <= 9; d += 3) ev = applyBite(h, x, y - d * CFG.toe.pxPerMm);
     assert.ok(h.metrics().claws[CLAW.OUTER].toeShort > CFG.toe.blood, `${frame}: only ${h.metrics().claws[CLAW.OUTER].toeShort} mm`);
     assert.ok(h.metrics().blood > 0 || ev.blood, `${frame}: no blood`);
   }
 });
 
-test('a big cow’s dead toe short of her line is hers: left on, it costs nothing', () => {
-  const h = cow({ breed: 'brownswiss' });
-  let kept = 0;
-  for (let i = 0; i < h.n; i++) if ((h.zone[i] & Z.DEAD) && !h.over[i]) kept++;
-  assert.ok(kept > 0);
-  makePlayer(h).nip();
-  for (let i = 0; i < h.n; i++) if ((h.zone[i] & Z.DEAD) && !h.over[i]) assert.ok(h.thick[i] > 0.05, 'her toe was nipped');
+test('her own toe cut short is reported in her real mm: the same bite is more on a big cow', () => {
+  const short = (frame) => {
+    const h = cow({ frame });
+    makePlayer(h).nip();
+    const { x, y } = tipOf(h, CLAW.OUTER);
+    applyBite(h, x, y - 2 * CFG.toe.pxPerMm);
+    applyBite(h, x, y - 4 * CFG.toe.pxPerMm);
+    return h.metrics().claws[CLAW.OUTER].toeShort;
+  };
+  const s = short('small'), a = short('average'), l = short('large');
+  assert.ok(a > 0);
+  assert.ok(Math.abs(s / a - 70 / 75) < 1e-6 && Math.abs(l / a - 80 / 75) < 1e-6, `${s} ${a} ${l}`);
 });
 
-test('a small cow left with her living tip on gets the long-toe note', () => {
-  const h = cow({ breed: 'jerseyx' });
-  // Only the dead horn off: the average cow's line used on a small cow.
-  for (let i = 0; i < h.n; i++) if (h.zone[i] & Z.DEAD) h.thick[i] = 0;
-  const m = h.metrics();
-  assert.ok(m.claws[CLAW.OUTER].liveRemain > 0.2);
-  const r = scoreCase(m, newSession(), h, h.caseDef);
-  assert.ok(r.notes.some((n) => /long for her size/.test(n)), r.notes.join(' | '));
+test('every frame’s dead toe is overgrowth: none of it is hers to keep (D84)', () => {
+  for (const breed of Object.keys(BREEDS)) {
+    const h = cow({ breed });
+    for (let i = 0; i < h.n; i++) {
+      if (!h.claw[i] || Number.isNaN(h.toeD[i])) continue;
+      assert.equal(h.over[i], h.zone[i] & Z.DEAD ? 1 : 0, breed);
+    }
+  }
 });
 
 test('a pre-trimmed claw on a small cow was trimmed to her line', () => {
