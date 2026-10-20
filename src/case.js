@@ -44,12 +44,13 @@ function frameLine(breed, frame) {
 }
 
 // One line for the intro about anything out of the ordinary with this cow.
-function traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young }) {
+function traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young, bunkCurl }) {
   const bits = [];
   // A heifer's short toe is in her own intro line (PARTIAL).
   const fl = young ? null : frameLine(breed, frame);
   if (fl) bits.push(fl);
   if (foot === 'front') bits.push('A front foot: the inner claw is the long one here, so the outer claw goes first.');
+  if (bunkCurl) bits.push('Reaching for the feed fence has curled that inner toe in hard.');
   if (kicker) bits.push('The farmer warned you: she kicks. Short strokes, and keep clear of her heel.');
   else if (temper >= 0.7) bits.push('She’s a flighty one: expect her to shift about.');
   else if (temper <= 0.3) bits.push('She’s a calm old girl and stands well.');
@@ -60,7 +61,7 @@ function traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young }) 
 }
 
 // Everything a case needs, written out from where things are on the foot.
-function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker, swollen, breed = 'holstein', frame = 'average', young = false }) {
+function buildCase(condition, { seed, side, foot, excess, lesion, lesions, looseHorn, decoys, temper, mud, growth, kicker, swollen, breed = 'holstein', frame = 'average', young = false, bunkCurl = false }) {
   const C = CONDITIONS[condition];
   const cow = 100 + (((seed - 100) % 900) + 900) % 900; // ear tag #100–#999; seed 214 is #214
   const leg = side === 'RH' ? 'right' : 'left';
@@ -79,6 +80,8 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     subtitle: `${(BREEDS[breed] ?? BREEDS.holstein).name} #${cow} · ${limb}`,
     // Her breed and frame (D68, D73): the frame sets her toe length (hoof.js toeShiftPx).
     breed, frame,
+    // D82: a bunk-fed cow's front inner claw curls in harder (shape.js). Front feet only.
+    ...(bunkCurl && foot === 'front' ? { bunkCurl: true } : {}),
 
     // The step ids this job needs, in order (see steps.js).
     steps: C.steps,
@@ -100,7 +103,7 @@ function buildCase(condition, { seed, side, foot, excess, lesion, lesions, loose
     // (1 covered; above 1 caked harder, below 1 patchy).
     temper,
     mud,
-    traits: traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young }),
+    traits: traitsLine({ temper, mud, growth, foot, kicker, breed, frame, young, bunkCurl: bunkCurl && foot === 'front' }),
     // A known kicker (WP12.2): the farmer names her on the visit card.
     ...(kicker ? { kicker: true } : {}),
 
@@ -158,6 +161,7 @@ function withPits({ decoys, lesion, lesions, looseHorn }, pits) {
 //   stage      'burst': a white-line abscess that has broken out on its own (WP15.3)
 //   partial    'heifer' | 'lately': a routine cow with less to do (WP17.2, see partialWork)
 //   apprentice [fault ids]: trimmed already by the farm's apprentice, with these faults (WP17.1)
+//   bunkCurl   true: fed at a bunk, so a front inner claw curls in harder (D82, shape only)
 //   breed      a BREEDS id (D73), and frame 'small'|'average'|'large' (D68) if not the breed's own;
 //              a heifer is small whatever her breed
 // and can override any of excess, lesion, looseHorn or decoys outright (CASE_B does).

@@ -12,7 +12,7 @@ import { CALLS, CONDITIONS } from './conditions.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
 import { fitCamera, toScene } from './view.js';
-import { toTemplate, toView } from './shape.js';
+import { toTemplate, toView, LIMIT } from './shape.js';
 import { Particles } from './particles.js';
 import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
@@ -43,6 +43,8 @@ function devMods() {
     apprentice: devCase.has('apprentice') ? devCase.get('apprentice').split(',').filter(Boolean) : undefined,
     // D68/D73: &breed=jerseyx|brownswiss|holstein, &frame=small|average|large.
     breed: devCase.get('breed') ?? undefined, frame: devCase.get('frame') ?? undefined,
+    // D82: &bunk for a bunk-fed cow (with &foot=front her inner toe curls in harder).
+    bunkCurl: devCase.has('bunk') || undefined,
   };
   return Object.fromEntries(Object.entries(mods).filter(([, v]) => v !== undefined));
 }
@@ -53,7 +55,7 @@ if (freePlay && devCase.has('shape')) caseDef = { ...caseDef, shape: devShape(de
 function devShape(v, cd) {
   if (v !== 'max') return 'flat';
   const big = cd.foot === 'front' ? CLAW.INNER : CLAW.OUTER;
-  return { [big]: { w: 1.06, toeMm: 7, lean: 5 }, [big === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER]: { w: 0.95, toeMm: -3, lean: 0 } };
+  return { [big]: { w: 1.06, toeMm: 7, lean: cd.bunkCurl ? LIMIT.lean[1] : 5 }, [big === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER]: { w: 0.95, toeMm: -3, lean: 0 } };
 }
 // The trimmer's round (route.js), saved on this device after each cow (save.js).
 const route = loadRound();

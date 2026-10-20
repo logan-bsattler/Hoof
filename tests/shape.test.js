@@ -75,3 +75,32 @@ test('a claw box is still the template box: the sim and the bot never see the sh
   const a = makeCase('routine', 11), b = { ...a, shape: 'flat' };
   assert.deepEqual(clawBox(CLAW.OUTER, a.side), clawBox(CLAW.OUTER, b.side));
 });
+
+test('a bunk-fed front foot curls its inner toe in harder, and never past the centre line (D82)', async () => {
+  const { FARMS, farmMods } = await import('../src/route.js');
+  for (let seed = 1; seed < 200; seed++) {
+    const plain = makeCase('routine', seed, { foot: 'front' }), bunk = makeCase('routine', seed, { foot: 'front', bunkCurl: true });
+    const a = clawShapes(plain), b = clawShapes(bunk);
+    assert.ok(b[CLAW.INNER].lean >= 5.5 && b[CLAW.INNER].lean <= LIMIT.lean[1], `seed ${seed}`);
+    assert.ok(b[CLAW.INNER].lean > a[CLAW.INNER].lean);
+    // Only the curl changes: width, toe and the outer claw are as they were.
+    assert.equal(b[CLAW.INNER].w, a[CLAW.INNER].w);
+    assert.deepEqual(b[CLAW.OUTER], a[CLAW.OUTER]);
+    for (const dead of [false, true]) {
+      for (const [x, y] of clawPolygon(CLAW.INNER, dead, bunk.side)) {
+        const v = toView(bunk, x, y);
+        assert.ok(inBox(v), `seed ${seed} in box`);
+        assert.ok((v.x - 200) * (x - 200) > 0, `seed ${seed} stays on its side of the centre line`);
+      }
+    }
+    // A hind foot ignores it.
+    assert.equal(makeCase('routine', seed, { bunkCurl: true }).bunkCurl, undefined);
+  }
+  // Every front foot on the road is bunk-fed except on pasture (Hollins), and the deal is unchanged.
+  for (const farm of FARMS) {
+    for (let seed = 1; seed < 60; seed++) {
+      const { mods } = farmMods(farm, seed);
+      assert.equal(!!mods.bunkCurl, mods.foot === 'front' && farm.housing !== 'pasture', `${farm.id} ${seed}`);
+    }
+  }
+});

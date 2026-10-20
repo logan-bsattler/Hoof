@@ -198,6 +198,9 @@ export function farmMods(farm, seed, season = null) {
     mud: between(farm.mud) + wet,
     temper: between(farm.temper),
   };
+  // D82: cows fed at a bunk reach forward for it and their front inner claws curl in. Never on
+  // pasture. No draw, so the deal is as it was.
+  if (mods.foot === 'front' && farm.housing !== 'pasture') mods.bunkCurl = true;
   if (farm.decoys) mods.decoyCount = Math.floor(between([farm.decoys[0], farm.decoys[1] + 1]));
   if (farm.decoyKinds) mods.decoyKinds = farm.decoyKinds;
   // Drawn last, so it leaves every earlier draw as it was. makeCase uses it on routine feet only.

@@ -38,6 +38,16 @@ stages the nippers with `dev/artlab.html?cond=routine&seed=214&frame=small&toe=1
 
 ---
 
+## 0a. Claw shape (WP18, 2026-10-19)
+
+Free play takes `&shape=max` (the most different pair allowed) and `&shape=flat` (the template).
+
+- [ ] **Cuts land under your finger on the phone.** On a widened claw (`?cond=routine&seed=3&shape=max`), the grinder and knife take horn exactly under the blade, out at the toe as well as at the heel.
+- [ ] **No two feet alike.** Over a day on the road, do the claws read as different feet? Is the bigger claw (hind outer, front inner) noticeably the bigger one?
+- [ ] **Bunk-fed front feet curl in (18.4, D82).** `?cond=routine&seed=3&foot=front&bunk&shape=max`: the inner claw's toe bends in hard toward the other claw, and the intro says "Reaching for the feed fence has curled that inner toe in hard." On the road, front feet from Top Lane on curl like this. Hollins (pasture) never deals front feet. Does the curl read as a real foot, or as a drawing glitch?
+
+---
+
 ## 0b. Phone notes fixes (2026-10-19)
 
 - [ ] **Gauge word.** Step 2 with the claws matched but still high: the gauge says e.g. `level · inner 1.1 mm high` in amber, and LEVEL (green) comes up exactly when step 2 ticks.

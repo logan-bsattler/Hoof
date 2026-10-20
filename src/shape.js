@@ -16,7 +16,9 @@ const AXIAL = 7;           // the axial wall's distance from the centre line: th
 const HEEL = 182, TIP = 585; // top of the heel bulb and tip of the living toe, in the template
 // D79: the camera framing stays put, so the widest claw must stay inside the phone content box
 // (config view.phone.content, right edge 362 vs the template's 352). Toe stretch is capped too.
-export const LIMIT = { w: [0.95, 1.06], toeMm: [-3, 7], lean: [0, 5] };
+// Lean is capped where the curled toe still clears the centre line (8 px leaves 0.5 px): each
+// half is clipped there when drawn.
+export const LIMIT = { w: [0.95, 1.06], toeMm: [-3, 7], lean: [0, 8] };
 
 const IDENTITY = { w: 1, sy: 1, lean: 0 };
 const clamp = (v, [a, b]) => Math.max(a, Math.min(b, v));
@@ -30,6 +32,8 @@ function shapeOf(w, toeMm, lean) {
 // Her two claws' shapes, keyed by claw (1 outer, 2 inner), or null for the template foot.
 // D78: the claw that overgrows (hind outer, front inner) is about 5% wider with a toe about 4 mm
 // longer and a slight curl in; on top of that, each cow ±5% width and ±3 mm toe, from her seed.
+// D82: a bunk-fed cow's front inner claw curls in harder (5.5–8 px, not 2–5), from reaching
+// forward at the feed fence; `cd.bunkCurl` says so. Shape only: the trim is the same.
 // `cd.shape`: 'flat' for the template foot, or { 1: {w, toeMm, lean}, 2: {...} } to set it.
 const memo = new WeakMap();
 export function clawShapes(cd) {
@@ -46,11 +50,10 @@ export function clawShapes(cd) {
     out = {};
     for (const c of [1, 2]) {
       const over = c === big;
-      out[c] = shapeOf(
-        1 + (over ? 0.05 : 0) + cowW + (rand() - 0.5) * 0.04,
-        (over ? 4 : 0) + cowToe + (rand() - 0.5) * 2,
-        over ? 2 + rand() * 3 : rand() * 1.5,
-      );
+      const w = 1 + (over ? 0.05 : 0) + cowW + (rand() - 0.5) * 0.04;
+      const toe = (over ? 4 : 0) + cowToe + (rand() - 0.5) * 2;
+      const r = rand();
+      out[c] = shapeOf(w, toe, over ? (cd.bunkCurl ? 5.5 + r * 2.5 : 2 + r * 3) : r * 1.5);
     }
   }
   memo.set(cd, out);
