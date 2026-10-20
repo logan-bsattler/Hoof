@@ -22,19 +22,36 @@ const HEEL = 182, TIP = 585; // top of the heel bulb and tip of the living toe, 
 // view.phone.content, framed for it). Toe stretch is capped too.
 // Lean is capped where the curled toe still clears the centre line (8 px leaves 0.5 px): each
 // half is clipped there when drawn.
-export const LIMIT = { w: [0.95, 1.06], toeMm: [-3, 7], lean: [0, 8] };
+export const LIMIT = { w: [0.84, 1.18], toeMm: [-3, 7], lean: [0, 8] };
+
+// The widest a claw can be drawn on her frame and still fit the phone box (right edge 375):
+// its abaxial wall, and the tutorial's nip target just past it, sit up to 148 px out from the
+// axial anchor, all of it scaled by her frame.
+export const fitW = (k) => Math.min(LIMIT.w[1], (175 / k - 7) / 148 - 0.002);
+
+// Her foot type (D86): narrow, average or wide and round, from her seed, leaning by breed. It
+// scales both claws' width; the trim is the same.
+export const FOOT_TYPES = { narrow: 0.88, average: 1, wide: 1.12 };
+const TYPE_ODDS = { jerseyx: [0.4, 0.45], brownswiss: [0.15, 0.45] }; // [narrow, average]; the rest wide
+export function footType(cd) {
+  if (cd.footType) return cd.footType;
+  const [n, a] = TYPE_ODDS[cd.breed] ?? [0.25, 0.5];
+  const r = mulberry32((cd.seed ?? 0) ^ 0x77a1)();
+  return r < n ? 'narrow' : r < n + a ? 'average' : 'wide';
+}
 
 const IDENTITY = { w: 1, sy: 1, lean: 0, k: 1 };
 const clamp = (v, [a, b]) => Math.max(a, Math.min(b, v));
 
 // One claw's shape from a width factor and a toe length (mm past the template's).
-function shapeOf(w, toeMm, lean) {
+function shapeOf(w, toeMm, lean, k = 1) {
   const px = clamp(toeMm, LIMIT.toeMm) * CFG.toe.pxPerMm;
-  return { w: clamp(w, LIMIT.w), sy: 1 + px / (TIP - HEEL), lean: clamp(lean, LIMIT.lean) };
+  return { w: clamp(w, [LIMIT.w[0], fitW(k)]), sy: 1 + px / (TIP - HEEL), lean: clamp(lean, LIMIT.lean) };
 }
 
 // Her two claws' shapes, keyed by claw (1 outer, 2 inner), each with her frame's scale `k`, or
 // null for the template foot.
+// D86: her foot type scales both claws' width (footType), capped so her frame still fits.
 // D78: the claw that overgrows (hind outer, front inner) is about 5% wider with a toe about 4 mm
 // longer and a slight curl in; on top of that, each cow ±5% width and ±3 mm toe, from her seed.
 // D82: a bunk-fed cow's front inner claw curls in harder (5.5–8 px, not 2–5), from reaching
@@ -45,23 +62,23 @@ export function clawShapes(cd) {
   if (!cd || cd.shape === 'flat') return null;
   if (memo.has(cd)) return memo.get(cd);
   let out;
+  const k = frameScale(cd);
   if (cd.shape && typeof cd.shape === 'object') {
     out = {};
-    for (const c of [1, 2]) { const s = cd.shape[c] ?? {}; out[c] = shapeOf(s.w ?? 1, s.toeMm ?? 0, s.lean ?? 0); }
+    for (const c of [1, 2]) { const s = cd.shape[c] ?? {}; out[c] = shapeOf(s.w ?? 1, s.toeMm ?? 0, s.lean ?? 0, k); }
   } else {
     const rand = mulberry32((cd.seed ?? 0) ^ 0x5a9e);
     const big = cd.foot === 'front' ? 2 : 1;
-    const cowW = (rand() - 0.5) * 0.06, cowToe = (rand() - 0.5) * 4;
+    const cowW = (rand() - 0.5) * 0.06, cowToe = (rand() - 0.5) * 4, type = FOOT_TYPES[footType(cd)];
     out = {};
     for (const c of [1, 2]) {
       const over = c === big;
-      const w = 1 + (over ? 0.05 : 0) + cowW + (rand() - 0.5) * 0.04;
+      const w = type * (1 + (over ? 0.05 : 0) + cowW + (rand() - 0.5) * 0.04);
       const toe = (over ? 4 : 0) + cowToe + (rand() - 0.5) * 2;
       const r = rand();
-      out[c] = shapeOf(w, toe, over ? (cd.bunkCurl ? 5.5 + r * 2.5 : 2 + r * 3) : r * 1.5);
+      out[c] = shapeOf(w, toe, over ? (cd.bunkCurl ? 5.5 + r * 2.5 : 2 + r * 3) : r * 1.5, k);
     }
   }
-  const k = frameScale(cd);
   for (const c of [1, 2]) out[c].k = k;
   memo.set(cd, out);
   return out;

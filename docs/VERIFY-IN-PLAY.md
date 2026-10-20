@@ -30,6 +30,7 @@ stages the nippers with `dev/artlab.html?cond=routine&seed=214&frame=small&toe=1
 - [ ] **The intro names her size.** `?cond=routine&breed=jerseyx`: the card reads "She's small, a Jersey cross: … nearer 7 cm." A Brown Swiss says "nearer 8 cm". A plain Holstein says nothing.
 - [ ] **Her foot is her size (D84).** A Jersey's foot is drawn smaller in the chute, a Brown Swiss's bigger (`&breed=jerseyx`, `&breed=brownswiss`). Can you see it without being told? Her trim line is the dead/live seam on every cow. From Journeyman on, there's no line at all (`?rep=75&farm=hollins`).
 - [ ] **The nippers' rule (D84).** Pick up the nippers: a steel rule lies along each claw's toe, numbered at 60/70/80 mm. On a Jersey her line is at 70, on a Holstein the long tick at 75, on a Brown Swiss 80. Readable on the phone? Does it get in the way of the bite?
+- [ ] **Foot types (D86).** `&type=narrow` vs `&type=wide` on the same seed: does a wide foot read as a different cow, not a stretched one? Is a narrow foot still easy to work on?
 - [ ] **The phone frame (D85).** Everything is about 7% smaller than before on every cow. A Brown Swiss with `&shape=max` should still fit, with the OUTER/INNER labels under her toes. Is the foot still big enough to work on?
 - [ ] **The pink face.** Bite well past her line: the notch's face goes pink at about 3.5 mm and bleeds past 5 mm. Is it clear enough as a warning before the blood?
 - [ ] **Breeds on the road.** Hollins, Greystone and Ridgeway now bring Jerseys and Brown Swiss. Heifers are always small.

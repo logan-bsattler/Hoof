@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { CFG } from '../src/config.js';
 import { CLAW, clawPolygon, clawBox } from '../src/hoof.js';
 import { makeCase, dealCase } from '../src/case.js';
-import { clawShapes, toView, toTemplate, LIMIT, labelY } from '../src/shape.js';
+import { clawShapes, toView, toTemplate, LIMIT, labelY, footType } from '../src/shape.js';
 import { tutorialBeats } from '../src/tutorial.js';
 
 const CB = CFG.view.phone.content;
@@ -90,6 +90,26 @@ test('the biggest foot fits the phone box on every frame, labels under it (D84/D
         assert.ok(ly - 12 > low, `${frame}: labels at ${ly} under the toe at ${low.toFixed(1)}`);
         assert.ok(inBox({ x: CB.x, y: ly + 5 }), `${frame}: labels in the box`);
       }
+    }
+  }
+});
+
+test('feet come narrow, average or wide, leaning by breed, and every one fits the phone box (D86)', () => {
+  const share = (breed, type) => {
+    let n = 0;
+    for (let seed = 1; seed <= 400; seed++) if (footType(makeCase('routine', seed, breed ? { breed } : {})) === type) n++;
+    return n / 400;
+  };
+  assert.ok(Math.abs(share(null, 'wide') - 0.25) < 0.08 && Math.abs(share(null, 'narrow') - 0.25) < 0.08);
+  assert.ok(share('brownswiss', 'wide') > 0.3 && share('jerseyx', 'narrow') > 0.3);
+  // A wide foot is drawn clearly wider than a narrow one of the same cow.
+  const cd = makeCase('routine', 9);
+  const w = (t) => clawShapes({ ...cd, footType: t })[CLAW.OUTER].w;
+  assert.ok(w('wide') / w('narrow') > 1.2, `${w('wide')} vs ${w('narrow')}`);
+  for (const frame of ['small', 'average', 'large']) {
+    for (let seed = 1; seed < 120; seed++) {
+      const c = { ...makeCase('routine', seed, { frame }), footType: 'wide' };
+      for (const claw of [CLAW.OUTER, CLAW.INNER]) for (const [x, y] of clawPolygon(claw, true, c.side)) assert.ok(inBox(toView(c, x, y)), `${frame} seed ${seed}`);
     }
   }
 });

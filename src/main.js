@@ -50,6 +50,8 @@ function devMods() {
 }
 const freePlay = devCase.has('cond');
 let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_A;
+// D86: &type=narrow|average|wide sets her foot type.
+if (freePlay && devCase.has('type')) caseDef = { ...caseDef, footType: devCase.get('type') };
 // WP18: &shape=flat draws the template foot; &shape=max the most different pair D78 allows.
 if (freePlay && devCase.has('shape')) caseDef = { ...caseDef, shape: devShape(devCase.get('shape'), caseDef) };
 function devShape(v, cd) {
