@@ -1107,3 +1107,32 @@ From Ben, 2026-10-16: "hooves are different shapes and sizes." The references ag
 **D74 built (2026-10-19):** src/coat.js holds a coat per breed and a draw scale per frame (small 0.86, large 1.1). The walk-off cow (walkoff.js `coatTexture`, `head`) and the walk-in sketch (stance.js) both read it. A Holstein is red and white one time in eight, from her seed. Beef and bull bodies wait for those cows.
 
 **Ben's answers (2026-10-19):** defaults on all of D68–D76. Ready to build in the D76 order, starting with size data, the intro line and the toe line. Check the small-cow 7.0 cm figure against a reference first.
+
+## WP18: claws that aren't the same shape (D75; scoped 2026-10-19 at `d1efc70`)
+Ben asked for D75 on 2026-10-19, before D68–D74 had been played (they aren't pushed yet). D75's own default said to wait for that play. This is the scope. Build after Ben answers D77–D83.
+
+**What the references add (Shearer pp. 11, 27–28, step 1):**
+- **The two claws aren't twins.** The inner hind claw is "the more normal claw", used as the model for the overgrown outer one. The game mirrors one outline, and the claws differ only in horn height (`excess`, case.js:191).
+- **Corkscrew claw** is hereditary and mostly hits the hind outer claw. The outside wall curls under the sole and carries weight. The toe rises and rotates, the inside wall folds at the toe, and the heel is overgrown, "nearly always higher" than the other claw's. The trim: straighten the front wall and stop at blood. Take out the curl and fold. Set the toe to 10 cm, then come down 6 mm at a time to 8.25 cm unless it bleeds. Balance with the other claw, and *don't* lower that claw's heel. The commonest mistake is over-trimming the outside sole near the toe, which often ends with a block on the other claw.
+- **Acquired toe-out** of the front inner claws comes from reaching forward at a feed bunk and is "unknown in pastured cattle."
+
+**The engineering choice: warp one outline per claw instead of drawing new outlines.** Each claw gets a shape `{ width, toe, curl, heel }`, with a forward map (template → screen) and its inverse. The sim grid tests each cell's *template* position against `GEOM`, so the 78 `GEOM` uses and the ten placement bands in conditions.js stay as written. `clawPolygon`/`clawSpan`/`clawBox`/`toeLine`/`dishRect` (about 60 call sites) take the shape and warp what they return. Lesions are placed in template coordinates and warped when stamped. The default shape is the identity, so every existing test stays green until a cow gets a shape.
+- **The hard parts:** (1) hoofart.js (1.9k lines) draws from `clawPolygon` but also from fixed y values (the heel shading at 330/200), and those need the inverse map. (2) A corkscrew isn't just a warped outline: the outer wall moves *onto* the sole as a band of weight-bearing wall, which is a new zone shape, not a stretch. (3) The camera framing (D69) has to fit the widest claw.
+
+**Packages:**
+- **18.1 Warp plumbing, identity default.** No visible change. Test: an identity shape gives a byte-identical grid and art.
+- **18.2 Ordinary variation.** The overgrown claw (hind outer, front inner) is a bit wider and longer than its partner. Seeded jitter per cow on width, toe and heel. Art lab `&shape=`. Nothing new to score: the toe line, dish and heel all follow the warp, so the player reads each foot instead of memorising screen positions.
+- **18.3 Corkscrew claw** as a condition and a farm trait. Read card, probe text, field-guide entry, Shearer's trim as the rule, and the two traps (outside sole near the toe, the other claw's heel) as scoring.
+- **18.4 Acquired toe-out on front feet**, on bunk-fed farms only (D82).
+
+| # | Decision | Default (recommended) |
+|---|---|---|
+| D77 | Build now, or wait for D68–D74 in play? | **Push D68–D74 now so the playtester has them, and build 18.1–18.2 in parallel.** 18.1 is invisible and 18.2 is cosmetic-plus, so neither depends on how size plays. Hold 18.3 until there's a play report on size. |
+| D78 | How much ordinary variation? | **Modest.** The overgrown claw is about 5% wider with a toe about 4 mm longer. Per-cow jitter is ±5% width and ±3 mm toe. Visible side by side, never a different rule. |
+| D79 | Does the camera reframe for wide claws? | **No.** Keep D69's fixed framing. Cap the warp so the widest claw still fits the current margins (about +8% width at most). |
+| D80 | Corkscrew: where and how often? | **A farm trait on Greystone** (big Holsteins: a sire line), about 1 cow in 6 there and 1 in 40 elsewhere. Always the hind outer claw, often on both hind feet. |
+| D81 | Corkscrew: what counts as a good trim? | **Shearer's procedure.** Nip the curl and the inside-wall fold. Her toe target is 8.25 cm, not her frame's. The outside sole near the toe is a thin-sole trap (pink, then blood). Lowering the *other* claw's heel is a Balance fault. Blood there means a block on the other claw. Not "fixed": she comes back on the calendar (WP15) like an ulcer. |
+| D82 | Acquired toe-out of front inner claws | **Shape only, no new condition:** a stronger 18.2 curl on front inner claws at bunk-fed farms, never at the grazing farm (Hollins). Only if front feet come up often enough to be seen; otherwise drop it. |
+| D83 | An odd claw enlarged by an old pedal-bone injury (Nate lives #12) | **Not taken**, as in WP15 ("a bigger pedal bone ... not taken"). 18.2 makes it a one-line case later if wanted. |
+
+**Ben's answers (2026-10-19):** defaults on all of D77–D83. D68–D74 pushed; building 18.1–18.2 now, corkscrew (18.3) held for a play report on size.
