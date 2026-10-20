@@ -19,11 +19,14 @@ const KINDS = {
 export class Particles {
   constructor() {
     this.list = [];
+    // Spawn points come off the template foot; map(x, y) puts them where it's drawn (WP18).
+    this.map = null;
   }
 
   // `dir` optionally throws the particles along a velocity (e.g. grinder dust, spray).
   spawn(kind, x, y, color, count = 1, dir = null) {
     const k = KINDS[kind];
+    if (this.map) ({ x, y } = this.map(x, y));
     for (let n = 0; n < count; n++) {
       if (this.list.length > 900) this.list.shift();
       const life = R(...k.life);

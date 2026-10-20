@@ -2,7 +2,7 @@
 // title → route → visit → intro → play → (failing → fail) | (walkoff → results) → … → day → route
 
 import { CFG, touchAngle, tolOf } from './config.js';
-import { Hoof, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
+import { Hoof, CLAW, CLAW_NAME, LOOSE, lesionSpot } from './hoof.js';
 import { CASE_A, apprenticeLeft, dealCase, makeCase, temperament, readOptions, cowName, tagAndLimb } from './case.js';
 import { TOOLS, TOOL_ORDER, applyStroke, applyFlick, applyGrind, applyBite, applySpray, applyWrap, applyPry } from './tools.js';
 import { startStroke, strokeMove, strokeTick, strokeEnd } from './stroke.js';
@@ -12,6 +12,7 @@ import { CALLS, CONDITIONS } from './conditions.js';
 import { Renderer } from './render.js';
 import { paintScenery } from './scenery.js';
 import { fitCamera, toScene } from './view.js';
+import { toTemplate, toView } from './shape.js';
 import { Particles } from './particles.js';
 import { Sound, buzz } from './audio.js';
 import { Walkoff } from './walkoff.js';
@@ -47,6 +48,13 @@ function devMods() {
 }
 const freePlay = devCase.has('cond');
 let caseDef = freePlay ? makeCase(devCase.get('cond'), +(devCase.get('seed') ?? 1), devMods()) : CASE_A;
+// WP18: &shape=flat draws the template foot; &shape=max the most different pair D78 allows.
+if (freePlay && devCase.has('shape')) caseDef = { ...caseDef, shape: devShape(devCase.get('shape'), caseDef) };
+function devShape(v, cd) {
+  if (v !== 'max') return 'flat';
+  const big = cd.foot === 'front' ? CLAW.INNER : CLAW.OUTER;
+  return { [big]: { w: 1.06, toeMm: 7, lean: 5 }, [big === CLAW.OUTER ? CLAW.INNER : CLAW.OUTER]: { w: 0.95, toeMm: -3, lean: 0 } };
+}
 // The trimmer's round (route.js), saved on this device after each cow (save.js).
 const route = loadRound();
 // Free play never touches the round: a saved day in progress waits for the next normal launch.
@@ -218,6 +226,8 @@ function newCase() {
   // On the route the tier sets the guides and the band (WP7.6); free play keeps your chip.
   renderer.tol = tolOf(caseDef);
   renderer.caseDef = caseDef;
+  const cow = caseDef;
+  particles.map = (x, y) => toView(cow, x, y);
   game.guideMode = route.visit ? tierFor(route.rep).guides : null;
   if (game.guideMode) setGuides(game.guideMode === 'on');
   renderer.toeGuide = !game.guideMode || game.guideMode === 'on';
@@ -347,13 +357,14 @@ function selectTool(id) {
 
 // Pointer → logical working point. A finger holds the handle, so for touch the working
 // point is the tool tip, offset up-left of the finger (CFG.touch); the sprite is drawn back to it.
+// The point is on the template foot: her claws' shapes (WP18) are undone here.
 function toLogical(e) {
   const r = canvas.getBoundingClientRect();
   const touch = e.pointerType === 'touch' && !CFG.touch.direct.includes(game.tool);
   const cam = renderer.cam, angle = touchAngle();
   const grip = touch ? CFG.touch.grip / cam.scale : 0; // CSS px → logical at this zoom
   const p = toScene(cam, e.clientX - r.left, e.clientY - r.top);
-  return { x: p.x - grip * Math.cos(angle), y: p.y - grip * Math.sin(angle), touch };
+  return { ...toTemplate(caseDef, p.x - grip * Math.cos(angle), p.y - grip * Math.sin(angle)), touch };
 }
 
 canvas.addEventListener('pointerdown', (e) => {

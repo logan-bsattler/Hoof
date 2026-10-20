@@ -8,6 +8,7 @@ import { HoofArt } from './hoofart.js';
 import { paintScenery, drawStrap, shadowSprite } from './scenery.js';
 import { fitCamera } from './view.js';
 import { levelRead } from './steps.js';
+import { warpHalves, toView } from './shape.js';
 import {
   drawKnife, drawGrinder, drawBrush, drawNippers, drawRasp, drawTesters, drawSpray,
   drawWrapRoll, drawBlock, drawPad, drawWrap, roundRect,
@@ -162,23 +163,46 @@ export class Renderer {
     return this.next.prepareFor(hoof, ms);
   }
 
+  // Draw template-coord work (the foot and everything on it) through her claws' shapes (WP18):
+  // each half of the screen with its own claw's transform, clipped at the centre line.
+  warped(cd, fn) {
+    const halves = warpHalves(cd);
+    if (!halves) return fn();
+    const c = this.ctx;
+    for (const { s, m } of halves) {
+      c.save();
+      c.beginPath();
+      c.rect(s > 0 ? GEOM.midX : GEOM.midX - 4 * W, -H, 4 * W, 3 * H);
+      c.clip();
+      c.transform(...m);
+      fn();
+      c.restore();
+    }
+  }
+
   hoof(hoof, diagnosed, m) {
     const c = this.ctx;
     this.material(hoof).sync(hoof);
-    // Contact shadows give each claw weight against the chute.
-    const shadows = this.shadows && this.shadowsFor(hoof.side);
-    for (const claw of CLAWS) {
-      const dead = m ? m.claws[claw].deadRemain : 1;
-      if (!shadows) break;
-      this.shadow(shadows[claw], 0.65);
-      if (dead > 0.02) this.shadow(shadows[claw + 2], 0.65 * dead);
-    }
-    this.art.draw(c);
+    this.warped(hoof.caseDef, () => {
+      // Contact shadows give each claw weight against the chute.
+      const shadows = this.shadows && this.shadowsFor(hoof.side);
+      for (const claw of CLAWS) {
+        const dead = m ? m.claws[claw].deadRemain : 1;
+        if (!shadows) break;
+        this.shadow(shadows[claw], 0.65);
+        if (dead > 0.02) this.shadow(shadows[claw + 2], 0.65 * dead);
+      }
+      this.art.draw(c);
+    });
     drawStrap(c);
+    if (diagnosed) this.warped(hoof.caseDef, () => this.markers(hoof));
+  }
 
-    // Colour-blind-safe lesion marker once it's been diagnosed.
-    // One per lesion (both claws on a J3 pair), until its claw is padded.
-    if (diagnosed) for (const L of hoof.lesions()) {
+  // Colour-blind-safe lesion marker once it's been diagnosed.
+  // One per lesion (both claws on a J3 pair), until its claw is padded.
+  markers(hoof) {
+    const c = this.ctx;
+    for (const L of hoof.lesions()) {
       if (hoof.wrappedOn(L.claw) >= 1) continue;
       c.save();
       c.setLineDash([4, 3]);
@@ -223,7 +247,10 @@ export class Renderer {
 
   // Guided run: a pulsing brass outline around where to work, plus a progress arc on rings.
   coach(target, progress, time) {
-    if (!target) return;
+    if (target) this.warped(this.caseDef, () => this.coachTarget(target, progress, time));
+  }
+
+  coachTarget(target, progress, time) {
     const c = this.ctx;
     const pulse = 0.55 + 0.45 * Math.sin(time * 4);
     c.save();
@@ -268,7 +295,9 @@ export class Renderer {
   // Choose the guides for the current step (an id from STEPS, or null when all are done).
   setGuides(stepId) { this.guideOn = new Set(GUIDE_SETS[stepId] ?? []); }
 
-  guides(hoof) {
+  guides(hoof) { this.warped(hoof.caseDef, () => this.guideLines(hoof)); }
+
+  guideLines(hoof) {
     const c = this.ctx;
     const side = hoof.side;
     const A = this.guideAlpha;
@@ -339,7 +368,9 @@ export class Renderer {
   }
 
   // ghostKind: which block the aim ghost shows (the one in hand, not yet glued).
-  block(hoof, ghostClaw = 0, ghostKind = 'rubber') {
+  block(hoof, ghostClaw = 0, ghostKind = 'rubber') { this.warped(hoof.caseDef, () => this.blocks(hoof, ghostClaw, ghostKind)); }
+
+  blocks(hoof, ghostClaw, ghostKind) {
     const c = this.ctx;
     const press = Math.min(1, (this.time - this.placed.block) / 0.25);
     // Last visit's block, still on (J2): already pressed home, worn, and loosening with each tap.
@@ -355,7 +386,9 @@ export class Renderer {
   }
 
   // Pad and pink wrap over the treated claw (plus a ghost pad while aiming).
-  dressing(hoof, ghostClaw = 0) {
+  dressing(hoof, ghostClaw = 0) { this.warped(hoof.caseDef, () => this.dressings(hoof, ghostClaw)); }
+
+  dressings(hoof, ghostClaw) {
     const c = this.ctx;
     const L = hoof.caseDef.lesion;
     if (!L) return;
@@ -385,13 +418,15 @@ export class Renderer {
     if (claw) this.placed[what + claw] = this.time;
   }
 
+  // Under each claw, on a fixed line: a long toe (WP18) moves the label across, not down.
   labels(hoof) {
     const c = this.ctx;
     c.save();
     const fs = this.font(12, true);
     c.textAlign = 'center';
     for (const claw of CLAWS) {
-      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, clawBox(claw, hoof.side).cx, 652, 'rgba(241,231,208,0.9)', fs);
+      const box = clawBox(claw, hoof.side);
+      label(c, `${claw === CLAW.OUTER ? 'OUTER' : 'INNER'} claw`, toView(hoof.caseDef, box.cx, box.cy).x, 652, 'rgba(241,231,208,0.9)', fs);
     }
     c.restore();
   }
@@ -530,8 +565,10 @@ export class Renderer {
     }
   }
 
-  cursor(tool, ptr, hoof, guides, time) {
-    if (!ptr.over && !ptr.down) return;
+  // `ptr` is on the template foot (WP18): the tool is drawn where that point shows on screen.
+  cursor(tool, at, hoof, guides, time) {
+    if (!at.over && !at.down) return;
+    const ptr = { ...at, ...toView(hoof.caseDef, at.x, at.y) };
     const c = this.ctx;
     const r = toolRadius(tool);
     const f = this.fx;
@@ -563,7 +600,7 @@ export class Renderer {
 
     // Thickness readout: the trimmer's gauge.
     if (guides && !['block', 'brush', 'spray', 'wrap'].includes(tool)) {
-      const i = hoof.cellAt(ptr.x, ptr.y);
+      const i = hoof.cellAt(at.x, at.y);
       if (i >= 0 && (hoof.zone[i] & Z.LIVE) && !(hoof.zone[i] & Z.ULCER)) {
         const t = hoof.thick[i];
         const tgt = hoof.zoneTarget(i);
